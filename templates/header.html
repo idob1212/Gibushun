@@ -38,7 +38,7 @@
   <!-- Navigation -->
   <nav class="navbar navbar-expand-md navbar-light fixed-top" id="mainNav">
     <div class="container-fluid">
-      <a class="navbar-brand" href="{{url_for('get_all_posts')}}">B.I. DATA</a>
+      <a class="navbar-brand" href="{{url_for('home')}}">גיבושים</a>
     <button class="navbar-toggler" style="margin-right:5px; float: right; !important;" type="button" data-bs-toggle="collapse" data-bs-target="#navbarResponsive">
                 <span class="navbar-toggler-icon"></span>
               </button>
@@ -65,8 +65,20 @@
               <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('add_new_review') }}">חוות דעת</a>
               </li>
+              <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('showPhysicalReviews') }}">סיכום פיזי</a>
+              </li>
+              <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('showStationReviews') }}">דירוג לפי תחנה</a>
+              </li>
+              <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('showODTReviews') }}">ODT ציוני </a>
+              </li>
+              <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('addCandidate') }}">הוסף מגובש</a>
+              </li>
                <li class="nav-item">
-                    <a class="nav-link" href="{{ url_for('get_all_posts') }}">בית</a>
+                    <a class="nav-link" href="{{ url_for('home') }}">בית</a>
                 </li>
             {% else %}
 
@@ -74,11 +86,11 @@
             <a class="nav-link" href="{{ url_for('login') }}">התחבר</a>
             </li>
             <li class="nav-item">
-            <a class="nav-link" href="{{ url_for('get_all_posts') }}">בית</a>
+            <a class="nav-link" href="{{ url_for('home') }}">בית</a>
           </li>
-{#               <li class="nav-item">#}
-{#                <a class="nav-link" href="{{ url_for('register') }}">הוסף משתמש</a>#}
-{#            </li>#}
+               <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('register') }}">הוסף משתמש</a>
+            </li>
           {% endif %}
         </ul>
       </div>
