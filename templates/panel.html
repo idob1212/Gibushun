@@ -29,6 +29,18 @@
     .table{
         float: right;
     }
+    td {
+    border: 1px solid #000;
+}
+    th{
+        text-align: right;
+    }
+
+tr td {
+    width: 1%;
+    white-space: nowrap;
+    text-align: right;
+}
 </style>
       <div class="col-lg-8 col-md-10 mx-auto content" style="direction: rtl; float: right">
       {% with messages = get_flashed_messages() %}
@@ -42,50 +54,26 @@
 <table class = "table table-striped" style="width:100%; direction: rtl;">
     <thead>
     <tr>
-        <th>מספר אישי</th>
-        <th>סיסמה</th>
+        <th>מספר</th>
         <th>שם</th>
-        <th>סטטוס</th>
-        <th>כשירות</th>
-        <th>כשירות סיוע</th>
-        <th>מדר"ט</th>
-        <th>סטטוס הסמכה</th>
-        <th>שעות טיסה מבצעיות</th>
-        <th>יעד שעות טיסה מבצעיות</th>
-        <th>שעות טיסה אימון</th>
-        <th>יעד שעות טיסה אימון</th>
-        <th>שעות טיסה הדרכה</th>
-        <th>כוננות 15' אחרונה</th>
-        <th>תאריך טיסה אחרונה</th>
-        <th>מאמן</th>
-        <th>עריכה</th>
-        <th>מחק</th>
     </tr>
     </thead>
     <tbody>
-        {% for user in users %}
-            {% if user.id != 1 %}
+        {% for candidate in candidates %}
+
     <tr>
-        <td>{{ user.id }}</td>
-        <td>{{ user.password }}</td>
-        <td>{{ user.name }}</td>
-        <td>{{ user.status }}</td>
-        <td>{{ user.qualified }}</td>
-        <td>{{ user.qualified_assist }}</td>
-        <td>{{ user.madrat }}</td>
-        <td>{{ user.qualified_status }}</td>
-        <td>{{ user.op_flight_time }}</td>
-        <td>{{ user.op_flight_time_goal }}</td>
-        <td>{{ user.tr_flight_time }}</td>
-        <td>{{ user.tr_flight_time_goal }}</td>
-        <td>{{ user.guide_flight_time }}</td>
-        <td>{{ user.last_15_date }}</td>
-        <td>{{ user.last_flight_date }}</td>
-        <td>{{ user.coach }}</td>
-        <td><a href="{{url_for('edit_user', user_id=user.id) }}" style="color:red">ערוך</a></td>
-        <td><a href="{{url_for('delete_post', user_id=user.id) }}">✘</a></td>
+        {%  if candidate.status != "פרש" %}
+            <td>{{ candidate.id.split("/")[1] }}</td>
+        {% else %}
+            <td style="color:red">{{ candidate.id.split("/")[1] }}</td>
+        {% endif %}
+        <td>{{ candidate.name }}</td>
+        {%   if candidate.status != "פרש" %}
+        <td><a href="{{url_for('delete_candidate', candidate_id=candidate.id.split("/")[1]) }}">פרש</a></td>
+            {% else %}
+        <td><a href="{{url_for('return_candidate', candidate_id= candidate.id.split("**")[0].split("/")[1]) }}">הפוך לפעיל</a></td>
+        {% endif %}
     </tr>
-            {% endif %}
         {% endfor %}
     </tbody>
 </table>

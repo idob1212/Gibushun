@@ -63,7 +63,7 @@
                 <a class="nav-link" href="{{ url_for('logout') }}">התנתק</a>
             </li>
               <li class="nav-item">
-                    <a class="nav-link" href="{{ url_for('add_new_review') }}">חוות דעת</a>
+                    <a class="nav-link" href="{{ url_for('add_new_review') }}">הזן ציונים</a>
               </li>
               <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('showPhysicalReviews') }}">סיכום פיזי</a>
@@ -72,10 +72,19 @@
                     <a class="nav-link" href="{{ url_for('showStationReviews') }}">דירוג לפי תחנה</a>
               </li>
               <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('AddStatus') }}">הזן חוות דעת </a>
+              </li>
+              <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('showODTReviews') }}">ODT ציוני </a>
               </li>
               <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('addCandidate') }}">הוסף מגובש</a>
+              </li>
+              <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('manageCandidates') }}">ניהול קבוצה</a>
+              </li>
+              <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('showCandidate') }}">הקבוצה שלי</a>
               </li>
                <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('home') }}">בית</a>
