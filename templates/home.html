@@ -5,13 +5,15 @@
 {% include "header.html" %}
 
   <!-- Page Header -->
-  <header class="masthead" style="background-image: url('https://images.unsplash.com/photo-1484100356142-db6ab6244067?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=800&q=80')">
+  <header class="masthead" style="background-image: url('https://www.srugim.co.il/wp-content/uploads/2020/07/%D7%90%D7%99%D7%9E%D7%95%D7%9F-%D7%A6%D7%94%D7%9C-%D7%99%D7%97%D7%99%D7%93%D7%AA-%D7%A8%D7%A4%D7%90%D7%99%D7%9D-%D7%93%D7%95%D7%A6-3.jpeg')">
     <div class="overlay"></div>
     <div class="container">
       <div class="row">
         <div class="col-lg-8 col-md-10 mx-auto">
           <div class="page-heading">
             <h1> שלום {{ current_user.name }}</h1>
+            <span class="subheading" style="direction: rtl">מגבש קבוצה מס'  {{ current_user.id }} </span>
+
           </div>
         </div>
       </div>
@@ -54,22 +56,30 @@
         <th>ממוצע פיזי</th>
         <th>ממוצע כללי</th>
         <th>סטטוס סיכום</th>
+        <th>הערת סיכום</th>
     </tr>
     </thead>
     <tbody>
     {% if candidates %}
         {% for index, candidate in candidates %}
+            {% if candidate.status != "פרש" %}
     <tr>
         <td>{{ candidate.id.split('/')[1] }}</td>
         <td>{{ candidate.name }}</td>
         <td>{{ tiz_avg[index] }}</td>
         <td>{{ total_avg[index] }}</td>
         {% if candidate.final_status == None  %}
-            <td> להתאבד </td>
+            <td> לא הוזן </td>
         {% else %}
-            <td>בלית ברירה</td>
+            <td> {{ candidate.final_status }} </td>
+        {% endif %}
+        {% if candidate.final_note == None  %}
+            <td> לא הוזן </td>
+        {% else %}
+            <td> {{ candidate.final_note }} </td>
         {% endif %}
     </tr>
+            {% endif %}
         {% endfor %}
     {% endif %}
     </tbody>

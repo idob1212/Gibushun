@@ -8,8 +8,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import relationship
 from flask_login import UserMixin, login_user, LoginManager, login_required, current_user, logout_user
-from forms import LoginForm, RegisterForm, CreateReviewForm, EditUserForm, Search_review, EditReviewForm, \
-    UpdateDateForm, NewCandidateForm, SelectPhysicalReviewsForm, ShowStaionForm, selectCandidate
+from forms import LoginForm, RegisterForm, CreateReviewForm, EditUserForm, Search_review, EditReviewForm, UpdateDateForm, NewCandidateForm, SelectPhysicalReviewsForm, ShowStaionForm, selectCandidate, AddFinalStatusForm
 from flask_gravatar import Gravatar
 import sys
 import logging
@@ -62,6 +61,8 @@ class Candidate(db.Model):
     group = relationship("User", back_populates="candidates")
     name = db.Column(db.String(1000), nullable=False)
     final_status = db.Column(db.String(1000))
+    final_note = db.Column(db.String(1000))
+    status = db.Column(db.String(1000))
     reviews = relationship("Review", back_populates="subject")
 
 class Review(db.Model):
@@ -94,51 +95,38 @@ def home():
         return redirect(url_for("login"))
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     tiz_avgs = []
-    total_avg = []
+    total_avgs = []
     if candidates:
+        update_avgs_nf()
         for candidate in candidates:
-            avg = 0
-            count = 0
-            tiz_avg = 0
-            tiz_count = 0
-            crawl_avg = 0
-            crawl_count = 0
-            sprint_avg = 0
-            sprint_count = 0
-            odt_avg = 0
-            odt_count = 0
-            for review in candidate.reviews:
-                if review.station == "זחילות" or review.station == "ספרינטים" or review.station == "ODT":
-                    if review.station == "זחילות":
-                        crawl_count += 1
-                        crawl_avg += review.grade
-                    if review.station == "ספרינטים":
-                        sprint_count += 1
-                        sprint_avg += review.grade
-                    tiz_avg += review.grade
-                    tiz_count += 1
-                    if review.station == "ODT":
-                        odt_avg += review.grade
-                        odt_count += 1
-                else:
-                    avg += review.grade
-                    count += 1
-            if tiz_count != 0:
-                tiz_avg /= tiz_count
-            if crawl_count != 0:
-                crawl_avg /= crawl_count
-            if sprint_count != 0:
-                sprint_avg /= sprint_count
-            if odt_count != 0:
-                odt_avg /= odt_count
-            avg += crawl_avg + sprint_avg + odt_avg
-            count += 3
-            avg = avg/count
-            tiz_avgs.append(round(tiz_avg,2))
-            total_avg.append(round(avg,2))
-    if candidates:
-        return render_template("home.html", current_user=current_user, candidates = enumerate(candidates), tiz_avg = tiz_avgs, total_avg = total_avg)
-    return render_template("home.html", current_user=current_user, candidates = candidates, tiz_avg = tiz_avgs, total_avg = total_avg)
+            sprint_avg = Review.query.filter_by(subject_id=candidate.id, station="ספרינטים סיכום").first()
+            crawl_avg = Review.query.filter_by(subject_id=candidate.id, station="זחילות סיכום").first()
+            if crawl_avg:
+                crawl_avg = crawl_avg.grade
+            if sprint_avg:
+                sprint_avg = sprint_avg.grade
+            if not sprint_avg and not crawl_avg:
+                tiz_avgs.append(0)
+            elif crawl_avg == 0 or not crawl_avg:
+                tiz_avgs.append(round(sprint_avg,2))
+            elif sprint_avg == 0 or not sprint_avg:
+                tiz_avgs.append(round(crawl_avg,2))
+            else:
+                tiz_avgs.append(round((crawl_avg + sprint_avg) / 2,2))
+            reviews = Review.query.filter_by(subject_id=candidate.id).all()
+            total_count = 0
+            total_sum = 0
+            for review in reviews:
+                if review.station != "זחילות" and review.station != "ספרינטים" and review.station != "ODT":
+                    total_sum += review.grade
+                    total_count += 1
+            if total_count == 0:
+                total_avgs.append(0)
+            else:
+                total_avg = round(total_sum / total_count, 2)
+                total_avgs.append(total_avg)
+        return render_template("home.html", current_user=current_user, candidates = enumerate(candidates), tiz_avg = tiz_avgs, total_avg = total_avgs)
+    return render_template("home.html", current_user=current_user, candidates = candidates)
 
 
 @app.route('/register', methods=["GET", "POST"])
@@ -174,11 +162,11 @@ def register():
 def addCandidate():
     form = NewCandidateForm()
     if form.validate_on_submit():
-        if Candidate.query.filter_by(id=form.id.data, group_id=current_user.id).first():
+        if Candidate.query.filter_by(id=str(current_user.id) + "/" + str(form.id.data), group_id=current_user.id).first():
             # print(User.query.filter_by(id=form.id.data).first())
             #User already exists
             flash("מגובש כבר קיים!")
-            return redirect(url_for('addCandidate'))
+            return render_template("add-candidate.html", current_user=current_user, form=form)
 
         # hash_and_salted_password = generate_password_hash(
         #     form.password.data,
@@ -197,7 +185,7 @@ def addCandidate():
         #     return redirect(url_for('manage'))
         # else:
         return redirect(url_for('addCandidate'))
-    return render_template("register.html", form=form, current_user=current_user)
+    return render_template("add-candidate.html", form=form, current_user=current_user)
 
 @app.route('/login', methods=["GET", "POST"])
 def login():
@@ -225,7 +213,88 @@ def logout():
     return redirect(url_for('home'))
 
 stations = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "ODT", "מעגל זנבות", "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור"]
+def update_avgs_nf():
+    candidates = Candidate.query.filter_by(group_id=current_user.id).all()
+    for candidate in candidates:
+        reviews = Review.query.filter_by(subject_id=candidate.id).all()
+        count = 0
+        avg = 0
+        count = len(Review.query.filter_by(station="ספרינטים", subject_id=candidate.id).all())
+        avg = sum([review.grade for review in reviews if review.station == "ספרינטים"])
+        review = Review.query.filter_by(station="ספרינטים סיכום", subject_id=candidate.id).first()
+        if review and count == 0:
+            db.session.delete(review)
+            db.session.commit()
+        if count != 0 and review:
+            review.grade = avg/count
+            db.session.commit()
 
+        count = 0
+        avg = 0
+        count = len(Review.query.filter_by(station="זחילות", subject_id=candidate.id).all())
+        avg = sum([review.grade for review in reviews if review.station == "זחילות"])
+        review = Review.query.filter_by(station="זחילות סיכום", subject_id=candidate.id).first()
+        if review and count == 0:
+            db.session.delete(review)
+            db.session.commit()
+        if count != 0 and review:
+            review.grade = avg/count
+            db.session.commit()
+
+        count = 0
+        avg = 0
+        count = len(Review.query.filter_by(station="ODT", subject_id=candidate.id).all())
+        avg = sum([review.grade for review in reviews if review.station == "ODT"])
+        review = Review.query.filter_by(station="ODT סיכום", subject_id=candidate.id).first()
+        if review and count == 0:
+            db.session.delete(review)
+            db.session.commit()
+        if count != 0 and review:
+            review.grade = avg/count
+            db.session.commit()
+
+def update_avgs(form):
+    if form.station.data == "ספרינטים":
+        if not Review.query.filter_by(station="ספרינטים סיכום", subject_id=str(current_user.id) + "/" + form.subject.data).first():
+            new_review = Review(station="ספרינטים סיכום",
+                                subject_id=str(current_user.id) + "/" + str(form.subject.data),
+                                grade=form.grade.data, note=form.note.data, author=current_user,
+                                subject=Candidate.query.filter_by(
+                                    id=str(current_user.id) + "/" + str(form.subject.data)).first())
+            db.session.add(new_review)
+            db.session.commit()
+        else:
+            count = len(Review.query.filter_by(station="ספרינטים").all())
+            review = Review.query.filter_by(station="ספרינטים סיכום").first()
+            review.grade = (review.grade * (count - 1) + int(form.grade.data)) / count
+            db.session.commit()
+    if form.station.data == "זחילות":
+        if not Review.query.filter_by(station="זחילות סיכום", subject_id = str(current_user.id) + "/" + form.subject.data).first():
+            new_review = Review(station="זחילות סיכום",
+                                subject_id=str(current_user.id) + "/" + str(form.subject.data),
+                                grade=form.grade.data, note=form.note.data, author=current_user,
+                                subject=Candidate.query.filter_by(
+                                    id=str(current_user.id) + "/" + str(form.subject.data)).first())
+            db.session.add(new_review)
+            db.session.commit()
+        else:
+            count = len(Review.query.filter_by(station="זחילות").all())
+            review = Review.query.filter_by(station="זחילות סיכום", subject_id = str(current_user.id) + "/" + form.subject.data).first()
+            review.grade = (review.grade * (count - 1) + int(form.grade.data)) / count
+            db.session.commit()
+    if form.station.data == "ODT":
+        if not Review.query.filter_by(station="ODT סיכום", subject_id = str(current_user.id) + "/" + form.subject.data).first():
+            new_review = Review(station="ODT סיכום", subject_id=str(current_user.id) + "/" + str(form.subject.data),
+                                grade=form.grade.data, note=form.note.data, author=current_user,
+                                subject=Candidate.query.filter_by(
+                                    id=str(current_user.id) + "/" + str(form.subject.data)).first())
+            db.session.add(new_review)
+            db.session.commit()
+        else:
+            count = len(Review.query.filter_by(station="ODT").all())
+            review = Review.query.filter_by(station="ODT סיכום").first()
+            review.grade = (review.grade * (count - 1) + int(form.grade.data)) / count
+            db.session.commit()
 @app.route("/new-review", methods=["GET", "POST"])
 def add_new_review():
     stations = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "ODT", "מעגל זנבות", "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור"]
@@ -234,7 +303,8 @@ def add_new_review():
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     candidate_nums = []
     for candidate in candidates:
-        candidate_nums.append(candidate.id.split("/")[1])
+        if candidate.status != "פרש":
+            candidate_nums.append(candidate.id.split("/")[1])
     candidate_nums.sort()
     form.subject.choices = candidate_nums
     if form.validate_on_submit():
@@ -248,45 +318,33 @@ def add_new_review():
         )
         db.session.add(new_review)
         db.session.commit()
-        if form.station.data == "ספרינטים":
-            if not Review.query.filter_by(station = "ספרינטים סיכום").first():
-                new_review = Review(station = "ספרינטים סיכום",  subject_id=str(current_user.id) + "/" + str(form.subject.data),grade=form.grade.data,  note=form.note.data,  author=current_user,   subject=Candidate.query.filter_by(id=str(current_user.id) + "/" + str(form.subject.data)).first())
-                db.session.add(new_review)
-                db.session.commit()
-            else:
-                count = len(Review.query.filter_by(station = "ספרינטים").all())
-                review = Review.query.filter_by(station = "ספרינטים סיכום").first()
-                review.grade = (int(form.grade.data) * (count-1) + int(form.grade.data)) / count
-                db.session.commit()
-        if form.station.data == "זחילות":
-            if not Review.query.filter_by(station = "זחילות סיכום").first():
-                new_review = Review(station = "זחילות סיכום",  subject_id=str(current_user.id) + "/" + str(form.subject.data),grade=form.grade.data,  note=form.note.data,  author=current_user,   subject=Candidate.query.filter_by(id=str(current_user.id) + "/" + str(form.subject.data)).first())
-                db.session.add(new_review)
-                db.session.commit()
-            else:
-                count = len(Review.query.filter_by(station = "זחילות").all())
-                review = Review.query.filter_by(station = "זחילות סיכום").first()
-                review.grade = (form.grade.data * (count-1) + form.grade.data) / count
-                db.session.commit()
-        if form.station.data == "ODT":
-            if not Review.query.filter_by(station = "ODT סיכום").first():
-                new_review = Review(station = "ODT סיכום",  subject_id=str(current_user.id) + "/" + str(form.subject.data),grade=form.grade.data,  note=form.note.data,  author=current_user,   subject=Candidate.query.filter_by(id=str(current_user.id) + "/" + str(form.subject.data)).first())
-                db.session.add(new_review)
-                db.session.commit()
-            else:
-                count = len(Review.query.filter_by(station = "ODT").all())
-                review = Review.query.filter_by(station = "ODT סיכום").first()
-                review.grade = (form.grade.data * (count-1) + form.grade.data) / count
-                db.session.commit()
+        update_avgs(form)
         return redirect(url_for("home"))
     return render_template("make-post.html", form=form, current_user=current_user)
 
 
-@app.route('/panel')
-@admin_only
-def manage():
-    users = User.query.all()
-    return render_template('panel.html', users=users)
+@app.route('/group-manage', methods=["GET", "POST"])
+def manageCandidates():
+    candidates = Candidate.query.filter_by(group_id=current_user.id).all()
+    return render_template('panel.html', candidates=candidates)
+@app.route("/delete-candidate/<candidate_id>")
+def delete_candidate(candidate_id):
+    user_to_delete = Candidate.query.get(str(current_user.id) + "/" + candidate_id)
+    user_to_delete.id += "**"
+    user_to_delete.status = "פרש"
+    db.session.commit()
+    update_avgs_nf()
+    return redirect(url_for('manageCandidates'))
+
+@app.route("/return/<candidate_id>")
+def return_candidate(candidate_id):
+    user_to_return = Candidate.query.get(str(current_user.id) +"/" + candidate_id+"**")
+    user_to_return.id = user_to_return.id.split("**")[0]
+    user_to_return.status = ""
+    db.session.commit()
+    update_avgs_nf()
+    return redirect(url_for('manageCandidates'))
+
 
 @app.route("/edit-user/<int:user_id>", methods=["GET", "POST"])
 @admin_only
@@ -332,6 +390,7 @@ def delete_post(user_id):
     user_to_delete = User.query.get(user_id)
     db.session.delete(user_to_delete)
     db.session.commit()
+    update_avgs_nf()
     return redirect(url_for('home'))
 
 @app.route('/reviews-finder', methods=["GET", "POST"])
@@ -369,7 +428,8 @@ def showPhysicalReviews():
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     candidate_nums = []
     for candidate in candidates:
-        candidate_nums.append(candidate.id.split("/")[1])
+        if candidate.status != "פרש":
+            candidate_nums.append(candidate.id.split("/")[1])
     candidate_nums.sort()
     form.subject.choices = candidate_nums
     if form.validate_on_submit():
@@ -378,7 +438,8 @@ def showPhysicalReviews():
         candidates = Candidate.query.filter_by(group_id=current_user.id).all()
         candidate_nums = []
         for candidate in candidates:
-            candidate_nums.append(candidate.id.split("/")[1])
+            if candidate.status != "פרש":
+                candidate_nums.append(candidate.id.split("/")[1])
         candidate_nums.sort()
         form.subject.choices = candidate_nums
         candidate = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(form.subject.data)).first()
@@ -396,7 +457,8 @@ def showODTReviews():
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     candidate_nums = []
     for candidate in candidates:
-        candidate_nums.append(candidate.id.split("/")[1])
+        if candidate.status != "פרש":
+            candidate_nums.append(candidate.id.split("/")[1])
     candidate_nums.sort()
     form.id.choices = candidate_nums
     if form.validate_on_submit():
@@ -404,13 +466,58 @@ def showODTReviews():
         candidates = Candidate.query.filter_by(group_id=current_user.id).all()
         candidate_nums = []
         for candidate in candidates:
-            candidate_nums.append(candidate.id.split("/")[1])
+            if candidate.status != "פרש":
+                candidate_nums.append(candidate.id.split("/")[1])
         candidate_nums.sort()
         form.id.choices = candidate_nums
         candidate = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(form.id.data)).first()
         reviews = Review.query.filter_by(subject_id=candidate.id, station = "ODT").all()
         return render_template('ODT-sum.html', reviews=reviews, candidate_id=candidate.id.split("/")[1], form=form)
     return render_template('ODT-sum.html', form=form)
+
+@app.route("/candidates/", methods=["GET", "POST"])
+def showCandidate():
+    form = selectCandidate()
+    candidates = Candidate.query.filter_by(group_id=current_user.id).all()
+    candidate_nums = []
+    for candidate in candidates:
+        if candidate.status != "פרש":
+            candidate_nums.append(candidate.id.split("/")[1])
+    candidate_nums.sort()
+    form.id.choices = candidate_nums
+    if form.validate_on_submit():
+        form = selectCandidate()
+        candidates = Candidate.query.filter_by(group_id=current_user.id).all()
+        candidate_nums = []
+        for candidate in candidates:
+            if candidate.status != "פרש":
+                candidate_nums.append(candidate.id.split("/")[1])
+        candidate_nums.sort()
+        form.id.choices = candidate_nums
+        candidate = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(form.id.data)).first()
+        reviews = Review.query.filter_by(subject_id=candidate.id).all()
+        clean_reviews = [review for review in reviews if review.station != "ספרינטים" and review.station !=  "זחילות" and review.station != "ODT"]
+        return render_template('candidate.html', reviews=clean_reviews, candidate_id=candidate.id.split("/")[1], form=form)
+    return render_template('candidate.html', form=form)
+
+@app.route("/final-status/", methods=["GET", "POST"])
+def AddStatus():
+    form = AddFinalStatusForm()
+    candidates = Candidate.query.filter_by(group_id=current_user.id).all()
+    candidate_nums = []
+    for candidate in candidates:
+        if candidate.status != "פרש":
+            candidate_nums.append(candidate.id.split("/")[1])
+    candidate_nums.sort()
+    form.id.choices = candidate_nums
+    form.final_status.choices = ["לא לגעת - קו אדום", "בלית ברירה", "כן, אבל", "להתאבד"]
+    if form.validate_on_submit():
+        candidate = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(form.id.data)).first()
+        candidate.final_status = form.final_status.data
+        candidate.final_note = form.final_note.data
+        db.session.commit()
+        return redirect(url_for('AddStatus'))
+    return render_template('add-status.html', form=form)
 
 @app.route("/station-reviews/", methods=["GET", "POST"])
 def showStationReviews():
@@ -423,39 +530,107 @@ def showStationReviews():
         reviews.sort(key=lambda x: x.grade)
         if(form.station.data == "זחילות" or form.station.data == "ספרינטים" or form.station.data == "ODT"):
             reviews = Review.query.filter_by(author_id=current_user.id, station=form.station.data + " סיכום").all()
-            reviews.sort(key=lambda x: x.grade)
+            reviews.sort(key=lambda x: x.grade * -1)
         return render_template('rankings.html', reviews=reviews, form=form)
     return render_template('rankings.html', form=form)
 
 @app.route("/edit-review/<int:review_id>", methods=["GET", "POST"])
-@admin_only
 def edit_review(review_id):
+    stations = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "ODT", "מעגל זנבות",
+                "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור"]
     review = Review.query.get(review_id)
-    id = User.query.filter_by(name=review.subject).first().id
-    edit_form = EditReviewForm(
-        keep_pts=review.keep_pts,
-        improve_pts=review.improve_pts,
-        op_level=review.op_level,
-        co_op_level=review.co_op_level
-    )
-    if edit_form.validate_on_submit():
-        review.keep_pts = edit_form.keep_pts.data
-        review.improve_pts = edit_form.improve_pts.data
-        review.op_level = edit_form.op_level.data
-        review.co_op_level = edit_form.co_op_level.data
+    candidates = Candidate.query.filter_by(group_id=current_user.id).all()
+    candidate_nums = []
+    for candidate in candidates:
+        if candidate.status != "פרש":
+            candidate_nums.append(candidate.id.split("/")[1])
+    candidate_nums.sort()
+    form = CreateReviewForm(station=review.station, grade=review.grade, note=review.note, subject=review.subject_id.split("/")[1] )
+    form.subject.choices = candidate_nums
+    form.station.choices = stations
+    if form.validate_on_submit():
+        review.station = form.station.data
+        review.subject_id = str(current_user.id) + "/" + str(form.subject.data)
+        review.grade = form.grade.data
+        review.note = form.note.data
         db.session.commit()
-        return redirect(url_for("search_reviews"))
-    return render_template("make-post.html", form=edit_form, is_edit=True, current_user=current_user)
+        update_avgs(form)
+        return redirect(url_for("showCandidate"))
+    return render_template("make-post.html", form=form, current_user=current_user)
+
+@app.route("/edit-physical-review/<int:review_id>", methods=["GET", "POST"])
+def edit_physical_review(review_id):
+    stations = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "ODT", "מעגל זנבות",
+                "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור"]
+    review = Review.query.get(review_id)
+    candidates = Candidate.query.filter_by(group_id=current_user.id).all()
+    candidate_nums = []
+    for candidate in candidates:
+        if candidate.status != "פרש":
+            candidate_nums.append(candidate.id.split("/")[1])
+    candidate_nums.sort()
+    form = CreateReviewForm(station=review.station, grade=review.grade, note=review.note, subject=review.subject_id.split("/")[1] )
+    form.subject.choices = candidate_nums
+    form.station.choices = stations
+    if form.validate_on_submit():
+        review.station = form.station.data
+        review.subject_id = str(current_user.id) + "/" + str(form.subject.data)
+        review.grade = form.grade.data
+        review.note = form.note.data
+        db.session.commit()
+        update_avgs(form)
+        return redirect(url_for("showPhysicalReviews"))
+    return render_template("make-post.html", form=form, current_user=current_user)
+
+@app.route("/edit-odt-review/<int:review_id>", methods=["GET", "POST"])
+def edit_odt_review(review_id):
+    stations = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "ODT", "מעגל זנבות",
+                "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור"]
+    review = Review.query.get(review_id)
+    candidates = Candidate.query.filter_by(group_id=current_user.id).all()
+    candidate_nums = []
+    for candidate in candidates:
+        if candidate.status != "פרש":
+            candidate_nums.append(candidate.id.split("/")[1])
+    candidate_nums.sort()
+    form = CreateReviewForm(station=review.station, grade=review.grade, note=review.note, subject=review.subject_id.split("/")[1] )
+    form.subject.choices = candidate_nums
+    form.station.choices = stations
+    if form.validate_on_submit():
+        review.station = form.station.data
+        review.subject_id = str(current_user.id) + "/" + str(form.subject.data)
+        review.grade = form.grade.data
+        review.note = form.note.data
+        db.session.commit()
+        update_avgs(form)
+        return redirect(url_for("showODTReviews"))
+    return render_template("make-post.html", form=form, current_user=current_user)
 
 
 @app.route("/delete-review/<int:review_id>")
-@admin_only
 def delete_review(review_id):
     review_to_delete = Review.query.get(review_id)
-    id = User.query.filter_by(name=review_to_delete.subject).first().id
     db.session.delete(review_to_delete)
     db.session.commit()
-    return redirect(url_for("search_reviews"))
+    update_avgs_nf()
+    return redirect(url_for("showCandidate"))
+
+@app.route("/delete-physical-review/<int:review_id>")
+def delete_physical_review(review_id):
+    review_to_delete = Review.query.get(review_id)
+    db.session.delete(review_to_delete)
+    db.session.commit()
+    update_avgs_nf()
+    return redirect(url_for("showPhysicalReviews"))
+
+@app.route("/delete-odt-review/<int:review_id>")
+def delete_odt_review(review_id):
+    review_to_delete = Review.query.get(review_id)
+    db.session.delete(review_to_delete)
+    db.session.commit()
+    update_avgs_nf()
+    return redirect(url_for("showODTReviews"))
+
 
 
 @app.route("/update-date", methods=["GET", "POST"])

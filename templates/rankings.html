@@ -71,7 +71,7 @@ th{
 </style>
 {{ wtf.quick_form(form, novalidate=True, button_map={"submit": "primary"}) }}
 {% if reviews %}
-<table class = "table table-striped" style="width:100%; direction: rtl;">
+<table class = "table table-bordered" style="width:100%; direction: rtl;">
     <thead>
     <tr>
         <th>מספר מועמד</th>
@@ -83,11 +83,13 @@ th{
     </thead>
     <tbody>
         {% for review in reviews %}
+            {% if review.subject.status != "פרש" %}
     <tr>
         <td class="block">{{ review.subject_id.split("/")[1] }}</td>
-        <td class="block">{{ review.grade }}</td>
+        <td class="block">{{ review.grade|round(2) }}</td>
         <td class="block">{{ review.note }}</td>
     </tr>
+            {% endif %}
         {% endfor %}
     </tbody>
 

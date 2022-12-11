@@ -1,0 +1,49 @@
+{#{% extends 'bootstrap/base.html' %}#}
+{% import "bootstrap/wtf.html" as wtf %}
+
+{% block content %}
+{% include "header.html" %}
+  <!-- Page Header -->
+  <header class="masthead" style="background-image: url('{{ url_for('static', filename='img/edit-bg.jpg')}}')">
+    <div class="overlay"></div>
+
+    <div class="container">
+      <div class="row">
+        <div class="col-lg-8 col-md-10 mx-auto">
+          <div class="page-heading">
+            {% if is_edit %}
+{#            <h1>ערוך חוות דעת</h1>#}
+            {% else: %}
+            <h1 style="color: white">הזן נתוני סיכום</h1>
+            {% endif %}
+{#            <span class="subheading" style="direction: rtl; color: white">נשמח לשמוע את דעתך!</span>#}
+          </div>
+        </div>
+      </div>
+    </div>
+      <link href="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" rel="stylesheet">
+    <script src="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js"> </script>
+  </header>
+    <style>
+    label{
+  direction: rtl;
+  float: right;
+}</style>
+  <div class="overlay"></div>
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8 col-md-10 mx-auto", style="direction: rtl; float: right">
+{#        {{ ckeditor.load() }}#}
+{#        {{ ckeditor.config(name='body') }}#}
+        {{ wtf.quick_form(form, novalidate=True, button_map={"submit": "primary"}) }}
+      </div>
+    </div>
+  </div>
+
+{% include "footer.html" %}
+{% endblock %}
+
+
+
+
+

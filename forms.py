@@ -44,6 +44,12 @@ class NewCandidateForm(FlaskForm):
     name = StringField("שם", validators=[DataRequired("זהו סעיף חובה")])
     submit = SubmitField("הוסף מגובש")
 
+class AddFinalStatusForm(FlaskForm):
+    id = SelectField("מספר מגובש", validators=[DataRequired("זהו סעיף חובה")])
+    final_status = SelectField("סטטוס סיכום", validators=[DataRequired("זהו סעיף חובה")])
+    final_note = StringField("הערת סיכום", validators=[DataRequired("זהו סעיף חובה")])
+    submit = SubmitField("הזן סיכום")
+
 class EditUserForm(FlaskForm):
     name = StringField("שם מלא", validators=[DataRequired("זהו סעיף חובה")])
     status = StringField("סטטוס", validators=[DataRequired("זהו סעיף חובה")])
