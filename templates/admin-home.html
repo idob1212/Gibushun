@@ -1,0 +1,124 @@
+{#{% extends 'bootstrap/base.html' %}#}
+{% import "bootstrap/wtf.html" as wtf %}
+
+{% block content %}
+{% include "header.html" %}
+
+  <!-- Page Header -->
+  <header class="masthead" style="background-image: url('https://www.srugim.co.il/wp-content/uploads/2020/07/%D7%90%D7%99%D7%9E%D7%95%D7%9F-%D7%A6%D7%94%D7%9C-%D7%99%D7%97%D7%99%D7%93%D7%AA-%D7%A8%D7%A4%D7%90%D7%99%D7%9D-%D7%93%D7%95%D7%A6-3.jpeg')">
+    <div class="overlay"></div>
+    <div class="container">
+      <div class="row">
+        <div class="col-lg-8 col-md-10 mx-auto">
+          <div class="page-heading">
+            <h1> שלום מנהל</h1>
+            <span class="subheading" style="direction: rtl">סיכום קבוצה מספר {{ group_id }}  </span>
+
+          </div>
+        </div>
+      </div>
+    </div>
+      <link href="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" rel="stylesheet">
+    <script src="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js"> </script>
+  </header>
+
+<head>
+    <meta charset="UTF-8">
+    <title>דף בית</title>
+</head>
+<body>
+<style>
+    .table{
+        float: right;
+    }
+    th{
+        text-align: right;
+    }
+    td{
+        text-align: right;
+    }
+    form{
+        float: right;
+        direction: rtl;
+        display: flex;
+    }
+    .form-group{
+        display: -webkit-box;
+    }
+    .btn{
+    float: right;
+    direction: rtl;
+    {#padding: 10px;#}
+        height: fit-content;
+        margin-right: 5px;
+}
+
+
+</style>
+      <div class="col-lg-8 col-md-10 mx-auto content" style="direction: rtl; float: right">
+      {% with messages = get_flashed_messages() %}
+        {% if messages %}
+          {% for message in messages %}
+           <p>{{ message }}</p>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+      </div>
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+        <form method="POST">
+          {{ form.csrf_token}}
+        <div class="form-group">
+                <label for="group" style="margin-left: 5px">קבוצה:</label>
+                {{ form.group(class="form-control")}}
+                {{ form.submit(class="btn btn-primary")}}
+
+            </div>
+
+        </form>
+        </div>
+    </div>
+<table class = "table table-bordered" style="width:100%; direction: rtl;">
+    <thead>
+    <tr>
+        <th>מספר מגובש</th>
+        <th>שם</th>
+        <th>ממוצע פיזי</th>
+        <th>ממוצע כללי</th>
+        <th>סטטוס סיכום</th>
+        <th>הערת סיכום</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% if candidates %}
+        {% for index, candidate in candidates %}
+            {% if candidate.status != "פרש" %}
+    <tr>
+        <td>{{ candidate.id.split('/')[1] }}</td>
+        <td>{{ candidate.name }}</td>
+        <td>{{ tiz_avg[index] }}</td>
+        <td>{{ total_avg[index] }}</td>
+        {% if candidate.final_status == None  %}
+            <td> לא הוזן </td>
+        {% else %}
+            <td> {{ candidate.final_status }} </td>
+        {% endif %}
+        {% if candidate.final_note == None  %}
+            <td> לא הוזן </td>
+        {% else %}
+            <td> {{ candidate.final_note }} </td>
+        {% endif %}
+    </tr>
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+    </tbody>
+</table>
+</body>
+
+{% endblock %}
+
+{% block scripts %}
+{#{% include "footer.html" %}#}
+{% endblock %}
