@@ -96,10 +96,68 @@ def get_groups():
     groups.sort()
     return groups
 
+@app.route('/admin-home', methods=["GET", "POST"])
+@admin_only
+def admin_home():
+    first_group = get_groups()[0]
+    return redirect(url_for('homeAdmin', group_id= first_group))
+
+
+
+@app.route('/<group_id>/', methods=["GET", "POST"])
+@admin_only
+def homeAdmin(group_id):
+    form = selectGroup()
+    form.group.choices = get_groups()
+    form.group.default = group_id
+    if form.validate_on_submit():
+        return redirect(url_for('homeAdmin', group_id=form.group.data))
+    candidates = Candidate.query.filter_by(group_id=group_id).all()
+    tiz_avgs = []
+    total_avgs = []
+    if candidates:
+        update_avgs_nf()
+        for candidate in candidates:
+            sprint_avg = Review.query.filter_by(subject_id=candidate.id, station="ספרינטים סיכום").first()
+            crawl_avg = Review.query.filter_by(subject_id=candidate.id, station="זחילות סיכום").first()
+            if crawl_avg:
+                crawl_avg = crawl_avg.grade
+            if sprint_avg:
+                sprint_avg = sprint_avg.grade
+            if not sprint_avg and not crawl_avg:
+                tiz_avgs.append(0)
+            elif crawl_avg == 0 or not crawl_avg:
+                tiz_avgs.append(round(sprint_avg,2))
+            elif sprint_avg == 0 or not sprint_avg:
+                tiz_avgs.append(round(crawl_avg,2))
+            else:
+                tiz_avgs.append(round((crawl_avg + sprint_avg) / 2,2))
+            reviews = Review.query.filter_by(subject_id=candidate.id).all()
+            total_count = 0
+            total_sum = 0
+            for review in reviews:
+                if review.station != "זחילות" and review.station != "ספרינטים" and review.station != "ODT":
+                    total_sum += review.grade
+                    total_count += 1
+            if total_count == 0:
+                total_avgs.append(0)
+            else:
+                total_avg = round(total_sum / total_count, 2)
+                total_avgs.append(total_avg)
+        zipped = zip(candidates, total_avgs, tiz_avgs)
+        candidates = [x for _, x in sorted(zip(total_avgs, candidates), key=lambda pair: pair[0], reverse=True)]
+        tiz_avgs = [x for _, x in sorted(zip(total_avgs, tiz_avgs), key=lambda pair: pair[0], reverse=True)]
+        total_avgs.sort(reverse=True)
+        return render_template("admin-home.html", group_id=group_id, candidates = enumerate(candidates), tiz_avg = tiz_avgs, total_avg = total_avgs, form = form)
+    return render_template("admin-home.html", group_id=group_id, candidates = candidates, form=form)
+
+
 @app.route('/')
 def home():
     if not current_user.is_authenticated:
         return redirect(url_for("login"))
+    if current_user.id == 0:
+        return redirect(url_for("admin_home"))
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     tiz_avgs = []
     total_avgs = []
@@ -132,7 +190,11 @@ def home():
             else:
                 total_avg = round(total_sum / total_count, 2)
                 total_avgs.append(total_avg)
-        return render_template("home.html", current_user=current_user, candidates = enumerate(candidates), tiz_avg = tiz_avgs, total_avg = total_avgs)
+        zipped = zip(candidates, total_avgs, tiz_avgs)
+        candidates = [x for _, x in sorted(zip(total_avgs, candidates), key=lambda pair: pair[0], reverse=True)]
+        tiz_avgs = [x for _, x in sorted(zip(total_avgs, tiz_avgs), key=lambda pair: pair[0], reverse=True)]
+        total_avgs.sort(reverse=True)
+        return render_template("home.html", current_user=current_user, candidates = enumerate(candidates), tiz_avg =tiz_avgs, total_avg =total_avgs)
     return render_template("home.html", current_user=current_user, candidates = candidates)
 
 

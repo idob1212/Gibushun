@@ -44,7 +44,7 @@ class EditReviewForm(FlaskForm):
     submit = SubmitField("סיים טיסה")
 
 class RegisterForm(FlaskForm):
-    id = IntegerField("מספר קבוצה", validators=[DataRequired("זהו סעיף חובה")])
+    id = IntegerField("מספר קבוצה", validators=[InputRequired("זהו סעיף חובה")])
     name = StringField("שם", validators=[DataRequired("זהו סעיף חובה")])
     password = PasswordField("סיסמה", validators=[DataRequired("זהו סעיף חובה")])
     submit = SubmitField("הוסף מגבש")
@@ -99,7 +99,7 @@ class selectCandidateAdmin(FlaskForm):
 
 class selectGroup(FlaskForm):
     group = SelectField("בחר קבוצה", validators=[DataRequired()])
-    submit = SubmitField()
+    submit = SubmitField("הצג")
 
 class selectCandidateAdmin(FlaskForm):
     group = SelectField("בחר קבוצה")
