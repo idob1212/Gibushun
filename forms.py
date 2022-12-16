@@ -18,10 +18,20 @@ class SelectPhysicalReviewsForm(FlaskForm):
     subject = SelectField("מספר מגובש", validators=[DataRequired()])
     submit = SubmitField("הצג תוצאה")
 
+class SelectPhysicalReviewsFormAdmin(FlaskForm):
+    group = SelectField("קבוצה", validators=[DataRequired()])
+    station = SelectField("תחנה", validators=[DataRequired()])
+    subject = SelectField("מספר מגובש", validators=[DataRequired()])
+    submit = SubmitField("הצג תוצאה")
+
 class ShowStaionForm(FlaskForm):
     station = SelectField("תחנה", validators=[DataRequired()])
     submit = SubmitField("הצג תוצאה")
 
+class ShowStaionFormAdmin(FlaskForm):
+    group = SelectField("קבוצה", validators=[DataRequired()])
+    station = SelectField("תחנה", validators=[DataRequired()])
+    submit = SubmitField("הצג תוצאה")
 
 class EditReviewForm(FlaskForm):
     keep_pts = StringField("נקודות לשימור", validators=[DataRequired()])
@@ -79,7 +89,21 @@ class Search_review(FlaskForm):
 
 
 class selectCandidate(FlaskForm):
-    id = SelectField("בחר מגובש", choices=[], validators=[DataRequired()])
+    id = SelectField("בחר מגובש", validators=[DataRequired()])
+    submit = SubmitField("הצג")
+
+class selectCandidateAdmin(FlaskForm):
+    group = SelectField("בחר קבוצה", validators=[DataRequired()])
+    id = SelectField("בחר מגובש", validators=[DataRequired()])
+    submit = SubmitField("הצג")
+
+class selectGroup(FlaskForm):
+    group = SelectField("בחר קבוצה", validators=[DataRequired()])
+    submit = SubmitField()
+
+class selectCandidateAdmin(FlaskForm):
+    group = SelectField("בחר קבוצה")
+    id = SelectField("מגובש")
     submit = SubmitField("הצג")
 
 class UpdateDateForm (FlaskForm):

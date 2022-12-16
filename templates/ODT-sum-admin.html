@@ -1,0 +1,158 @@
+{#{% extends 'bootstrap/base.html' %}#}
+{#{% import "bootstrap/wtf.html" as wtf %}#}
+{% import "bootstrap/wtf.html" as wtf %}
+
+{% block content %}
+{% include "header.html" %}
+
+  <!-- Page Header -->
+  <header class="masthead" style="background-image: url('https://images.unsplash.com/photo-1484100356142-db6ab6244067?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=800&q=80')">
+    <div class="overlay"></div>
+    <div class="container">
+      <div class="row">
+        <div class="col-lg-8 col-md-10 mx-auto">
+          <div class="page-heading">
+            <h1>אקטים פיזיים</h1>
+              {% if candidate_id %}
+          <span class="subheading" style="direction: rtl">ציוני ODT של מועמד מספר {{ candidate_id }} </span>
+              {% else %}
+{#         <span class="subheading" style="direction: rtl">חוות דעת על כולם </span>#}
+              {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+      <link href="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" rel="stylesheet">
+    <script src="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js"> </script>
+  </header>
+
+<head>
+    <meta charset="UTF-8">
+    <title>לוח חוות דעת</title>
+
+</head>
+<body>
+<style>
+    .table{
+        float: right;
+        size: auto;
+    }
+    td {
+    border: 1px solid #000;
+    text-align: right;
+}
+        label{
+        float: right;
+        direction: rtl;
+    }
+
+tr td {
+    width: 1%;
+    white-space: nowrap;
+    text-align: right;
+}
+select{
+    text-align: right;
+}
+.btn{
+    float: right;
+    direction: rtl;
+    padding: 10px;
+    margin: 10px;
+    margin-right: 50%;
+}
+#station{
+    float: right;
+    direction: rtl;
+}
+#subject{
+    float: right;
+    direction: rtl;
+}
+th{
+    text-align: right;
+}
+</style>
+
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+        <form method="POST">
+          {{ form.csrf_token}}
+        <div class="form-group">
+                <label for="group">קבוצה:</label>
+                {{ form.group(class="form-control")}}
+            </div>
+            <div class="form-group">
+                <label for="id">מגובש:</label>
+                {{ form.id(class="form-control")}}
+            </div>
+                <input type="submit" class="btn btn-primary" btn-lg>
+        </form>
+        </div>
+    </div>
+
+<table class = "table table-bordered" style="width:100%; direction: rtl;">
+    <thead>
+    {% if candidate_id %}
+
+    <tr>
+        <th>סוג תחנה</th>
+        <th>ציון</th>
+        <th>הערה</th>
+{#        <th>עריכה</th>#}
+{#        <th>מחק</th>#}
+    </tr>
+    </thead>
+    <tbody>
+        {% for review in reviews %}
+    <tr>
+        <td class="block">{{ review.station }}</td>
+        <td class="block">{{ review.grade }}</td>
+        <td class="block">{{ review.note }}</td>
+        <td class="block"><a href="{{ url_for('edit_physical_review', review_id=review.id) }}">עריכה</a></td>
+        <td class="block"><a href="{{ url_for('delete_physical_review', review_id=review.id) }}">מחק</a></td>
+    </tr>
+        {% endfor %}
+    </tbody>
+{% endif %}
+
+</table>
+    <script>
+        var group_select = document.getElementById("group");
+        var subject_select = document.getElementById("id");
+
+        group_select.onchange = function() {
+
+            group = group_select.value;
+
+            fetch('/subjects/' + group).then(function(response) {
+
+                response.json().then(function(data) {
+                    var optionHTML = '';
+
+                    for (var candidate of data.subjects) {
+                        optionHTML += '<option value="' + candidate.id + '">' + candidate.id + '</option>';
+                    }
+                    subject_select.innerHTML = optionHTML;
+                })
+
+            });
+        }
+    </script>
+</body>
+
+<style>
+footer{
+position: fixed;
+    left:0px;
+   bottom:0px;
+   height:50px;
+   width:100%;
+    padding-top: 20px;
+}
+</style>
+</html>
+{% endblock %}
+{#{% include "footer.html" %}#}
