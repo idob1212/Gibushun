@@ -1,5 +1,5 @@
 import os
-from flask import Flask, render_template, redirect, url_for, flash, abort
+from flask import Flask, render_template, redirect, url_for, flash, abort, request, jsonify
 from flask_bootstrap import Bootstrap
 from flask_ckeditor import CKEditor
 from datetime import date, datetime
@@ -8,7 +8,9 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import relationship
 from flask_login import UserMixin, login_user, LoginManager, login_required, current_user, logout_user
-from forms import LoginForm, RegisterForm, CreateReviewForm, EditUserForm, Search_review, EditReviewForm, UpdateDateForm, NewCandidateForm, SelectPhysicalReviewsForm, ShowStaionForm, selectCandidate, AddFinalStatusForm
+from forms import LoginForm, RegisterForm, CreateReviewForm, EditUserForm, Search_review, EditReviewForm, \
+    UpdateDateForm, NewCandidateForm, SelectPhysicalReviewsForm, ShowStaionForm, selectCandidate, AddFinalStatusForm, \
+    SelectPhysicalReviewsFormAdmin, ShowStaionFormAdmin, selectCandidateAdmin, selectGroup
 from flask_gravatar import Gravatar
 import sys
 import logging
@@ -83,11 +85,16 @@ db.create_all()
 def admin_only(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if current_user.id != 1:
+        if current_user.id != 0:
             return abort(403)
         return f(*args, **kwargs)
     return decorated_function
 
+def get_groups():
+    groups = User.query.all()
+    groups = [group.id for group in groups if group.id != 0]
+    groups.sort()
+    return groups
 
 @app.route('/')
 def home():
@@ -295,6 +302,23 @@ def update_avgs(form):
             review = Review.query.filter_by(station="ODT סיכום").first()
             review.grade = (review.grade * (count - 1) + int(form.grade.data)) / count
             db.session.commit()
+
+
+@app.route('/subjects/<group>')
+def subject(group):
+    subjects = Candidate.query.filter_by(group_id=group).all()
+    subjects = [int(subject.id.split("/")[1]) for subject in subjects if subject.status != "פרש"]
+    subjects.sort()
+    subjectsArray = []
+
+    for subject in subjects:
+        subjectObj = {}
+        subjectObj['id'] = subject
+
+        subjectsArray.append(subjectObj)
+
+    return jsonify({'subjects' : subjectsArray})
+
 @app.route("/new-review", methods=["GET", "POST"])
 def add_new_review():
     stations = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "ODT", "מעגל זנבות", "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור"]
@@ -451,6 +475,29 @@ def showPhysicalReviews():
         return render_template('physical-reviews.html', reviews=reviews, candidate_id=candidate.id.split("/")[1], form=form)
     return render_template('physical-reviews.html', form=form)
 
+
+@app.route("/physical-reviews-admin/", methods=["GET", "POST"])
+def showPhysicalReviewsAdmin():
+    form = SelectPhysicalReviewsFormAdmin()
+    form.group.choices = [group.id for group in User.query.all() if group.id != 0]
+    form.station.choices = ["ספרינטים", "גם וגם","זחילות"]
+    if form.group.data:
+        candidates = [candidate.id.split("/")[1] for candidate in Candidate.query.filter_by(group_id=int(form.group.data)).all() if candidate.status != "פרש"]
+    else:
+        candidates = [int(candidate.id.split("/")[1]) for candidate in Candidate.query.filter_by(group_id=2).all() if candidate.status != "פרש"]
+    candidates.sort()
+    form.subject.choices = candidates
+    if request.method == "POST":
+        candidate = Candidate.query.filter_by(id=str(form.group.data) + "/" + str(form.subject.data)).first()
+        if(form.station.data == "גם וגם"):
+            reviews = Review.query.filter_by(subject_id=candidate.id, station="ספרינטים").all()
+            reviews += Review.query.filter_by(subject_id=candidate.id, station="זחילות").all()
+        else:
+            reviews = Review.query.filter_by(subject_id=candidate.id, station = form.station.data).all()
+        return render_template('show-physical-admin.html', reviews=reviews, candidate_id=candidate.id.split("/")[1], form=form)
+    return render_template('show-physical-admin.html', form=form)
+
+
 @app.route("/odt-reviews/", methods=["GET", "POST"])
 def showODTReviews():
     form = selectCandidate()
@@ -474,6 +521,21 @@ def showODTReviews():
         reviews = Review.query.filter_by(subject_id=candidate.id, station = "ODT").all()
         return render_template('ODT-sum.html', reviews=reviews, candidate_id=candidate.id.split("/")[1], form=form)
     return render_template('ODT-sum.html', form=form)
+@app.route("/odt-reviews-admin/", methods=["GET", "POST"])
+def showODTReviewsAdmin():
+    form = selectCandidateAdmin()
+    form.group.choices = [group.id for group in User.query.all() if group.id != 0]
+    if form.group.data:
+        candidates = [candidate.id.split("/")[1] for candidate in Candidate.query.filter_by(group_id=int(form.group.data)).all() if candidate.status != "פרש"]
+    else:
+        candidates = [int(candidate.id.split("/")[1]) for candidate in Candidate.query.filter_by(group_id=User.query.first().id).all() if candidate.status != "פרש"]
+    candidates.sort()
+    form.id.choices = candidates
+    if request.method == "POST":
+        candidate = Candidate.query.filter_by(id=str(form.group.data) + "/" + str(form.id.data)).first()
+        reviews = Review.query.filter_by(subject_id=candidate.id, station = "ODT").all()
+        return render_template('ODT-sum-admin.html', reviews=reviews, candidate_id=candidate.id.split("/")[1], form=form)
+    return render_template('ODT-sum-admin.html', form=form)
 
 @app.route("/candidates/", methods=["GET", "POST"])
 def showCandidate():
@@ -500,6 +562,26 @@ def showCandidate():
         return render_template('candidate.html', reviews=clean_reviews, candidate_id=candidate.id.split("/")[1], form=form)
     return render_template('candidate.html', form=form)
 
+@app.route("/candidates-admin/", methods=["GET", "POST"])
+def showCandidateAdmin():
+    form = selectCandidateAdmin()
+    form.group.choices = get_groups()
+    if form.group.data:
+        candidates = [candidate.id.split("/")[1] for candidate in Candidate.query.filter_by(group_id=int(form.group.data)).all() if candidate.status != "פרש"]
+        candidates.sort()
+        form.id.choices = candidates
+    else:
+        candidates = [int(candidate.id.split("/")[1]) for candidate in Candidate.query.filter_by(group_id=User.query.first().id).all() if candidate.status != "פרש"]
+        candidates.sort()
+        form.id.choices = candidates
+    if request.method == "POST":
+        candidate = Candidate.query.filter_by(id=str(form.group.data) + "/" + str(form.id.data)).first()
+        reviews = Review.query.filter_by(subject_id=candidate.id).all()
+        clean_reviews = [review for review in reviews if review.station != "ספרינטים" and review.station !=  "זחילות" and review.station != "ODT"]
+        clean_reviews.sort(key=lambda x: x.grade, reverse=True)
+        return render_template('candidate-admin.html', reviews=clean_reviews, candidate_id=candidate.id.split("/")[1], form=form)
+    return render_template('candidate-admin.html', form=form)
+
 @app.route("/final-status/", methods=["GET", "POST"])
 def AddStatus():
     form = AddFinalStatusForm()
@@ -518,6 +600,23 @@ def AddStatus():
         db.session.commit()
         return redirect(url_for('AddStatus'))
     return render_template('add-status.html', form=form)
+
+@app.route("/station-reviews-admin/", methods=["GET", "POST"])
+def showStationReviewsAdmin():
+    form = ShowStaionFormAdmin()
+    form.group.choices = get_groups()
+    form.station.choices = stations
+    if form.validate_on_submit():
+        form = ShowStaionFormAdmin()
+        form.station.choices = stations
+        form.group.choices = get_groups()
+        reviews = Review.query.filter_by(author_id=form.group.data, station=form.station.data).all()
+        reviews.sort(key=lambda x: x.grade)
+        if(form.station.data == "זחילות" or form.station.data == "ספרינטים" or form.station.data == "ODT"):
+            reviews = Review.query.filter_by(author_id=form.group.data, station=form.station.data + " סיכום").all()
+            reviews.sort(key=lambda x: x.grade * -1)
+        return render_template('rankings-admin.html', reviews=reviews, form=form)
+    return render_template('rankings-admin.html', form=form)
 
 @app.route("/station-reviews/", methods=["GET", "POST"])
 def showStationReviews():
@@ -557,6 +656,8 @@ def edit_review(review_id):
         update_avgs(form)
         return redirect(url_for("showCandidate"))
     return render_template("make-post.html", form=form, current_user=current_user)
+
+
 
 @app.route("/edit-physical-review/<int:review_id>", methods=["GET", "POST"])
 def edit_physical_review(review_id):
