@@ -10,7 +10,7 @@ from sqlalchemy.orm import relationship
 from flask_login import UserMixin, login_user, LoginManager, login_required, current_user, logout_user
 from forms import LoginForm, RegisterForm, CreateReviewForm, EditUserForm, Search_review, EditReviewForm, \
     UpdateDateForm, NewCandidateForm, SelectPhysicalReviewsForm, ShowStaionForm, selectCandidate, AddFinalStatusForm, \
-    SelectPhysicalReviewsFormAdmin, ShowStaionFormAdmin, selectCandidateAdmin, selectGroup
+    SelectPhysicalReviewsFormAdmin, ShowStaionFormAdmin, selectCandidateAdmin, selectGroup, AddNameForm, InterviewForm
 from flask_gravatar import Gravatar
 import sys
 import logging
@@ -65,6 +65,10 @@ class Candidate(db.Model):
     final_status = db.Column(db.String(1000))
     final_note = db.Column(db.String(1000))
     status = db.Column(db.String(1000))
+    interview_grade = db.Column(db.String(1000))
+    interview_note = db.Column(db.String(1000))
+    tash_prob = db.Column(db.String(1000))
+    medical_prob = db.Column(db.String(1000))
     reviews = relationship("Review", back_populates="subject")
 
 class Review(db.Model):
@@ -99,6 +103,8 @@ def get_groups():
 @app.route('/admin-home', methods=["GET", "POST"])
 @admin_only
 def admin_home():
+    if len(get_groups()) == 0:
+        return redirect(url_for('register'))
     first_group = get_groups()[0]
     return redirect(url_for('homeAdmin', group_id= first_group))
 
@@ -223,7 +229,7 @@ def register():
         # if current_user.id == 1:
         #     return redirect(url_for('manage'))
         # else:
-        return redirect(url_for('login'))
+        return redirect(url_for('admin_home'))
     return render_template("register.html", form=form, current_user=current_user)
 
 
@@ -274,6 +280,16 @@ def login():
             login_user(user)
             return redirect(url_for('home'))
     return render_template("login.html", form=form, current_user=current_user)
+
+@app.route('/add-name', methods=["GET", "POST"])
+def addName():
+    form = AddNameForm()
+    if form.validate_on_submit():
+        name = form.name.data
+        current_user.name = name
+        db.session.commit()
+        return redirect(url_for('home'))
+    return render_template("register.html", form=form, current_user=current_user)
 
 
 @app.route('/logout')
@@ -405,7 +421,7 @@ def add_new_review():
         db.session.add(new_review)
         db.session.commit()
         update_avgs(form)
-        return redirect(url_for("home"))
+        return redirect(url_for("add_new_review"))
     return render_template("make-post.html", form=form, current_user=current_user)
 
 
@@ -413,6 +429,14 @@ def add_new_review():
 def manageCandidates():
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     return render_template('panel.html', candidates=candidates)
+
+
+@app.route('/admin-panel', methods=["GET", "POST"])
+def manageGroups():
+    groups = User.query.all()
+    return render_template('admin-panel.html', groups=groups)
+
+
 @app.route("/delete-candidate/<candidate_id>")
 def delete_candidate(candidate_id):
     user_to_delete = Candidate.query.get(str(current_user.id) + "/" + candidate_id)
@@ -438,46 +462,22 @@ def edit_user(user_id):
     user = User.query.get(user_id)
     edit_form = EditUserForm(
         name=user.name,
-        op_flight_time=user.op_flight_time,
-        tr_flight_time=user.tr_flight_time,
-        last_flight_date=user.last_flight_date,
-        qualified=user.qualified,
-        madrat=user.madrat,
-        coach=user.coach,
-        qualified_assist=user.qualified_assist,
-        op_flight_time_goal = user.op_flight_time_goal,
-        tr_flight_time_goal=user.tr_flight_time_goal,
-        guide_flight_time = user.guide_flight_time,
-        last_15_date = user.last_15_date,
-        status = user.status,
-        qualified_status=user.qualified_status,
     )
     if edit_form.validate_on_submit():
         user.name = edit_form.name.data
-        user.op_flight_time = edit_form.op_flight_time.data
-        user.tr_flight_time = edit_form.tr_flight_time.data
-        user.last_flight_date = edit_form.last_flight_date.data
-        user.qualified = edit_form.qualified.data
-        user.madrat = edit_form.madrat.data
-        user.coach = edit_form.coach.data
-        user.qualified_assist = edit_form.qualified_assist.data
-        user.op_flight_time_goal = edit_form.op_flight_time_goal.data
-        user.tr_flight_time_goal = edit_form.tr_flight_time_goal.data
-        user.guide_flight_time = edit_form.guide_flight_time.data
-        user.last_15_date = edit_form.last_15_date.data
         db.session.commit()
-        return redirect(url_for("manage"))
+        return redirect(url_for("manageGroups"))
     return render_template("register.html", form=edit_form, is_edit=True, current_user=current_user)
 
 
 @app.route("/delete/<int:user_id>")
 @admin_only
-def delete_post(user_id):
+def delete_user(user_id):
     user_to_delete = User.query.get(user_id)
     db.session.delete(user_to_delete)
     db.session.commit()
     update_avgs_nf()
-    return redirect(url_for('home'))
+    return redirect(url_for('manageGroups'))
 
 @app.route('/reviews-finder', methods=["GET", "POST"])
 @admin_only
@@ -590,7 +590,7 @@ def showODTReviewsAdmin():
     if form.group.data:
         candidates = [candidate.id.split("/")[1] for candidate in Candidate.query.filter_by(group_id=int(form.group.data)).all() if candidate.status != "פרש"]
     else:
-        candidates = [int(candidate.id.split("/")[1]) for candidate in Candidate.query.filter_by(group_id=User.query.first().id).all() if candidate.status != "פרש"]
+        candidates = [int(candidate.id.split("/")[1]) for candidate in Candidate.query.filter_by(group_id=get_groups()[0]).all() if candidate.status != "פרש"]
     candidates.sort()
     form.id.choices = candidates
     if request.method == "POST":
@@ -633,7 +633,7 @@ def showCandidateAdmin():
         candidates.sort()
         form.id.choices = candidates
     else:
-        candidates = [int(candidate.id.split("/")[1]) for candidate in Candidate.query.filter_by(group_id=User.query.first().id).all() if candidate.status != "פרש"]
+        candidates = [int(candidate.id.split("/")[1]) for candidate in Candidate.query.filter_by(group_id=get_groups()[0]).all() if candidate.status != "פרש"]
         candidates.sort()
         form.id.choices = candidates
     if request.method == "POST":
@@ -663,6 +663,60 @@ def AddStatus():
         return redirect(url_for('AddStatus'))
     return render_template('add-status.html', form=form)
 
+@app.route("/interview/", methods=["GET", "POST"])
+def Interview():
+    form = InterviewForm()
+    candidates = Candidate.query.filter_by(group_id=current_user.id).all()
+    candidate_nums = []
+    for candidate in candidates:
+        if candidate.status != "פרש":
+            candidate_nums.append(candidate.id.split("/")[1])
+    candidate_nums.sort()
+    form.id.choices = candidate_nums
+    form.grade.choices = ["לא לגעת - קו אדום", "בלית ברירה", "כן, אבל", "להתאבד"]
+    if form.validate_on_submit():
+        candidate = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(form.id.data)).first()
+        candidate.interview_grade = form.grade.data
+        candidate.interview_note = form.note.data
+        candidate.tash_prob = form.tash.data
+        candidate.medical_prob = form.medical.data
+        db.session.commit()
+        return redirect(url_for('Interview'))
+    return render_template('interview.html', form=form)
+
+@app.route("/show-interview/", methods=["GET", "POST"])
+def showInterview():
+    form = selectCandidate()
+    candidates = Candidate.query.filter_by(group_id=current_user.id).all()
+    candidate_nums = []
+    for candidate in candidates:
+        if candidate.status != "פרש":
+            candidate_nums.append(candidate.id.split("/")[1])
+    candidate_nums.sort()
+    form.id.choices = candidate_nums
+    if form.validate_on_submit():
+        candidate = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(form.id.data)).first()
+        return render_template('show-interview.html', form=form, candidate=candidate, candidate_id=candidate.id.split("/")[1])
+    return render_template('show-interview.html', form=form)
+
+
+@app.route("/show-interview-admin/", methods=["GET", "POST"])
+def showInterviewAdmin():
+    form = selectCandidateAdmin()
+    form.group.choices = get_groups()
+    if form.group.data:
+        candidates = [candidate.id.split("/")[1] for candidate in Candidate.query.filter_by(group_id=int(form.group.data)).all() if candidate.status != "פרש"]
+        candidates.sort()
+        form.id.choices = candidates
+    else:
+        candidates = [int(candidate.id.split("/")[1]) for candidate in Candidate.query.filter_by(group_id=get_groups()[0]).all() if candidate.status != "פרש"]
+        candidates.sort()
+        form.id.choices = candidates
+    if form.validate_on_submit():
+        candidate = Candidate.query.filter_by(id=str(form.group.data) + "/" + str(form.id.data)).first()
+        return render_template('show-interview-admin.html', form=form, candidate=candidate, candidate_id=candidate.id.split("/")[1])
+    return render_template('show-interview-admin.html', form=form)
+
 @app.route("/station-reviews-admin/", methods=["GET", "POST"])
 def showStationReviewsAdmin():
     form = ShowStaionFormAdmin()
@@ -685,12 +739,11 @@ def showStationReviews():
     form = ShowStaionForm()
     form.station.choices = stations
     if form.validate_on_submit():
-        form = ShowStaionForm()
-        form.station.choices = stations
         reviews = Review.query.filter_by(author_id=current_user.id, station=form.station.data).all()
         reviews.sort(key=lambda x: x.grade)
         if(form.station.data == "זחילות" or form.station.data == "ספרינטים" or form.station.data == "ODT"):
-            reviews = Review.query.filter_by(author_id=current_user.id, station=form.station.data + " סיכום").all()
+            reviews = Review.query.filter_by(station=form.station.data + " סיכום").all()
+            reviews = [review for review in reviews if review.subject_id.split("/")[0] == str(current_user.id)]
             reviews.sort(key=lambda x: x.grade * -1)
         return render_template('rankings.html', reviews=reviews, form=form)
     return render_template('rankings.html', form=form)

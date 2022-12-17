@@ -30,6 +30,8 @@
 <style>
     .table{
         float: right;
+        table-layout: fixed;
+
     }
     th{
         text-align: right;
@@ -40,10 +42,11 @@
     form{
         float: right;
         direction: rtl;
-        display: flex;
+
     }
     .form-group{
-        display: -webkit-box;
+        display: flex;
+        gap: 10px
     }
     .btn{
     float: right;
@@ -52,6 +55,10 @@
         height: fit-content;
         margin-right: 5px;
 }
+    .container{
+        width: 95vw;
+        height: fit-content;
+    }
 
 
 </style>
@@ -73,12 +80,13 @@
                 <label for="group" style="margin-left: 5px">קבוצה:</label>
                 {{ form.group(class="form-control")}}
                 {{ form.submit(class="btn btn-primary")}}
-
             </div>
 
         </form>
         </div>
     </div>
+</div>
+    <div class = "noa">
 <table class = "table table-bordered" style="width:100%; direction: rtl;">
     <thead>
     <tr>
@@ -114,11 +122,17 @@
         {% endfor %}
     {% endif %}
     </tbody>
-</table>
-</body>
+
+    </table>
+
+</div>
+
 
 {% endblock %}
 
+</body>
+
+
 {% block scripts %}
-{#{% include "footer.html" %}#}
+{% include "footer.html" %}
 {% endblock %}

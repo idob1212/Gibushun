@@ -45,13 +45,25 @@ class EditReviewForm(FlaskForm):
 
 class RegisterForm(FlaskForm):
     id = IntegerField("מספר קבוצה", validators=[InputRequired("זהו סעיף חובה")])
-    name = StringField("שם", validators=[DataRequired("זהו סעיף חובה")])
+    name = StringField("שם")
     password = PasswordField("סיסמה", validators=[DataRequired("זהו סעיף חובה")])
     submit = SubmitField("הוסף מגבש")
+
+class AddNameForm(FlaskForm):
+    name = StringField("שם", validators=[DataRequired("זהו סעיף חובה")])
+    submit = SubmitField("הוסף שם")
 
 class NewCandidateForm(FlaskForm):
     id = IntegerField("מספר מגובש", validators=[DataRequired("זהו סעיף חובה")])
     name = StringField("שם", validators=[DataRequired("זהו סעיף חובה")])
+    submit = SubmitField("הוסף מגובש")
+
+class InterviewForm(FlaskForm):
+    id = SelectField("מספר מגובש", validators=[DataRequired("זהו סעיף חובה")])
+    grade = SelectField("ציון ראיון", validators=[DataRequired("זהו סעיף חובה")])
+    note = TextAreaField("סיכום ראיון", validators=[DataRequired("זהו סעיף חובה")])
+    tash = TextAreaField('בעיות ת"ש')
+    medical = TextAreaField("בעיות רפואיות")
     submit = SubmitField("הוסף מגובש")
 
 class AddFinalStatusForm(FlaskForm):
@@ -62,19 +74,6 @@ class AddFinalStatusForm(FlaskForm):
 
 class EditUserForm(FlaskForm):
     name = StringField("שם מלא", validators=[DataRequired("זהו סעיף חובה")])
-    status = StringField("סטטוס", validators=[DataRequired("זהו סעיף חובה")])
-    qualified = StringField("כשירות", validators=[DataRequired("זהו סעיף חובה")])
-    qualified_status = StringField("סטטוס הסמכה", validators=[DataRequired("זהו סעיף חובה")])
-    op_flight_time = FloatField("שעות טיסה מבצעיות", validators=[InputRequired("זהו סעיף חובה"), NumberRange(min=-1, max=100000)])
-    op_flight_time_goal = FloatField("יעד שעות טיסה מבצעיות", validators=[InputRequired("זהו סעיף חובה"), NumberRange(min=-1, max=100000)])
-    tr_flight_time = FloatField("שעות טיסת אימון", validators=[InputRequired("זהו סעיף חובה"), NumberRange(min=-1, max=100000)])
-    tr_flight_time_goal = FloatField("יעד שעות טיסת אימון", validators=[InputRequired("זהו סעיף חובה"), NumberRange(min=-1, max=100000)])
-    guide_flight_time = FloatField("שעות טיסת הדרכה", validators=[InputRequired("זהו סעיף חובה"), NumberRange(min=-1, max=100000)])
-    last_15_date = DateField("כוננות 15' אחרונה ",render_kw={'max':date.today()}, validators=[DataRequired("זהו סעיף חובה")])
-    last_flight_date = DateField("תאריך טיסה אחרונה ",render_kw={'max':date.today()}, validators=[DataRequired("זהו סעיף חובה")])
-    coach = BooleanField( "ביצע מאמן" ,render_kw={'style':'margin:10px'})
-    qualified_assist = BooleanField("כשירות סיוע",render_kw={'style':'margin:10px'})
-    madrat = BooleanField('מדר"ט',render_kw={'style':'margin:10px'})
     submit = SubmitField("השלם עריכה")
 
 
