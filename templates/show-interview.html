@@ -34,8 +34,8 @@
 <style>
     .table{
         float: right;
-        size: auto;
-        table-layout: fixed;
+        {#size: auto;#}
+        {#table-layout: fixed;#}
     }
     td {
     border: 1px solid #000;
@@ -73,11 +73,15 @@ th{
     float: right;
     direction: rtl;
 }
+{#td{#}
+{#    overflow: scroll;#}
+{#}#}
 </style>
 <div>
 {{ wtf.quick_form(form, novalidate=True, button_map={"submit": "primary"}) }}
     </div>
 {% if candidate %}
+<div class="table-responsive">
 <table class = "table table-bordered" style="width:100%; direction: rtl;">
     <thead>
     <tr>
@@ -103,6 +107,8 @@ th{
 
 </table>
 {% endif %}
+</div>
+
 </div>
 </body>
 
