@@ -47,8 +47,8 @@
     }
 
 tr td {
-    width: 1%;
-    white-space: nowrap;
+    {#width: 1%;#}
+    {#white-space: nowrap;#}
     text-align: right;
 }
 .btn{
@@ -80,8 +80,9 @@ th{
 <div>
 {{ wtf.quick_form(form, novalidate=True, button_map={"submit": "primary"}) }}
     </div>
-{% if candidate %}
 <div class="table-responsive">
+
+{% if candidate %}
 <table class = "table table-bordered" style="width:100%; direction: rtl;">
     <thead>
     <tr>
