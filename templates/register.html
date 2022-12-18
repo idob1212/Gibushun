@@ -5,17 +5,22 @@
 {% include "header.html" %}
 
   <!-- Page Header -->
-  <header class="masthead" style="background-image: url('https://images.unsplash.com/photo-1531592937781-344ad608fabf?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=800&q=80')">
+  <header class="masthead" style="background-image: url('{{ url_for('static', filename='img/edit.jpg')}}')">
     <div class="overlay"></div>
     <div class="container">
       <div class="row">
         <div class="col-lg-8 col-md-10 mx-auto">
           <div class="page-heading">
+          {% if current_user.id %}
               {% if current_user.id != 0 %}
               <h1>עריכת פרטי משתמש</h1>
             {% else %}
-            <h1>הוסף משתמש</h1>
+            <h1>הוסף מגבש</h1>
               {% endif %}
+                      {% else %}
+              <h1>הוסף מגבש</h1>
+            {% endif %}
+
 {#            <span class="subheading">Start Contributing to the Blog!</span>#}
           </div>
         </div>
