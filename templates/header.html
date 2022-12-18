@@ -95,9 +95,6 @@
             </li>
 
 
-
-
-
             {% elif current_user.is_authenticated %}
                <li class="nav-item">
                     <a class="nav-link active" href="{{ url_for('home') }}">בית</a>
@@ -161,9 +158,9 @@
             <a class="nav-link active" href="{{ url_for('login') }}">התחבר</a>
             </li>
 
-               <li class="nav-item">
-                <a class="nav-link active" href="{{ url_for('register') }}">הוסף משתמש</a>
-            </li>
+{#               <li class="nav-item">#}
+{#                <a class="nav-link active" href="{{ url_for('register') }}">הוסף משתמש</a>#}
+{#            </li>#}
 
           {% endif %}
         </ul>
