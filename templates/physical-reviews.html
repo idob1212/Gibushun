@@ -34,10 +34,21 @@
 <style>
     .table{
         float: right;
+        {#size: auto;#}
         table-layout: fixed;
     }
     td {
     border: 1px solid #000;
+    text-align: right;
+}
+
+tr td {
+    {#width: 1%;#}
+    {#white-space: nowrap;#}
+    text-align: right;
+}
+
+th{
     text-align: right;
 }
         label{
@@ -45,11 +56,7 @@
         direction: rtl;
     }
 
-tr td {
-    width: 1%;
-    white-space: nowrap;
-    text-align: right;
-}
+
 .btn{
     float: right;
     direction: rtl;
@@ -65,9 +72,7 @@ tr td {
     float: right;
     direction: rtl;
 }
-th{
-    text-align: right;
-}
+
 </style>
 {{ wtf.quick_form(form, novalidate=True, button_map={"submit": "primary"}) }}
 
