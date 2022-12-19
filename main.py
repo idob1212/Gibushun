@@ -20,7 +20,6 @@ from forms import LoginForm, RegisterForm, CreateReviewForm, EditUserForm, Searc
 from flask_gravatar import Gravatar
 import sys
 import logging
-import time
 import pandas as pd
 import xlwt
 from xlwt.Workbook import *
@@ -894,72 +893,72 @@ def update_date():
         return render_template("index.html", current_user=current_user)
     return render_template("update-date.html", form=form, current_user=current_user)
 
-#
-# @app.route('/download-b/')
-# @admin_only
-# def downloadb():
-#     wb = Workbook()
-#     # candidates_query = db.query(Candidate)
-#     candidates = Candidate.query.all()
-#     engine = sqlalchemy.create_engine(app.config['SQLALCHEMY_DATABASE_URI'])
-#     df1 = pd.read_sql(db.session.query(Candidate).statement, db.session.bind)
-#     df1 = df1[df1["status"] != "פרש"]
-#     df1.drop(['status'], axis=1, inplace=True)
-#     df1.columns = ["מספר מגובש", "מספר קבוצה", "שם", "סטטוס סיכום", "הערת סיכום", "ציון ראיון", "סיכום ראיון", "בעיות תש", "בעיות רפואיות"]
-#     df1.index = df1['מספר מגובש']
-#     df1 = df1.drop(['מספר מגובש'], axis=1)
-#     df1.sort_index(inplace=True)
-#     candidates = df1.index.tolist()
-#     total_avgs = []
-#     tiz_avgs = []
-#     for candidate in candidates:
-#         reviews = Review.query.filter_by(subject_id=candidate).all()
-#         sprint_avg = Review.query.filter_by(subject_id=candidate, station="ספרינטים סיכום").first()
-#         crawl_avg = Review.query.filter_by(subject_id=candidate, station="זחילות סיכום").first()
-#         if crawl_avg:
-#             crawl_avg = crawl_avg.grade
-#         if sprint_avg:
-#             sprint_avg = sprint_avg.grade
-#         if not sprint_avg and not crawl_avg:
-#             tiz_avgs.append(0)
-#         elif crawl_avg == 0 or not crawl_avg:
-#             tiz_avgs.append(round(sprint_avg, 2))
-#         elif sprint_avg == 0 or not sprint_avg:
-#             tiz_avgs.append(round(crawl_avg, 2))
-#         else:
-#             tiz_avgs.append(round((crawl_avg + sprint_avg) / 2, 2))
-#         reviews = Review.query.filter_by(subject_id=candidate).all()
-#         total_count = 0
-#         total_sum = 0
-#         for review in reviews:
-#             if review.station != "זחילות" and review.station != "ספרינטים" and (
-#                     "ODT" not in review.station or review.station == "ODT סיכום"):
-#                 total_sum += review.grade
-#                 total_count += 1
-#         if total_count == 0:
-#             total_avgs.append(0)
-#         else:
-#             total_avg = round(total_sum / total_count, 2)
-#             total_avgs.append(total_avg)
-#     tot = pd.Series(total_avgs, name="ממוצע כללי")
-#     tiz = pd.Series(tiz_avgs, name="ממוצע תיז")
-#     tot.index = df1.index
-#     tiz.index = df1.index
-#     df1["ממוצע כללי"] = tot
-#     df1["ממוצע פיזי"] = tiz
-#     df2 = pd.DataFrame(columns=["שם","מספר בגיבוש", "מספר אישי", "מראיין", "מגבש", "ציון ממוצע בתחנות הגיבוש", 'חו"ד מראיין', 'חו"ד מגבש', "מצב עדכני במסלול(שליש)"])
-#     df2.index = df2['מספר אישי']
-#     df2.drop(['מספר אישי'], axis=1, inplace=True)
-#
-#     ws1 = wb.add_sheet('תוצאות גיבוש')
-#     ws2 = wb.add_sheet('מצב נוכחי')
-#     writer = pd.ExcelWriter('multiple.xlsx', engine='xlsxwriter')
-#     df1.to_excel(writer, 'תוצאות גיבוש')
-#     df2.to_excel(writer, 'מצב נוכחי')
-#     writer.save()
-#     # file_stream = BytesIO()
-#     # file_stream.seek(0)
-#     return send_file("multiple.xlsx", as_attachment=True, attachment_filename="multiple.xlsx", cache_timeout=5, )
+
+@app.route('/download-b/')
+@admin_only
+def downloadb():
+    wb = Workbook()
+    # candidates_query = db.query(Candidate)
+    candidates = Candidate.query.all()
+    engine = sqlalchemy.create_engine(app.config['SQLALCHEMY_DATABASE_URI'])
+    df1 = pd.read_sql(db.session.query(Candidate).statement, db.session.bind)
+    df1 = df1[df1["status"] != "פרש"]
+    df1.drop(['status'], axis=1, inplace=True)
+    df1.columns = ["מספר מגובש", "מספר קבוצה", "שם", "סטטוס סיכום", "הערת סיכום", "ציון ראיון", "סיכום ראיון", "בעיות תש", "בעיות רפואיות"]
+    df1.index = df1['מספר מגובש']
+    df1 = df1.drop(['מספר מגובש'], axis=1)
+    df1.sort_index(inplace=True)
+    candidates = df1.index.tolist()
+    total_avgs = []
+    tiz_avgs = []
+    for candidate in candidates:
+        reviews = Review.query.filter_by(subject_id=candidate).all()
+        sprint_avg = Review.query.filter_by(subject_id=candidate, station="ספרינטים סיכום").first()
+        crawl_avg = Review.query.filter_by(subject_id=candidate, station="זחילות סיכום").first()
+        if crawl_avg:
+            crawl_avg = crawl_avg.grade
+        if sprint_avg:
+            sprint_avg = sprint_avg.grade
+        if not sprint_avg and not crawl_avg:
+            tiz_avgs.append(0)
+        elif crawl_avg == 0 or not crawl_avg:
+            tiz_avgs.append(round(sprint_avg, 2))
+        elif sprint_avg == 0 or not sprint_avg:
+            tiz_avgs.append(round(crawl_avg, 2))
+        else:
+            tiz_avgs.append(round((crawl_avg + sprint_avg) / 2, 2))
+        reviews = Review.query.filter_by(subject_id=candidate).all()
+        total_count = 0
+        total_sum = 0
+        for review in reviews:
+            if review.station != "זחילות" and review.station != "ספרינטים" and (
+                    "ODT" not in review.station or review.station == "ODT סיכום"):
+                total_sum += review.grade
+                total_count += 1
+        if total_count == 0:
+            total_avgs.append(0)
+        else:
+            total_avg = round(total_sum / total_count, 2)
+            total_avgs.append(total_avg)
+    tot = pd.Series(total_avgs, name="ממוצע כללי")
+    tiz = pd.Series(tiz_avgs, name="ממוצע תיז")
+    tot.index = df1.index
+    tiz.index = df1.index
+    df1["ממוצע כללי"] = tot
+    df1["ממוצע פיזי"] = tiz
+    df2 = pd.DataFrame(columns=["שם","מספר בגיבוש", "מספר אישי", "מראיין", "מגבש", "ציון ממוצע בתחנות הגיבוש", 'חו"ד מראיין', 'חו"ד מגבש', "מצב עדכני במסלול(שליש)"])
+    df2.index = df2['מספר אישי']
+    df2.drop(['מספר אישי'], axis=1, inplace=True)
+
+    ws1 = wb.add_sheet('תוצאות גיבוש')
+    ws2 = wb.add_sheet('מצב נוכחי')
+    writer = pd.ExcelWriter('multiple.xlsx', engine='xlsxwriter')
+    df1.to_excel(writer, 'תוצאות גיבוש')
+    df2.to_excel(writer, 'מצב נוכחי')
+    writer.save()
+    # file_stream = BytesIO()
+    # file_stream.seek(0)
+    return send_file("multiple.xlsx", as_attachment=True, attachment_filename="multiple.xlsx", cache_timeout=5, )
 
 
 if __name__ == "__main__":
