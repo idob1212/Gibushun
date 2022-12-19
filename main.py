@@ -898,7 +898,6 @@ def update_date():
 @app.route('/download-b/')
 @admin_only
 def downloadb():
-    os.remove("multiple.xlsx")
     wb = Workbook()
     # candidates_query = db.query(Candidate)
     candidates = Candidate.query.all()
