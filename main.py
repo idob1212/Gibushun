@@ -463,7 +463,6 @@ def manageGroups():
 @app.route("/delete-candidate/<candidate_id>")
 def delete_candidate(candidate_id):
     user_to_delete = Candidate.query.get(str(current_user.id) + "/" + candidate_id)
-    user_to_delete.id += "**"
     user_to_delete.status = "פרש"
     db.session.commit()
     update_avgs_nf()
@@ -471,8 +470,7 @@ def delete_candidate(candidate_id):
 
 @app.route("/return/<candidate_id>")
 def return_candidate(candidate_id):
-    user_to_return = Candidate.query.get(str(current_user.id) +"/" + candidate_id+"**")
-    user_to_return.id = user_to_return.id.split("**")[0]
+    user_to_return = Candidate.query.get(str(current_user.id) +"/" + candidate_id)
     user_to_return.status = ""
     db.session.commit()
     update_avgs_nf()
@@ -538,7 +536,7 @@ def showPhysicalReviews():
     candidate_nums = []
     for candidate in candidates:
         if candidate.status != "פרש":
-            candidate_nums.append(candidate.id.split("/")[1])
+            candidate_nums.append(int(candidate.id.split("/")[1]))
     candidate_nums.sort()
     form.subject.choices = candidate_nums
     if form.validate_on_submit():
@@ -548,7 +546,7 @@ def showPhysicalReviews():
         candidate_nums = []
         for candidate in candidates:
             if candidate.status != "פרש":
-                candidate_nums.append(candidate.id.split("/")[1])
+                candidate_nums.append(int(candidate.id.split("/")[1]))
         candidate_nums.sort()
         form.subject.choices = candidate_nums
         candidate = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(form.subject.data)).first()
@@ -591,7 +589,7 @@ def showODTReviews():
     candidate_nums = []
     for candidate in candidates:
         if candidate.status != "פרש":
-            candidate_nums.append(candidate.id.split("/")[1])
+            candidate_nums.append(int(candidate.id.split("/")[1]))
     candidate_nums.sort()
     form.id.choices = candidate_nums
     if form.validate_on_submit():
@@ -600,7 +598,7 @@ def showODTReviews():
         candidate_nums = []
         for candidate in candidates:
             if candidate.status != "פרש":
-                candidate_nums.append(candidate.id.split("/")[1])
+                candidate_nums.append(int(candidate.id.split("/")[1]))
         candidate_nums.sort()
         form.id.choices = candidate_nums
         candidate = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(form.id.data)).first()
@@ -633,7 +631,7 @@ def showCandidate():
     candidate_nums = []
     for candidate in candidates:
         if candidate.status != "פרש":
-            candidate_nums.append(candidate.id.split("/")[1])
+            candidate_nums.append(int(candidate.id.split("/")[1]))
     candidate_nums.sort()
     form.id.choices = candidate_nums
     if form.validate_on_submit():
@@ -642,7 +640,7 @@ def showCandidate():
         candidate_nums = []
         for candidate in candidates:
             if candidate.status != "פרש":
-                candidate_nums.append(candidate.id.split("/")[1])
+                candidate_nums.append(int(candidate.id.split("/")[1]))
         candidate_nums.sort()
         form.id.choices = candidate_nums
         candidate = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(form.id.data)).first()
@@ -657,7 +655,7 @@ def showCandidateAdmin():
     form = selectCandidateAdmin()
     form.group.choices = get_groups()
     if form.group.data:
-        candidates = [candidate.id.split("/")[1] for candidate in Candidate.query.filter_by(group_id=int(form.group.data)).all() if candidate.status != "פרש"]
+        candidates = [int(candidate.id.split("/")[1]) for candidate in Candidate.query.filter_by(group_id=int(form.group.data)).all() if candidate.status != "פרש"]
         candidates.sort()
         form.id.choices = candidates
     else:
@@ -679,7 +677,7 @@ def AddStatus():
     candidate_nums = []
     for candidate in candidates:
         if candidate.status != "פרש":
-            candidate_nums.append(candidate.id.split("/")[1])
+            candidate_nums.append(int(candidate.id.split("/")[1]))
     candidate_nums.sort()
     form.id.choices = candidate_nums
     form.final_status.choices = ["לא לגעת - קו אדום", "בלית ברירה", "כן, אבל", "להתאבד"]
@@ -698,7 +696,7 @@ def Interview():
     candidate_nums = []
     for candidate in candidates:
         if candidate.status != "פרש":
-            candidate_nums.append(candidate.id.split("/")[1])
+            candidate_nums.append(int(candidate.id.split("/")[1]))
     candidate_nums.sort()
     form.id.choices = candidate_nums
     form.grade.choices = ["לא לגעת - קו אדום", "בלית ברירה", "כן, אבל", "להתאבד"]
@@ -719,7 +717,7 @@ def showInterview():
     candidate_nums = []
     for candidate in candidates:
         if candidate.status != "פרש":
-            candidate_nums.append(candidate.id.split("/")[1])
+            candidate_nums.append(int(candidate.id.split("/")[1]))
     candidate_nums.sort()
     form.id.choices = candidate_nums
     if form.validate_on_submit():
@@ -797,7 +795,7 @@ def edit_review(review_id):
     candidate_nums = []
     for candidate in candidates:
         if candidate.status != "פרש":
-            candidate_nums.append(candidate.id.split("/")[1])
+            candidate_nums.append(int(candidate.id.split("/")[1]))
     candidate_nums.sort()
     form = CreateReviewForm(station=review.station, grade=review.grade, note=review.note, subject=review.subject_id.split("/")[1] )
     form.subject.choices = candidate_nums
@@ -823,7 +821,7 @@ def edit_physical_review(review_id):
     candidate_nums = []
     for candidate in candidates:
         if candidate.status != "פרש":
-            candidate_nums.append(candidate.id.split("/")[1])
+            candidate_nums.append(int(candidate.id.split("/")[1]))
     candidate_nums.sort()
     form = CreateReviewForm(station=review.station, grade=review.grade, note=review.note, subject=review.subject_id.split("/")[1] )
     form.subject.choices = candidate_nums
@@ -846,7 +844,7 @@ def edit_odt_review(review_id):
     candidate_nums = []
     for candidate in candidates:
         if candidate.status != "פרש":
-            candidate_nums.append(candidate.id.split("/")[1])
+            candidate_nums.append(int(candidate.id.split("/")[1]))
     candidate_nums.sort()
     form = CreateReviewForm(station=review.station, grade=review.grade, note=review.note, subject=review.subject_id.split("/")[1] )
     form.subject.choices = candidate_nums
