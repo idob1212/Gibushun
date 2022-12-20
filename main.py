@@ -958,7 +958,7 @@ def downloadb():
     writer.save()
     # file_stream = BytesIO()
     # file_stream.seek(0)
-    return send_file("multiple.xlsx", as_attachment=True, attachment_filename="multiple.xlsx", cache_timeout=5, )
+    return send_file("multiple.xlsx", as_attachment=True, attachment_filename="data.xlsx", cache_timeout=5, )
 
 
 if __name__ == "__main__":
