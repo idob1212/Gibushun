@@ -449,7 +449,7 @@ def manageCandidates():
     candidates.sort(key=lambda x: int(x.id.split("/")[1]))
     retired = Candidate.query.filter_by(group_id=current_user.id).all()
     retired = [candidate for candidate in retired if candidate.status == "פרש"]
-    candidates.sort(key=lambda x: int(x.id.split("**")[0].split("/")[1]))
+    candidates.sort(key=lambda x: int(x.id.split("/")[1]))
     return render_template('panel.html', candidates=candidates, retired=retired, current_user=current_user)
 
 
