@@ -85,7 +85,7 @@ th{
         {%  if candidate.status != "פרש" %}
             <td>{{ candidate.id.split("/")[1] }}</td>
         {% else %}
-            <td style="color:red">{{ candidate.id.split("/")[1] }}</td>
+            <td style="color:red">{{ candidate.id.split("/")[1] }}**</td>
         {% endif %}
         <td>{{ candidate.name }}</td>
         {%   if candidate.status != "פרש" %}
