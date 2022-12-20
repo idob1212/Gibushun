@@ -79,6 +79,22 @@ th{
         {% endif %}
     </tr>
         {% endfor %}
+            {% for candidate in retired %}
+
+    <tr>
+        {%  if candidate.status != "פרש" %}
+            <td>{{ candidate.id.split("/")[1] }}</td>
+        {% else %}
+            <td style="color:red">{{ candidate.id.split("/")[1] }}</td>
+        {% endif %}
+        <td>{{ candidate.name }}</td>
+        {%   if candidate.status != "פרש" %}
+        <td><a href="{{url_for('delete_candidate', candidate_id=candidate.id.split("/")[1]) }}">פרש</a></td>
+            {% else %}
+        <td><a href="{{url_for('return_candidate', candidate_id= candidate.id.split("**")[0].split("/")[1]) }}">הפוך לפעיל</a></td>
+        {% endif %}
+    </tr>
+        {% endfor %}
     </tbody>
 </table>
 </body>
