@@ -563,7 +563,7 @@ def showPhysicalReviews():
 @admin_only
 def showPhysicalReviewsAdmin():
     form = SelectPhysicalReviewsFormAdmin()
-    form.group.choices = [group.id for group in User.query.all() if group.id != 0]
+    form.group.choices = get_groups()
     form.station.choices = ["ספרינטים", "גם וגם","זחילות"]
     if form.group.data:
         candidates = [candidate.id.split("/")[1] for candidate in Candidate.query.filter_by(group_id=int(form.group.data)).all() if candidate.status != "פרש"]
@@ -610,7 +610,7 @@ def showODTReviews():
 @admin_only
 def showODTReviewsAdmin():
     form = selectCandidateAdmin()
-    form.group.choices = [group.id for group in User.query.all() if group.id != 0]
+    form.group.choices = get_groups()
     if form.group.data:
         candidates = [candidate.id.split("/")[1] for candidate in Candidate.query.filter_by(group_id=int(form.group.data)).all() if candidate.status != "פרש"]
     else:
