@@ -438,7 +438,7 @@ def add_new_review():
         db.session.add(new_review)
         db.session.commit()
         update_avgs(form)
-        return redirect(url_for("add_new_review"))
+        return render_template("make-post.html", form=form, current_user=current_user)
     return render_template("make-post.html", form=form, current_user=current_user)
 
 
