@@ -1,9 +1,12 @@
 import os
 from io import BytesIO
 import logging
+
+import flask
+import requests
 import sqlalchemy
 from flask import Flask, render_template, redirect, url_for, flash, abort, request, jsonify, send_from_directory, \
-    send_file, after_this_request
+    send_file, after_this_request, request
 from flask_bootstrap import Bootstrap
 from flask_ckeditor import CKEditor
 from datetime import date, datetime
@@ -16,7 +19,8 @@ from sqlalchemy.orm import relationship
 from flask_login import UserMixin, login_user, LoginManager, login_required, current_user, logout_user
 from forms import LoginForm, RegisterForm, CreateReviewForm, EditUserForm, Search_review, EditReviewForm, \
     UpdateDateForm, NewCandidateForm, SelectPhysicalReviewsForm, ShowStaionForm, selectCandidate, AddFinalStatusForm, \
-    SelectPhysicalReviewsFormAdmin, ShowStaionFormAdmin, selectCandidateAdmin, selectGroup, AddNameForm, InterviewForm
+    SelectPhysicalReviewsFormAdmin, ShowStaionFormAdmin, selectCandidateAdmin, selectGroup, AddNameForm, InterviewForm, \
+    GroupReviewForm
 from flask_gravatar import Gravatar
 import sys
 import logging
@@ -442,6 +446,64 @@ def add_new_review():
         return render_template("make-post.html", form=form, current_user=current_user)
     return render_template("make-post.html", form=form, current_user=current_user)
 
+@app.route("/new-group-review", methods=["GET", "POST"])
+def add_new_group_review():
+    form = GroupReviewForm()
+    form.station.choices = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "מעגל זנבות",
+                             "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור", "ODT בניית פסל סביבתי",
+                             "ODT בניית אוהל סיירים", "ODT בניית צילייה", 'ODT מעבר שד"מ', "ODT הסתדרות לפי גובה",
+                             "ODT שבלול", "ODT צורת ריבוע בחבל"]
+
+    candidates = Candidate.query.filter_by(group_id=current_user.id).all()
+    candidates = [int(candidate.id.split("/")[1]) for candidate in candidates if candidate.status != "פרש"]
+    candidates.sort()
+    return render_template('make-post-group.html', candidates=candidates, user_form=form, current_user=current_user)
+
+@app.route('/add-review-candidate', methods=['POST'])
+def addOneReview():
+  form = GroupReviewForm()
+  if form.validate_on_submit():
+    if form.grade != 0:
+        new_review = Review(
+            station="ספרינטים",
+            subject_id=str(current_user.id) + "/" + str(form.subject.data),
+            grade=form.grade.data,
+            note=form.note.data,
+            author=current_user,
+            subject=Candidate.query.filter_by(id=str(current_user.id) + "/" + str(form.subject.data)).first()
+        )
+        db.session.add(new_review)
+        db.session.commit()
+        update_avgs(form)
+        form.note.data = ""
+  return 'User updated'
+
+@app.route('/add-all', methods=['GET','POST'])
+def update_all():
+    candidates = Candidate.query.filter_by(group_id=current_user.id).all()
+    candidates = [int(candidate.id.split("/")[1]) for candidate in candidates if candidate.status != "פרש"]
+    candidates.sort()
+    counter = 0
+    output = []
+    result2 = request.form.to_dict(flat=False)
+    station = result2['station'][0]
+    result2.pop('station')
+    datamap = [{key: value[i] for key, value in result2.items()} for i in range(len(result2['grade']))]
+    for point in datamap:
+        if int(point['grade']) != 0:
+            new_review = Review(
+                station=station,
+                subject_id=str(current_user.id) + "/" + str(candidates[counter]),
+                grade=int(point['grade']),
+                note=point['note'],
+                author=current_user,
+                subject=Candidate.query.filter_by(id=str(current_user.id) + "/" + str(candidates[counter])).first()
+            )
+            db.session.add(new_review)
+            db.session.commit()
+        counter += 1
+    update_avgs_nf()
+    return redirect(url_for('add_new_group_review'))
 
 @app.route('/group-manage', methods=["GET", "POST"])
 def manageCandidates():
