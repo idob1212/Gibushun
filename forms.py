@@ -91,6 +91,13 @@ class selectCandidate(FlaskForm):
     id = SelectField("בחר מגובש", validators=[DataRequired()])
     submit = SubmitField("הצג")
 
+class GroupReviewForm(FlaskForm):
+    subject = StringField("בחר מגובש", validators=[DataRequired()])
+    station = SelectField("בחר תחנה", validators=[DataRequired()])
+    grade = SelectField(choices=[0,1,2,3,4])
+    note = StringField('הערה')
+    submit = SubmitField('הזן')
+
 class selectCandidateAdmin(FlaskForm):
     group = SelectField("בחר קבוצה", validators=[DataRequired()])
     id = SelectField("בחר מגובש", validators=[DataRequired()])
