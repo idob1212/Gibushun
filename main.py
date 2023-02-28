@@ -676,10 +676,12 @@ def showODTReviewsAdmin():
     form.group.choices = get_groups()
     if form.group.data:
         candidates = [candidate.id.split("/")[1] for candidate in Candidate.query.filter_by(group_id=int(form.group.data)).all() if candidate.status != "פרש"]
-    else:
+        candidates.sort()
+        form.id.choices = candidates
+    elif len(get_groups()) > 0:
         candidates = [int(candidate.id.split("/")[1]) for candidate in Candidate.query.filter_by(group_id=get_groups()[0]).all() if candidate.status != "פרש"]
-    candidates.sort()
-    form.id.choices = candidates
+        candidates.sort()
+        form.id.choices = candidates
     if request.method == "POST":
         candidate = Candidate.query.filter_by(id=str(form.group.data) + "/" + str(form.id.data)).first()
         reviews = Review.query.filter_by(subject_id=candidate.id).all()
@@ -721,7 +723,7 @@ def showCandidateAdmin():
         candidates = [int(candidate.id.split("/")[1]) for candidate in Candidate.query.filter_by(group_id=int(form.group.data)).all() if candidate.status != "פרש"]
         candidates.sort()
         form.id.choices = candidates
-    else:
+    elif len(get_groups()) > 0:
         candidates = [int(candidate.id.split("/")[1]) for candidate in Candidate.query.filter_by(group_id=get_groups()[0]).all() if candidate.status != "פרש"]
         candidates.sort()
         form.id.choices = candidates
@@ -798,7 +800,7 @@ def showInterviewAdmin():
         candidates = [candidate.id.split("/")[1] for candidate in Candidate.query.filter_by(group_id=int(form.group.data)).all() if candidate.status != "פרש"]
         candidates.sort()
         form.id.choices = candidates
-    else:
+    elif len(get_groups()) >0:
         candidates = [int(candidate.id.split("/")[1]) for candidate in Candidate.query.filter_by(group_id=get_groups()[0]).all() if candidate.status != "פרש"]
         candidates.sort()
         form.id.choices = candidates
