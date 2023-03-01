@@ -981,7 +981,7 @@ def update_date():
     return render_template("update-date.html", form=form, current_user=current_user)
 
 
-@app.route('/download-b/')
+@app.route('/download-sheet/')
 @admin_only
 def downloadb():
     wb = Workbook()
