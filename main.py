@@ -994,12 +994,12 @@ def downloadb():
     df1.columns = ["מספר מגובש", "מספר קבוצה", "שם", "סטטוס סיכום", "הערת סיכום", "ציון ראיון", "סיכום ראיון", "בעיות תש", "בעיות רפואיות"]
     df1["מגבש"] = pd.Series()
     groups =[]
-    for value in df1.index:
-        groups.append(df1.loc[value,"מספר מגובש"].split("/")[0])
-    names =[]
-    for group in groups:
-        names.append(User.query.filter_by(id=int(group)).first().name)
-    df1["מגבש"] = pd.Series(names)
+    # for value in df1.index:
+    #     groups.append(df1.loc[value,"מספר מגובש"].split("/")[0])
+    # names =[]
+    # for group in groups:
+    #     names.append(User.query.filter_by(id=int(group)).first().name)
+    # df1["מגבש"] = pd.Series(names)
     # for index, row in df1.iterrows():
     #     df1.iloc[index,-1] = User.query.filter_by(id=int(df1.iloc[index,0].split("/")[0])).first().name
     df1.index = df1['מספר מגובש']
@@ -1043,6 +1043,10 @@ def downloadb():
     tiz.index = df1.index
     df1["ממוצע כללי"] = tot
     df1["ממוצע פיזי"] = tiz
+    names = []
+    df1["מגבש"] = pd.Series()
+    for value in df1.index:
+        df1.loc[value,"מגבש"] = User.query.filter_by(id=int(df1.loc[value,"מספר קבוצה"])).first().name
     df2 = pd.DataFrame(columns=["שם","מספר בגיבוש", "מספר אישי", "מראיין", "מגבש", "ציון ממוצע בתחנות הגיבוש", 'חו"ד מראיין', 'חו"ד מגבש', "מצב עדכני במסלול(שליש)"])
     df2.index = df2['מספר אישי']
     df2.drop(['מספר אישי'], axis=1, inplace=True)
