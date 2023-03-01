@@ -325,6 +325,13 @@ def update_avgs_nf():
         if review and count == 0:
             db.session.delete(review)
             db.session.commit()
+        if count != 0 and not review:
+            new_review = Review(station="ספרינטים סיכום",
+                                subject_id=candidate.id,
+                                grade=0, note="", author=current_user,
+                                subject=candidate)
+            db.session.add(new_review)
+            db.session.commit()
         if count != 0 and review:
             review.grade = avg/count
             db.session.commit()
@@ -336,6 +343,13 @@ def update_avgs_nf():
         review = Review.query.filter_by(station="זחילות סיכום", subject_id=candidate.id).first()
         if review and count == 0:
             db.session.delete(review)
+            db.session.commit()
+        if count != 0 and not review:
+            new_review = Review(station="זחילות סיכום",
+                                subject_id=candidate.id,
+                                grade=0, note="", author=current_user,
+                                subject=candidate)
+            db.session.add(new_review)
             db.session.commit()
         if count != 0 and review:
             review.grade = avg/count
@@ -350,6 +364,13 @@ def update_avgs_nf():
         review = Review.query.filter_by(station="ODT סיכום", subject_id=candidate.id).first()
         if review and count == 0:
             db.session.delete(review)
+            db.session.commit()
+        if count != 0 and not review:
+            new_review = Review(station="ODT סיכום",
+                                subject_id=candidate.id,
+                                grade=0, note="", author=current_user,
+                                subject=candidate)
+            db.session.add(new_review)
             db.session.commit()
         if count != 0 and review:
             review.grade = avg/count
@@ -465,7 +486,7 @@ def addOneReview():
   if form.validate_on_submit():
     if form.grade != 0:
         new_review = Review(
-            station="ספרינטים",
+            station=form.station.data,
             subject_id=str(current_user.id) + "/" + str(form.subject.data),
             grade=form.grade.data,
             note=form.note.data,
