@@ -992,9 +992,9 @@ def downloadb():
     df1 = df1[df1["status"] != "פרש"]
     df1.drop(['status'], axis=1, inplace=True)
     df1.columns = ["מספר מגובש", "מספר קבוצה", "שם", "סטטוס סיכום", "הערת סיכום", "ציון ראיון", "סיכום ראיון", "בעיות תש", "בעיות רפואיות"]
-    df1["מגבש"] = pd.Series()
-    for index, row in df1.iterrows():
-        df1.iloc[index,-1] = User.query.filter_by(id=int(df1.iloc[index,0].split("/")[0])).first().name
+    # df1["מגבש"] = pd.Series()
+    # for index, row in df1.iterrows():
+    #     df1.iloc[index,-1] = User.query.filter_by(id=int(df1.iloc[index,0].split("/")[0])).first().name
     df1.index = df1['מספר מגובש']
     df1 = df1.drop(['מספר מגובש'], axis=1)
     df1.sort_index(inplace=True)
