@@ -1,7 +1,6 @@
 import os
 from io import BytesIO
 import logging
-
 import flask
 import requests
 import sqlalchemy
@@ -11,7 +10,6 @@ from flask_bootstrap import Bootstrap
 from flask_ckeditor import CKEditor
 from datetime import date, datetime
 from functools import wraps
-
 from sqlalchemy import engine
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
@@ -312,7 +310,7 @@ def logout():
     logout_user()
     return redirect(url_for('home'))
 
-stations = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "ODT", "מעגל זנבות", "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור"]
+stations = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "ODT", "מעגל זנבות", "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור", "אחר"]
 def update_avgs_nf():
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     for candidate in candidates:
@@ -441,7 +439,7 @@ def subject(group):
 
 @app.route("/new-review", methods=["GET", "POST"])
 def add_new_review():
-    stations = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "מעגל זנבות", "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור", "ODT בניית פסל סביבתי" , "ODT בניית אוהל סיירים", "ODT בניית צילייה", 'ODT מעבר שד"מ', "ODT הסתדרות לפי גובה", "ODT שבלול", "ODT צורת ריבוע בחבל"]
+    stations = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "מעגל זנבות", "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור", "ODT בניית פסל סביבתי" , "ODT בניית אוהל סיירים", "ODT בניית צילייה", 'ODT מעבר שד"מ', "ODT הסתדרות לפי גובה", "ODT שבלול", "ODT צורת ריבוע בחבל","אחר"]
     form = CreateReviewForm()
     form.station.choices = stations
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
@@ -473,7 +471,7 @@ def add_new_group_review():
     form.station.choices = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "מעגל זנבות",
                              "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור", "ODT בניית פסל סביבתי",
                              "ODT בניית אוהל סיירים", "ODT בניית צילייה", 'ODT מעבר שד"מ', "ODT הסתדרות לפי גובה",
-                             "ODT שבלול", "ODT צורת ריבוע בחבל"]
+                             "ODT שבלול", "ODT צורת ריבוע בחבל", "אחר"]
 
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     candidates = [int(candidate.id.split("/")[1]) for candidate in candidates if candidate.status != "פרש"]
@@ -836,7 +834,7 @@ def showStationReviewsAdmin():
     form = ShowStaionFormAdmin()
     form.group.choices = get_groups()
     stations = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "ODT", "מעגל זנבות",
-                "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור"]
+                "אלונקה סוציומטרית", "הרצאות", "בניית שוח","חפירת בור", "אחר"]
     form.station.choices = stations
     if form.validate_on_submit():
         form = ShowStaionFormAdmin()
@@ -857,7 +855,7 @@ def showStationReviewsAdmin():
 def showStationReviews():
     form = ShowStaionForm()
     stations = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "ODT", "מעגל זנבות",
-                "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור"]
+                "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור", "אחר"]
     form.station.choices = stations
     if form.validate_on_submit():
         reviews = Review.query.filter_by(author_id=current_user.id, station=form.station.data).all()
@@ -875,7 +873,7 @@ def showStationReviews():
 
 @app.route("/edit-review/<int:review_id>", methods=["GET", "POST"])
 def edit_review(review_id):
-    stations = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "מעגל זנבות", "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור", "ODT בניית פסל סביבתי" , "ODT בניית אוהל סיירים", "ODT בניית צילייה", 'ODT מעבר שד"מ', "ODT הסתדרות לפי גובה", "ODT שבלול", "ODT צורת ריבוע בחבל"]
+    stations = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "מעגל זנבות", "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור", "ODT בניית פסל סביבתי" , "ODT בניית אוהל סיירים", "ODT בניית צילייה", 'ODT מעבר שד"מ', "ODT הסתדרות לפי גובה", "ODT שבלול", "ODT צורת ריבוע בחבל", "אחר"]
     review = Review.query.get(review_id)
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     candidate_nums = []
@@ -900,7 +898,7 @@ def edit_review(review_id):
 
 @app.route("/edit-physical-review/<int:review_id>", methods=["GET", "POST"])
 def edit_physical_review(review_id):
-    stations = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "מעגל זנבות", "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור", "ODT בניית פסל סביבתי" , "ODT בניית אוהל סיירים", "ODT בניית צילייה", 'ODT מעבר שד"מ', "ODT הסתדרות לפי גובה", "ODT שבלול", "ODT צורת ריבוע בחבל"]
+    stations = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "מעגל זנבות", "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור", "ODT בניית פסל סביבתי" , "ODT בניית אוהל סיירים", "ODT בניית צילייה", 'ODT מעבר שד"מ', "ODT הסתדרות לפי גובה", "ODT שבלול", "ODT צורת ריבוע בחבל", "אחר"]
 
     review = Review.query.get(review_id)
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
@@ -924,7 +922,7 @@ def edit_physical_review(review_id):
 
 @app.route("/edit-odt-review/<int:review_id>", methods=["GET", "POST"])
 def edit_odt_review(review_id):
-    stations = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "מעגל זנבות", "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור", "ODT בניית פסל סביבתי" , "ODT בניית אוהל סיירים", "ODT בניית צילייה", 'ODT מעבר שד"מ', "ODT הסתדרות לפי גובה", "ODT שבלול", "ODT צורת ריבוע בחבל"]
+    stations = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "מעגל זנבות", "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור", "ODT בניית פסל סביבתי" , "ODT בניית אוהל סיירים", "ODT בניית צילייה", 'ODT מעבר שד"מ', "ODT הסתדרות לפי גובה", "ODT שבלול", "ODT צורת ריבוע בחבל","אחר"]
     review = Review.query.get(review_id)
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     candidate_nums = []
