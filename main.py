@@ -310,7 +310,7 @@ def logout():
     logout_user()
     return redirect(url_for('home'))
 
-stations = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "ODT", "מעגל זנבות", "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור", "אחר"]
+stations = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "ODT", "מעגל זנבות", "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול", "אחר"]
 def update_avgs_nf():
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     for candidate in candidates:
@@ -439,7 +439,7 @@ def subject(group):
 
 @app.route("/new-review", methods=["GET", "POST"])
 def add_new_review():
-    stations = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "מעגל זנבות", "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור", "ODT רשת עכביש" , "ODT מעגל מספריים", "ODT הולכת לוחם", 'ODT בניית מגדל אבנים', "אחר"]
+    stations = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "מעגל זנבות", "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול", "ODT רשת עכביש" , "ODT מעגל מספריים", "ODT הולכת לוחם", 'ODT בניית מגדל אבנים', "אחר"]
     form = CreateReviewForm()
     form.station.choices = stations
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
@@ -469,7 +469,7 @@ def add_new_review():
 def add_new_group_review():
     form = GroupReviewForm()
     form.station.choices = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "מעגל זנבות",
-                             "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור", "ODT רשת עכביש",
+                             "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול", "ODT רשת עכביש",
                              "ODT מעגל מספריים", "ODT הולכת לוחם", 'ODT בניית מגדל אבנים', "אחר"]
 
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
@@ -833,7 +833,7 @@ def showStationReviewsAdmin():
     form = ShowStaionFormAdmin()
     form.group.choices = get_groups()
     stations = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "ODT", "מעגל זנבות",
-                "אלונקה סוציומטרית", "הרצאות", "בניית שוח","חפירת בור", "אחר"]
+                "אלונקה סוציומטרית", "הרצאות", "בניית שוח","חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול", "אחר"]
     form.station.choices = stations
     if form.validate_on_submit():
         form = ShowStaionFormAdmin()
@@ -854,7 +854,7 @@ def showStationReviewsAdmin():
 def showStationReviews():
     form = ShowStaionForm()
     stations = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "ODT", "מעגל זנבות",
-                "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור", "אחר"]
+                "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול", "אחר"]
     form.station.choices = stations
     if form.validate_on_submit():
         reviews = Review.query.filter_by(author_id=current_user.id, station=form.station.data).all()
@@ -872,7 +872,7 @@ def showStationReviews():
 
 @app.route("/edit-review/<int:review_id>", methods=["GET", "POST"])
 def edit_review(review_id):
-    stations = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "מעגל זנבות", "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור", "ODT רשת עכביש" , "ODT מעגל מספריים", "ODT הולכת לוחם", 'ODT בניית מגדל אבנים', "אחר"]
+    stations = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "מעגל זנבות", "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול", "ODT רשת עכביש" , "ODT מעגל מספריים", "ODT הולכת לוחם", 'ODT בניית מגדל אבנים', "אחר"]
     review = Review.query.get(review_id)
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     candidate_nums = []
@@ -897,7 +897,7 @@ def edit_review(review_id):
 
 @app.route("/edit-physical-review/<int:review_id>", methods=["GET", "POST"])
 def edit_physical_review(review_id):
-    stations = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "מעגל זנבות", "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור", "ODT רשת עכביש" , "ODT מעגל מספריים", "ODT הולכת לוחם", 'ODT בניית מגדל אבנים', "אחר"]
+    stations = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "מעגל זנבות", "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול", "ODT רשת עכביש" , "ODT מעגל מספריים", "ODT הולכת לוחם", 'ODT בניית מגדל אבנים', "אחר"]
 
     review = Review.query.get(review_id)
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
@@ -921,7 +921,7 @@ def edit_physical_review(review_id):
 
 @app.route("/edit-odt-review/<int:review_id>", methods=["GET", "POST"])
 def edit_odt_review(review_id):
-    stations = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "מעגל זנבות", "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור", "ODT רשת עכביש" , "ODT מעגל מספריים", "ODT הולכת לוחם",'ODT בניית מגדל אבנים', "אחר"]
+    stations = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "מעגל זנבות", "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול", "ODT רשת עכביש" , "ODT מעגל מספריים", "ODT הולכת לוחם",'ODT בניית מגדל אבנים', "אחר"]
     review = Review.query.get(review_id)
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     candidate_nums = []
