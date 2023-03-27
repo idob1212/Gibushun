@@ -649,7 +649,7 @@ def showPhysicalReviewsAdmin():
     if form.group.data:
         candidates = [candidate.id.split("/")[1] for candidate in Candidate.query.filter_by(group_id=int(form.group.data)).all() if candidate.status != "פרש"]
     else:
-        candidates = [int(candidate.id.split("/")[1]) for candidate in Candidate.query.filter_by(group_id=2).all() if candidate.status != "פרש"]
+        candidates = [int(candidate.id.split("/")[1]) for candidate in Candidate.query.filter_by(group_id=1).all() if candidate.status != "פרש"]
     candidates.sort()
     form.subject.choices = candidates
     if request.method == "POST":
