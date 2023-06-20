@@ -31,14 +31,73 @@
 }</style>
   <div class="overlay"></div>
   <div class="container">
+        <a href = "{{ url_for('circles') }}"><button class="btn btn-primary btn-lg btn-block" style="margin-bottom: 10px;"> עבור למצב ספרינט\זחילות</button></a>
       <a href = "{{ url_for('add_new_group_review') }}"><button class="btn btn-primary btn-lg btn-block" style="margin-bottom: 10px;"> עבור למצב קבוצתי</button></a>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    var stationField = document.getElementById('station');
+
+    stationField.addEventListener('change', function() {
+      var selectedStation = stationField.value;
+      var additionalField = document.getElementById('additionalField');
+
+      if (selectedStation === 'ODT') {
+        additionalField.style.display = 'block';
+      } else {
+        additionalField.style.display = 'none';
+      }
+    });
+  });
+</script>
 
     <div class="row">
-      <div class="col-lg-8 col-md-10 mx-auto", style="direction: rtl; float: right">
-{#        {{ ckeditor.load() }}#}
-{#        {{ ckeditor.config(name='body') }}#}
-        {{ wtf.quick_form(form, novalidate=True, button_map={"submit": "primary"}) }}
-      </div>
+{#      <div class="col-lg-8 col-md-10 mx-auto", style="direction: rtl; float: right">#}
+{#        {{ wtf.quick_form(form, novalidate=True, button_map={"submit": "primary"}) }}#}
+{#        <div id="additionalField" style="display: none">#}
+{##}
+{#        </div>#}
+{#      </div>#}
+        <div class="col-lg-8 col-md-10 mx-auto" style="direction: rtl; float: right">
+  <form method="POST">
+    {{ form.hidden_tag() }}
+
+    <div class="form-group">
+      <label for="station">תחנה</label>
+      {{ form.station(class="form-control", required="required") }}
+    </div>
+
+    {% if form.station.data == 'ODT' %}
+    <div class="form-group" id="additionalField">
+        <label for="additionalField">שם ODT:</label>
+        {{ form.odt(class="form-control") }}
+    </div>
+      {% else: %}
+    <div class="form-group" id="additionalField" style="display: none">
+        <label for="additionalField">שם ODT:</label>
+        {{ form.odt(class="form-control") }}
+    </div>
+      {% endif %}
+
+    <div class="form-group">
+      <label for="subject">מספר מגובש</label>
+      {{ form.subject(class="form-control", required="required") }}
+    </div>
+
+    <div class="form-group">
+      <label for="grade">ציון</label>
+      {{ form.grade(class="form-control", required="required") }}
+    </div>
+
+    <div class="form-group">
+      <label for="note">הערות</label>
+      {{ form.note(class="form-control") }}
+    </div>
+
+    <div class="form-group">
+      {{ form.submit(class="btn btn-primary") }}
+    </div>
+  </form>
+</div>
     </div>
   </div>
 

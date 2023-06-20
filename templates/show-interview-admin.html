@@ -86,6 +86,7 @@ th{
     <thead>
     <tr>
         <th>ציון ראיון</th>
+        <th>שם מראיין</th>
         <th>סיכום ראיון</th>
         <th>בעיות תש</th>
         <th>בעיות רפואיות</th>
@@ -98,6 +99,7 @@ th{
     {% if candidate.interview_grade %}
     <tr>
         <td class="block">{{ candidate.interview_grade }}</td>
+        <td class="block">{{ candidate.interviewer }}</td>
         <td class="block">{{ candidate.interview_note }}</td>
         <td class="block">{{ candidate.tash_prob }}</td>
         <td class="block">{{ candidate.medical_prob }}</td>

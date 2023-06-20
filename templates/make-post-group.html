@@ -69,14 +69,36 @@ th,td{
     </style>
   <div class="overlay"></div>
   <div class="container">
+    <a href = "{{ url_for('circles') }}"><button class="btn btn-primary btn-lg btn-block" style="margin-bottom: 10px;"> עבור למצב ספרינט\זחילות</button></a>
     <a href = "{{ url_for('add_new_review') }}"><button class="btn btn-primary btn-lg btn-block" style="margin-bottom: 10px;"> עבור למצב יחיד</button></a>
     <div class="row">
+    <script>
+  document.addEventListener('DOMContentLoaded', function() {
+    var stationField = document.getElementById('station');
+
+    stationField.addEventListener('change', function() {
+      var selectedStation = stationField.value;
+      var additionalField = document.getElementById('additionalField');
+
+      if (selectedStation === 'ODT') {
+        additionalField.style.display = 'block';
+      } else {
+        additionalField.style.display = 'none';
+      }
+    });
+  });
+</script>
       <div class="col-lg-8 col-md-10 mx-auto", style="direction: rtl; float: right">
         <table class = "table table-bordered" style="width:100%; direction: rtl;">
         <form method="POST" action="/add-all">
         <tr>
+
       <td colspan="3" style="text-align: center; margin-right: 50%; margin-left: 50%" >
         {{ user_form.station() }}
+        <div class="form-group" id="additionalField" style="display: none">
+        <label for="additionalField">שם ODT:</label>
+        {{ user_form.odt(class="form-control") }}
+    </div>
       </td>
         </tr>
           <tr>
