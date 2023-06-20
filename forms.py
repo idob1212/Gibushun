@@ -7,6 +7,7 @@ from wtforms.fields.html5 import DateField
 
 class CreateReviewForm(FlaskForm):
     station = SelectField("תחנה", validators=[DataRequired()])
+    odt = TextAreaField("שם ODT:")
     subject = SelectField("מספר מגובש", validators=[DataRequired()])
     grade = SelectField("ציון", choices=[1, 2, 3, 4], validators=[DataRequired()])
     note = TextAreaField("הערות")
@@ -23,6 +24,8 @@ class SelectPhysicalReviewsFormAdmin(FlaskForm):
     station = SelectField("תחנה", validators=[DataRequired()])
     subject = SelectField("מספר מגובש", validators=[DataRequired()])
     submit = SubmitField("הצג תוצאה")
+
+
 
 class ShowStaionForm(FlaskForm):
     station = SelectField("תחנה", validators=[DataRequired()])
@@ -60,6 +63,7 @@ class NewCandidateForm(FlaskForm):
 
 class InterviewForm(FlaskForm):
     id = SelectField("מספר מגובש", validators=[DataRequired("זהו סעיף חובה")])
+    interviewer = StringField("שם מראיין", validators=[DataRequired("זהו סעיף חובה")])
     grade = SelectField("ציון ראיון", validators=[DataRequired("זהו סעיף חובה")])
     note = TextAreaField("סיכום ראיון", validators=[DataRequired("זהו סעיף חובה")])
     tash = TextAreaField('בעיות ת"ש')
@@ -73,7 +77,7 @@ class AddFinalStatusForm(FlaskForm):
     submit = SubmitField("הזן סיכום")
 
 class EditUserForm(FlaskForm):
-    name = StringField("שם מלא", validators=[DataRequired("זהו סעיף חובה")])
+    name = StringField("שם", validators=[DataRequired("זהו סעיף חובה")])
     submit = SubmitField("השלם עריכה")
 
 
@@ -94,6 +98,7 @@ class selectCandidate(FlaskForm):
 class GroupReviewForm(FlaskForm):
     subject = StringField("בחר מגובש", validators=[DataRequired()])
     station = SelectField("בחר תחנה", validators=[DataRequired()])
+    odt = StringField("שם ODT:")
     grade = SelectField(choices=[0,1,2,3,4])
     note = StringField('הערה')
     submit = SubmitField('הזן')

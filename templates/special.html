@@ -1,0 +1,29 @@
+{% extends 'bootstrap/base.html' %}
+
+{% block content %}
+{% include "header.html" %}
+<!-- Page Header -->
+<header class="masthead" style="background-image: url('{{ url_for('static', filename='img/review.jpg')}}')">
+  <div class="overlay"></div>
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8 col-md-10 mx-auto">
+        <div class="page-heading">
+        </div>
+      </div>
+    </div>
+  </div>
+  <link href="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" rel="stylesheet">
+  <script src="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js"></script>
+</header>
+
+<div class="overlay"></div>
+<div class="container">
+  <div class="row">
+    <div class="col-lg-8 col-md-10 mx-auto" style="direction: rtl; float: right">
+
+  </div>
+</div>
+
+{% include "footer.html" %}
+{% endblock %}

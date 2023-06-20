@@ -90,7 +90,6 @@ th{
     </thead>
     <tbody>
         {% for review in reviews %}
-            {% if review.station == "זחילות" or review.station == "ספרינטים" %}
     <tr>
         <td class="block">{{ review.station }}</td>
         <td class="block">{{ review.grade }}</td>
@@ -98,7 +97,6 @@ th{
         <td class="block"><a href="{{ url_for('edit_physical_review', review_id=review.id) }}">עריכה</a></td>
         <td class="block"><a href="{{ url_for('delete_physical_review', review_id=review.id) }}">מחק</a></td>
     </tr>
-            {% endif  %}
         {% endfor %}
     </tbody>
 {% endif %}
