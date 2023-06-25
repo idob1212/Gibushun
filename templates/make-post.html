@@ -41,7 +41,7 @@
       var selectedStation = stationField.value;
       var additionalField = document.getElementById('additionalField');
 
-      if (selectedStation === 'ODT') {
+      if (selectedStation === 'ODT' || selectedStation === 'אחר') {
         additionalField.style.display = 'block';
       } else {
         additionalField.style.display = 'none';
@@ -68,12 +68,12 @@
 
     {% if form.station.data == 'ODT' %}
     <div class="form-group" id="additionalField">
-        <label for="additionalField">שם ODT:</label>
+        <label for="additionalField">שם תחנה:</label>
         {{ form.odt(class="form-control") }}
     </div>
       {% else: %}
     <div class="form-group" id="additionalField" style="display: none">
-        <label for="additionalField">שם ODT:</label>
+        <label for="additionalField">שם תחנה:</label>
         {{ form.odt(class="form-control") }}
     </div>
       {% endif %}

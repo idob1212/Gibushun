@@ -484,7 +484,7 @@ def subject(group):
 
 @app.route("/new-review", methods=["GET", "POST"])
 def add_new_review():
-    stations = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "מעגל זנבות","ODT", "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול" , "נאסא", "אחר"]
+    stations = ["משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "מעגל זנבות", "ODT", "הרצאות", "בניית שוח", "חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול" , "נאסא", "אחר"]
     form = CreateReviewForm()
     form.station.choices = stations
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
@@ -495,8 +495,10 @@ def add_new_review():
     candidate_nums.sort()
     form.subject.choices = candidate_nums
     if form.validate_on_submit():
-        if form.odt.data != "":
+        if form.station.data == "ODT":
             form.station.data = form.station.data + " " + form.odt.data
+        if form.station.data == "אחר":
+            form.station.data = form.odt.data
         new_review = Review(
             station=form.station.data,
             subject_id=str(current_user.id) + "/" + str(form.subject.data),
@@ -517,7 +519,7 @@ def add_new_review():
 @app.route("/new-group-review", methods=["GET", "POST"])
 def add_new_group_review():
     form = GroupReviewForm()
-    stations = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "מעגל זנבות","ODT", "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול" , "נאסא", "אחר"]
+    stations = ["משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "מעגל זנבות","ODT", "הרצאות", "בניית שוח", "חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול" , "נאסא", "אחר"]
     form.station.choices = stations
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     candidates = [int(candidate.id.split("/")[1]) for candidate in candidates if candidate.status != "פרש"]
@@ -531,6 +533,8 @@ def addOneReview():
     if form.grade != 0:
         if form.station.data == "ODT":
             form.station.data = form.station.data + " " + form.odt.data
+        if form.station.data == "אחר":
+            form.station.data = form.odt.data
         new_review = Review(
             station=form.station.data,
             subject_id=str(current_user.id) + "/" + str(form.subject.data),
@@ -555,7 +559,9 @@ def update_all():
     result2 = request.form.to_dict(flat=False)
     station = result2['station'][0]
     if station == "ODT":
-        station = station +" " + result2['odt'][0]
+        station = station + " " + result2['odt'][0]
+    if station == "אחר":
+        station = result2['odt'][0]
     result2.pop('station')
     result2.pop("odt")
     datamap = [{key: value[i] for key, value in result2.items()} for i in range(len(result2['grade']))]
