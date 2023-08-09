@@ -240,7 +240,7 @@ def register():
             print(User.query.filter_by(id=form.id.data).first())
             #User already exists
             flash("משתמש כבר קיים!")
-            return redirect(url_for('manage'))
+            return redirect(url_for('register'))
 
         # hash_and_salted_password = generate_password_hash(
         #     form.password.data,
@@ -260,7 +260,7 @@ def register():
         # if current_user.id == 1:
         #     return redirect(url_for('manage'))
         # else:
-        return redirect(url_for('admin_home'))
+        return redirect(url_for('register'))
     return render_template("register.html", form=form, current_user=current_user)
 
 
