@@ -958,15 +958,15 @@ def edit_review(review_id):
             candidate_nums.append(int(candidate.id.split("/")[1]))
     candidate_nums.sort()
     if "ODT" in review.station:
-        form = CreateReviewForm(station="ODT", grade=review.grade, note=review.note,
-                                subject=review.subject_id.split("/")[1], odt=review.station.split("T ")[1])
+        form = CreateReviewForm(station=review.station, grade=review.grade, note=review.note,
+                                subject=review.subject_id.split("/")[1])
     else:
-        form = CreateReviewForm(station=review.station, grade=review.grade, note=review.note, subject=review.subject_id.split("/")[1], odt=review.odt)
+        form = CreateReviewForm(station=review.station, grade=review.grade, note=review.note, subject=review.subject_id.split("/")[1])
     form.subject.choices = candidate_nums
     form.station.choices = stations
     if form.validate_on_submit():
         if form.station.data == "ODT":
-            review.station = form.station.data + " " + form.odt.data
+            review.station = form.station.data
         else:
             review.station = form.station.data
         review.subject_id = str(current_user.id) + "/" + str(form.subject.data)
