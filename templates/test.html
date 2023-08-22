@@ -200,12 +200,9 @@ window.addEventListener('load', () => {
 
  fetch('/circles/finished', { // Update the endpoint to '/circles/finished'
     method: 'POST',
-    cache: false,
-    processData: false,
-    async: true,
+    mode: 'cors',
     headers: {
-      'Content-Type': 'application/json',
-        "cache-control": "no-cache"
+      'Content-Type': 'application/json'
     },
     body: JSON.stringify(data)
   })
@@ -247,12 +244,9 @@ window.addEventListener('load', () => {
 
  fetch('/circles/finished-act', { // Update the endpoint to '/circles/finished'
     method: 'POST',
-    cache: false,
-    processData: false,
-    async: true,
+    mode: 'cors',
     headers: {
-      'Content-Type': 'application/json',
-        "cache-control": "no-cache"
+      'Content-Type': 'application/json'
     },
     body: JSON.stringify(data)
   })
