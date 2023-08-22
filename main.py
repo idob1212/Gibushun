@@ -929,6 +929,7 @@ def showStationReviewsAdmin():
 @app.route("/station-reviews/", methods=["GET", "POST"])
 def showStationReviews():
     form = ShowStaionForm()
+    update_avgs_nf()
     stations = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "ODT", "מעגל זנבות",
                 "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול","נאסא", "אחר"]
     form.station.choices = stations
@@ -937,11 +938,11 @@ def showStationReviews():
         reviews.sort(key=lambda x: x.grade)
         if(form.station.data == "זחילות" or form.station.data == "ספרינטים"):
             reviews = Review.query.filter_by(station=form.station.data + " סיכום").all()
-            reviews = [review for review in reviews if review.subject_id.split("/")[0] == str(current_user.id)]
+            reviews = [review for review in reviews if str(review.author_id) == str(current_user.id)]
             reviews.sort(key=lambda x: x.grade * -1)
         if "ODT" in form.station.data:
             reviews = Review.query.filter_by(station="ODT סיכום").all()
-            reviews = [review for review in reviews if review.subject_id.split("/")[0] == str(current_user.id)]
+            reviews = [review for review in reviews if str(review.author_id) == str(current_user.id)]
             reviews.sort(key=lambda x: x.grade * -1)
         return render_template('rankings.html', reviews=reviews, form=form)
     return render_template('rankings.html', form=form)
