@@ -1069,13 +1069,19 @@ def updateActAvgs():
                 avg_station = f" סיכום ספרינטים - אקט {i}"
                 station = f"ספרינטים - אקט {i}"
                 for candidate in Candidate.query.filter_by(group_id=current_user.id).all():
-                    if Review.query.filter_by(station=avg_station, subject_id= candidate.id).first() is None:
-                        for review in Review.query.filter_by(station=station, subject_id= candidate.id).all():
-                            act_sum += review.grade
-                            act_count += 1
-                        if act_count != 0:
-                            act_avg = act_sum / act_count
-                            act_avg = round(act_avg, 2)
+                    act_count = 0
+                    act_sum = 0
+                    avg_review = Review.query.filter_by(station=avg_station, subject_id=candidate.id).first()
+                    for review in Review.query.filter_by(station=station, subject_id= candidate.id).all():
+                        act_sum += review.grade
+                        act_count += 1
+                    if act_count != 0:
+                        act_avg = act_sum / act_count
+                        act_avg = round(act_avg, 2)
+                        if avg_review is not None:
+                            avg_review.grade = act_avg
+                            db.session.commit()
+                        else:
                             review = Review(author_id=current_user.id, station=avg_station, grade=act_avg, note="אקט", subject_id=candidate.id)
                             db.session.add(review)
                             db.session.commit()
@@ -1085,14 +1091,20 @@ def updateActAvgs():
                 act_count = 0
                 avg_station = f"סיכום זחילות - אקט {i}"
                 station = f"זחילות - אקט {i}"
-                if Review.query.filter_by(station=avg_station).first() is None:
-                    for candidate in Candidate.query.filter_by(group_id=current_user.id).all():
-                        for review in Review.query.filter_by(station=station, subject_id=candidate.id).all():
-                            act_sum += review.grade
-                            act_count += 1
-                        if act_count != 0:
-                            act_avg = act_sum / act_count
-                            act_avg = round(act_avg, 2)
+                for candidate in Candidate.query.filter_by(group_id=current_user.id).all():
+                    act_sum = 0
+                    act_count = 0
+                    avg_review = Review.query.filter_by(station=avg_station, subject_id=candidate.id).first()
+                    for review in Review.query.filter_by(station=station, subject_id=candidate.id).all():
+                        act_sum += review.grade
+                        act_count += 1
+                    if act_count != 0:
+                        act_avg = act_sum / act_count
+                        act_avg = round(act_avg, 2)
+                        if avg_review is not None:
+                            avg_review.grade = act_avg
+                            db.session.commit()
+                        else:
                             review = Review(author_id=current_user.id, station=avg_station, grade=act_avg, note="אקט",
                                              subject_id=candidate.id)
                             db.session.add(review)
@@ -1103,14 +1115,20 @@ def updateActAvgs():
                 act_count = 0
                 avg_station = f"סיכום אלונקה סוציומטרית - אקט {i}"
                 station = f"אלונקה סוציומטרית - אקט {i}"
-                if Review.query.filter_by(station=avg_station).first() is None:
-                    for candidate in Candidate.query.filter_by(group_id=current_user.id).all():
-                        for review in Review.query.filter_by(station=station, subject_id=candidate.id).all():
-                            act_sum += review.grade
-                            act_count += 1
-                        if act_count != 0:
-                            act_avg = act_sum / act_count
-                            act_avg = round(act_avg, 2)
+                for candidate in Candidate.query.filter_by(group_id=current_user.id).all():
+                    act_sum = 0
+                    act_count = 0
+                    avg_review = Review.query.filter_by(station=avg_station, subject_id=candidate.id).first()
+                    for review in Review.query.filter_by(station=station, subject_id=candidate.id).all():
+                        act_sum += review.grade
+                        act_count += 1
+                    if act_count != 0:
+                        act_avg = act_sum / act_count
+                        act_avg = round(act_avg, 2)
+                        if avg_review is not None:
+                            avg_review.grade = act_avg
+                            db.session.commit()
+                        else:
                             review = Review(author_id=current_user.id, station=avg_station, grade=act_avg, note="אקט",
                                          subject_id=candidate.id)
                             db.session.add(review)
