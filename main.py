@@ -228,6 +228,7 @@ def home():
         candidates = [x for _, x in sorted(zip(total_avgs, candidates), key=lambda pair: pair[0], reverse=True)]
         tiz_avgs = [x for _, x in sorted(zip(total_avgs, tiz_avgs), key=lambda pair: pair[0], reverse=True)]
         total_avgs.sort(reverse=True)
+        updateActAvgs()
         return render_template("home.html", current_user=current_user, candidates=enumerate(candidates), tiz_avg =tiz_avgs, total_avg =total_avgs)
     return render_template("home.html", current_user=current_user, candidates = candidates)
 
