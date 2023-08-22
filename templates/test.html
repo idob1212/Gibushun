@@ -200,6 +200,7 @@ window.addEventListener('load', () => {
 
  fetch('/circles/finished', { // Update the endpoint to '/circles/finished'
     method: 'POST',
+    mode: 'cors',
     headers: {
       'Content-Type': 'application/json'
     },
@@ -243,6 +244,7 @@ window.addEventListener('load', () => {
 
  fetch('/circles/finished-act', { // Update the endpoint to '/circles/finished'
     method: 'POST',
+    mode: 'cors',
     headers: {
       'Content-Type': 'application/json'
     },
