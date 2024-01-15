@@ -27,6 +27,7 @@ import xlwt
 from xlwt.Workbook import *
 from pandas import ExcelWriter
 import xlsxwriter
+import logging
 
 
 
@@ -48,7 +49,6 @@ db = SQLAlchemy(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
 
-import logging
 
 app.logger.addHandler(logging.StreamHandler(sys.stdout))
 app.logger.setLevel(logging.ERROR)
