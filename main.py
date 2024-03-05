@@ -72,6 +72,7 @@ class User(UserMixin, db.Model):
     crawl_num = db.Column(db.Integer, nullable=False)
     alonka_num = db.Column(db.Integer, nullable=False)
 
+
 class Candidate(db.Model):
     __tablename__ = "candidates"
     id = db.Column(db.String(250), primary_key=True)
@@ -512,10 +513,9 @@ def add_new_review():
         db.session.commit()
         update_avgs(form)
         form.note.data = ""
-        form.station.data = "זחילות"
         form.odt.data = ""
-        return render_template("make-post.html", form=form, current_user=current_user)
-    return render_template("make-post.html", form=form, current_user=current_user)
+        return render_template("make-post.html", form=form, current_user=current_user, selected_subject=form.station.data)
+    return render_template("make-post.html", form=form, current_user=current_user, selected_subject=0)
 
 @app.route("/new-group-review", methods=["GET", "POST"])
 def add_new_group_review():
@@ -785,26 +785,29 @@ def showODTReviewsAdmin():
 @app.route("/candidates/", methods=["GET", "POST"])
 def showCandidate():
     form = selectCandidate()
+    all_reviews = []
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     candidate_nums = []
     for candidate in candidates:
         if candidate.status != "פרש":
             candidate_nums.append(int(candidate.id.split("/")[1]))
     candidate_nums.sort()
+    candidate_nums.append("הכל")
     form.id.choices = candidate_nums
     if form.validate_on_submit():
-        form = selectCandidate()
-        candidates = Candidate.query.filter_by(group_id=current_user.id).all()
-        candidate_nums = []
-        for candidate in candidates:
-            if candidate.status != "פרש":
-                candidate_nums.append(int(candidate.id.split("/")[1]))
-        candidate_nums.sort()
-        form.id.choices = candidate_nums
+        if form.id.data == "הכל":
+            for candidate_num in candidate_nums[:-1]:
+                candidate = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(candidate_num)).first()
+                reviews = Review.query.filter_by(subject_id=candidate.id).all()
+                clean_reviews = [review for review in reviews if
+                                 "אקט" not in review.station and review.station != "זחילות" and (
+                                             "ODT" not in review.station or review.station == "ODT סיכום")]
+                all_reviews.append(clean_reviews)
+            return render_template('candidate.html', reviews=clean_reviews, candidate_id=candidate.id.split("/")[1], form=form, all_reviews=all_reviews)
         candidate = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(form.id.data)).first()
         reviews = Review.query.filter_by(subject_id=candidate.id).all()
         clean_reviews = [review for review in reviews if review.station != "ספרינטים" and review.station != "זחילות" and ("ODT" not in review.station or review.station == "ODT סיכום")]
-        return render_template('candidate.html', reviews=clean_reviews, candidate_id=candidate.id.split("/")[1], form=form)
+        return render_template('candidate.html', reviews=clean_reviews, candidate_id=candidate.id.split("/")[1], form=form, all_reviews=all_reviews)
     return render_template('candidate.html', form=form)
 
 @app.route("/candidates-admin/", methods=["GET", "POST"])
@@ -1175,7 +1178,7 @@ def circles_finished():
             not_participated_idx = counter + 1
             break
         candidate = Candidate.query.get(str(current_user.id) + "/" + str(circle_number))
-        review = Review(station=station, author=current_user, subject_id=str(current_user.id) + "/" + str(circle_number), grade=5 - counter * penalty, subject=Candidate.query.filter_by(id=str(current_user.id) + "/" + str(circle_number)).first())
+        review = Review(station=station, author=current_user, subject_id=str(current_user.id) + "/" + str(circle_number), grade=4 - counter * penalty, subject=Candidate.query.filter_by(id=str(current_user.id) + "/" + str(circle_number)).first())
         db.session.add(review)
         db.session.commit()
     for circle_number in circle_numbers[not_participated_idx:]:
@@ -1215,7 +1218,7 @@ def circles_finished_act():
             not_participated_idx = counter + 1
             break
         candidate = Candidate.query.get(str(current_user.id) + "/" + str(circle_number))
-        review = Review(station=station, author=current_user, subject_id=str(current_user.id) + "/" + str(circle_number), grade=5 - counter * penalty, subject=Candidate.query.filter_by(id=str(current_user.id) + "/" + str(circle_number)).first())
+        review = Review(station=station, author=current_user, subject_id=str(current_user.id) + "/" + str(circle_number), grade=4 - counter * penalty, subject=Candidate.query.filter_by(id=str(current_user.id) + "/" + str(circle_number)).first())
         db.session.add(review)
         db.session.commit()
     for circle_number in circle_numbers[not_participated_idx:]:

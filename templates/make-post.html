@@ -69,7 +69,9 @@
     {% if form.station.data == 'ODT' %}
     <div class="form-group" id="additionalField">
         <label for="additionalField">שם תחנה:</label>
+        {% if selected_subject != 0 %} {{ form.odt(class="form-control", value=selected_subject) }} {% else: %}
         {{ form.odt(class="form-control") }}
+        {% endif %}
     </div>
       {% else: %}
     <div class="form-group" id="additionalField" style="display: none">

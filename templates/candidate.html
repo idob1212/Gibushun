@@ -13,11 +13,12 @@
         <div class="col-lg-8 col-md-10 mx-auto">
           <div class="page-heading">
             <h1>לוח ציונים</h1>
-              {% if candidate_id %}
+            {% if all_reviews|length > 0%}
+                <span class="subheading" style="direction: rtl">ציונים לכל המועמדים </span>
+          {% elif candidate_id %}
           <span class="subheading" style="direction: rtl">ציונים  למועמד מס'  {{ candidate_id }} </span>
-              {% else %}
-{#         <span class="subheading" style="direction: rtl">חוות דעת על כולם </span>#}
-              {% endif %}
+                {% endif %}
+
           </div>
         </div>
       </div>
@@ -75,10 +76,47 @@ th{
 .form-control{
     float: right;
     direction: rtl;
+    width: 100%;
 }
 </style>
+<body>
 {{ wtf.quick_form(form, novalidate=True, button_map={"submit": "primary"}) }}
+<div class="col-lg-8 col-md-10 mx-auto" style="direction: rtl; float: right">
+{#  <form method="POST">#}
+{#    {{ form.hidden_tag() }}#}
+{#    <div class="form-group">#}
+{#      <label for="subject">מספר מגובש</label>#}
+{#      {{ form.id(class="form-control", required="required") }}#}
+{#    </div>#}
 
+{% if all_reviews|length > 0 %}
+    {% for list in all_reviews %}
+        <div class="mx-auto">
+            <h4 style="text-align: right"> מועמד מספר {{ list[0].subject_id.split("/")[1] }} </h4>
+
+                <table class = "table table-bordered" style="direction: rtl;">
+                    <thead>
+                    <tr>
+                        <th>סוג תחנה</th>
+                        <th>ציון</th>
+                        <th>הערה</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for review in list %}
+                    <tr>
+                        <td class="block">{{ review.station }}</td>
+                        <td class="block">{{ review.grade|round(2) }}</td>
+                        <td class="block">{{ review.note }}</td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+        </div>
+    {%  endfor %}
+</div>
+
+{% else %}
 <table class = "table table-bordered" style="width:100%; direction: rtl;">
     <thead>
     {% if candidate_id %}
@@ -107,6 +145,8 @@ th{
 {% endif %}
 
 </table>
+{% endif %}
+
 </body>
 
 <style>
