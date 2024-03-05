@@ -208,6 +208,11 @@ img::-moz-selection {
   }
 }
 
+.dark-mode{
+    background-color: #212529;
+    color: white;
+}
+
 @media only screen and (min-width: 992px) {
   #mainNav {
     transition: background-color 0.2s;
