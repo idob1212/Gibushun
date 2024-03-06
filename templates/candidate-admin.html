@@ -13,10 +13,10 @@
         <div class="col-lg-8 col-md-10 mx-auto">
           <div class="page-heading">
             <h1>צפיה במגובש</h1>
-              {% if candidate_id %}
+              {% if candidate_id and not all_reviews %}
           <span class="subheading" style="direction: rtl">ציונים  למועמד מס' {{ candidate_id }} </span>
-              {% else %}
-{#         <span class="subheading" style="direction: rtl">חוות דעת על כולם </span>#}
+              {% elif all_reviews %}
+         <span class="subheading" style="direction: rtl">חוות דעת על קבוצה מס' {{ group }} </span>
               {% endif %}
           </div>
         </div>
@@ -84,25 +84,64 @@ select{
 </style>
 
 
-<div class="container">
+<div class="col-lg-8 col-md-10 mx-auto">
     <div class="row">
         <div class="col-md-12">
-        <form method="POST">
-          {{ form.csrf_token}}
-        <div class="form-group">
-                <label for="group">קבוצה:</label>
-                {{ form.group(class="form-control")}}
-            </div>
-            <div class="form-group">
-                <label for="id">מגובש:</label>
-                {{ form.id(class="form-control")}}
-            </div>
-                <input type="submit" class="btn btn-primary" btn-lg>
-        </form>
+            <form method="POST">
+                {{ form.csrf_token }}
+                <div class="form-group text-center">
+                    <label for="group">קבוצה:</label>
+                    {{ form.group(class="form-control") }}
+                </div>
+                <div class="form-group text-center">
+                    <label for="id">מגובש:</label>
+                    {{ form.id(class="form-control") }}
+                </div>
+                <div class="text-center">
+                    <input type="submit" class="btn btn-primary btn-lg">
+                </div>
+            </form>
         </div>
     </div>
+</div>
+<div class="col-lg-8 col-md-10 mx-auto" style="direction: rtl; float: right">
+{#  <form method="POST">#}
+{#    {{ form.hidden_tag() }}#}
+{#    <div class="form-group">#}
+{#      <label for="subject">מספר מגובש</label>#}
+{#      {{ form.id(class="form-control", required="required") }}#}
+{#    </div>#}
 
-<table class = "table table-bordered" style="width:100%; direction: rtl;">
+{% if all_reviews %}
+    {% for list in all_reviews %}
+        <div class="mx-auto">
+            <h4 style="text-align: right"> מועמד מספר {{ list[0].subject_id.split("/")[1] }} </h4>
+
+                <table class = "table table-bordered w-auto h-auto" style="direction: rtl;">
+                    <thead>
+                    <tr>
+                        <th>סוג תחנה</th>
+                        <th>ציון</th>
+                        <th>הערה</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for review in list %}
+                    <tr>
+                        <td class="block">{{ review.station }}</td>
+                        <td class="block">{{ review.grade|round(2) }}</td>
+                        <td class="block">{{ review.note }}</td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+        </div>
+    {%  endfor %}
+</div>
+
+{% else %}
+
+<table class = "table table-bordered w-auto h-auto" style="width:100%; direction: rtl;">
     <thead>
     {% if candidate_id %}
 
@@ -130,6 +169,7 @@ select{
 {% endif %}
 
 </table>
+{% endif %}
     <script>
         var group_select = document.getElementById("group");
         var subject_select = document.getElementById("id");
@@ -164,6 +204,6 @@ position: fixed;
     padding-top: 20px;
 }
 </style>
-</html>
+
+
 {% endblock %}
-{#{% include "footer.html" %}#}
