@@ -684,6 +684,7 @@ def show_reviews(user_id):
 
 @app.route("/physical-reviews/", methods=["GET", "POST"])
 def showPhysicalReviews():
+    update_avgs_nf()
     form = SelectPhysicalReviewsForm()
     form.station.choices = ["ספרינטים", "גם וגם","זחילות"]
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
@@ -717,6 +718,7 @@ def showPhysicalReviews():
 @app.route("/physical-reviews-admin/", methods=["GET", "POST"])
 @admin_only
 def showPhysicalReviewsAdmin():
+    update_avgs_nf()
     form = SelectPhysicalReviewsFormAdmin()
     form.group.choices = get_groups()
     form.station.choices = ["ספרינטים", "גם וגם","זחילות"]
@@ -741,6 +743,7 @@ def showPhysicalReviewsAdmin():
 @app.route("/odt-reviews/", methods=["GET", "POST"])
 def showODTReviews():
     form = selectCandidate()
+    update_avgs_nf()
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     candidate_nums = []
     for candidate in candidates:
@@ -766,6 +769,7 @@ def showODTReviews():
 @admin_only
 def showODTReviewsAdmin():
     form = selectCandidateAdmin()
+    update_avgs_nf()
     form.group.choices = get_groups()
     if form.group.data:
         candidates = [candidate.id.split("/")[1] for candidate in Candidate.query.filter_by(group_id=int(form.group.data)).all() if candidate.status != "פרש"]
@@ -785,6 +789,7 @@ def showODTReviewsAdmin():
 @app.route("/candidates/", methods=["GET", "POST"])
 def showCandidate():
     form = selectCandidate()
+    update_avgs_nf()
     all_reviews = []
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     candidate_nums = []
@@ -818,6 +823,7 @@ def showCandidate():
 @admin_only
 def showCandidateAdmin():
     form = selectCandidateAdmin()
+    update_avgs_nf()
     form.group.choices = get_groups()
     clean_reviews = []
     candidates = []
