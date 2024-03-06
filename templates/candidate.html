@@ -92,6 +92,7 @@ th{
 {% if all_reviews|length > 0 %}
     {% for list in all_reviews %}
         <div class="mx-auto">
+        {% if list|length > 0 %}
             <h4 style="text-align: right"> מועמד מספר {{ list[0].subject_id.split("/")[1] }} </h4>
 
                 <table class = "table table-bordered" style="direction: rtl;">
@@ -112,6 +113,7 @@ th{
                     {% endfor %}
                     </tbody>
                 </table>
+        {% endif %}
         </div>
     {%  endfor %}
 </div>
