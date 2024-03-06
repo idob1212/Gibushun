@@ -788,6 +788,7 @@ def showCandidate():
     all_reviews = []
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     candidate_nums = []
+    clean_reviews = []
     for candidate in candidates:
         if candidate.status != "פרש":
             candidate_nums.append(int(candidate.id.split("/")[1]))
@@ -798,11 +799,14 @@ def showCandidate():
         if form.id.data == "הכל":
             for candidate_num in candidate_nums[:-1]:
                 candidate = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(candidate_num)).first()
+
                 reviews = Review.query.filter_by(subject_id=candidate.id).all()
                 clean_reviews = [review for review in reviews if
                                  "אקט" not in review.station and review.station != "זחילות" and (
                                              "ODT" not in review.station or review.station == "ODT סיכום")]
                 all_reviews.append(clean_reviews)
+            if len(candidate_nums) == 1:
+                return render_template('candidate.html', form=form)
             return render_template('candidate.html', reviews=clean_reviews, candidate_id=candidate.id.split("/")[1], form=form, all_reviews=all_reviews)
         candidate = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(form.id.data)).first()
         reviews = Review.query.filter_by(subject_id=candidate.id).all()
@@ -815,6 +819,8 @@ def showCandidate():
 def showCandidateAdmin():
     form = selectCandidateAdmin()
     form.group.choices = get_groups()
+    clean_reviews = []
+    candidates = []
     if form.group.data:
         candidates = [int(candidate.id.split("/")[1]) for candidate in Candidate.query.filter_by(group_id=int(form.group.data)).all() if candidate.status != "פרש"]
         candidates.sort()
@@ -835,8 +841,12 @@ def showCandidateAdmin():
                                  "אקט" not in review.station and review.station != "זחילות" and (
                                              "ODT" not in review.station or review.station == "ODT סיכום")]
                 all_reviews.append(clean_reviews)
+            if len(candidates) == 1 :
+                return render_template('candidate.html', form=form)
             return render_template('candidate-admin.html', reviews=clean_reviews, candidate_id=candidate.id.split("/")[1], form=form, all_reviews=all_reviews, group = form.group.data)
         candidate = Candidate.query.filter_by(id=str(form.group.data) + "/" + str(form.id.data)).first()
+        if not candidate:
+            return render_template('candidate-admin.html', form=form)
         reviews = Review.query.filter_by(subject_id=candidate.id).all()
         clean_reviews = [review for review in reviews if review.station != "ספרינטים" and review.station != "זחילות" and ("ODT" not in review.station or review.station == "ODT סיכום")]
         clean_reviews.sort(key=lambda x: x.grade, reverse=True)
