@@ -7,9 +7,9 @@ from wtforms.fields.html5 import DateField
 
 class CreateReviewForm(FlaskForm):
     station = SelectField("תחנה", validators=[DataRequired()])
-    odt = TextAreaField("שם ODT:")
+    odt = StringField("שם ODT:")
     subject = SelectField("מספר מגובש", validators=[DataRequired()])
-    grade = SelectField("ציון", choices=[1, 2, 3, 4], validators=[DataRequired()])
+    grade = SelectField("ציון", choices=[(1, '1'), (2, '2'), (3, '3'), (4, '4')], validators=[DataRequired()])
     note = TextAreaField("הערות")
     submit = SubmitField("הוסף תוצאה")
 
