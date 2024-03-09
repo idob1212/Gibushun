@@ -49,6 +49,7 @@ class EditReviewForm(FlaskForm):
 class RegisterForm(FlaskForm):
     id = IntegerField("מספר קבוצה", validators=[InputRequired("זהו סעיף חובה")])
     name = StringField("שם")
+    mitam = IntegerField("מספר מתאם(קבוצת ליבה)", validators=[InputRequired("זהו סעיף חובה")])
     password = PasswordField("סיסמה", validators=[DataRequired("זהו סעיף חובה")])
     submit = SubmitField("הוסף מגבש")
 

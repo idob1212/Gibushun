@@ -71,6 +71,7 @@ class User(UserMixin, db.Model):
     sprint_num = db.Column(db.Integer, nullable=False)
     crawl_num = db.Column(db.Integer, nullable=False)
     alonka_num = db.Column(db.Integer, nullable=False)
+    mitam_num = db.Column(db.Integer, nullable=False)
 
 
 class Candidate(db.Model):
@@ -255,6 +256,7 @@ def register():
             sprint_num = 1,
             crawl_num = 1,
             alonka_num = 1,
+            mitam_num=form.mitam.data
         )
         db.session.add(new_user)
         db.session.commit()
@@ -1451,6 +1453,7 @@ def downloadb():
     df1 = df1[df1["status"] != "פרש"]
     df1.drop(['status'], axis=1, inplace=True)
     df1.columns = ["מספר מגובש", "מספר קבוצה", "שם", "סטטוס סיכום", "הערת סיכום", "שם מראיין", "ציון ראיון", "סיכום ראיון", "בעיות תש", "בעיות רפואיות"]
+    df1["מתאם(קבוצת ליבה)"] = pd.Series()
     df1["מגבש"] = pd.Series()
     df1.index = df1['מספר מגובש']
     df1 = df1.drop(['מספר מגובש'], axis=1)
@@ -1458,6 +1461,7 @@ def downloadb():
     candidates = df1.index.tolist()
     total_avgs = []
     tiz_avgs = []
+    mitams = []
     for candidate in candidates:
         reviews = Review.query.filter_by(subject_id=candidate).all()
         sprint_avg = Review.query.filter_by(subject_id=candidate, station="ספרינטים סיכום").first()
@@ -1487,22 +1491,25 @@ def downloadb():
         else:
             total_avg = round(total_sum / total_count, 2)
             total_avgs.append(total_avg)
+        mitams.append(User.query.get(candidate.split("/")[0]).mitam_num)
     tot = pd.Series(total_avgs, name="ממוצע כללי")
     tiz = pd.Series(tiz_avgs, name="ממוצע תיז")
+    mitams = pd.Series(mitams, name="מתאם(קבוצת ליבה)")
+    mitams.index = df1.index
     tot.index = df1.index
     tiz.index = df1.index
     final_review = pd.Series("", name="חוות דעת סופית")
     df1["ממוצע כללי"] = tot
     df1["ממוצע פיזי"] = tiz
+    df1["מתאם(קבוצת ליבה)"] = mitams
     names = []
     df1["מגבש"] = pd.Series()
     df1["חוות דעת סופית"] = final_review
     for value in df1.index:
         df1.loc[value,"מגבש"] = User.query.filter_by(id=int(df1.loc[value,"מספר קבוצה"])).first().name
-    df2 = pd.DataFrame(columns=["שם","מספר בגיבוש", "מספר אישי", "שם מראיין", "מגבש", "ציון ממוצע בתחנות הגיבוש", 'חו"ד מראיין', 'חו"ד מגבש', "מצב עדכני במסלול(שליש)"])
+    df2 = pd.DataFrame(columns=["שם","מספר בגיבוש", "מספר אישי", "שם מראיין", "מגבש", "ציון ממוצע בתחנות הגיבוש", 'חו"ד מראיין', 'חו"ד מגבש', "מצב עדכני במסלול(שליש)", "מתאם(קבוצת ליבה)"])
     df2.index = df2['מספר אישי']
     df2.drop(['מספר אישי'], axis=1, inplace=True)
-
     ws1 = wb.add_sheet('תוצאות גיבוש')
     ws2 = wb.add_sheet('מצב נוכחי')
     writer = pd.ExcelWriter('multiple.xlsx', engine='xlsxwriter')
