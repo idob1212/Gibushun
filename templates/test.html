@@ -1,20 +1,56 @@
-{% extends 'bootstrap/base.html' %}
+{#{% extends 'bootstrap/base.html' %}#}
+{#{% import "bootstrap/wtf.html" as wtf %}#}
+
 {% block content %}
 {% include "header.html" %}
+  <!-- Page Header -->
+  <header class="masthead" style="background-image: url('{{ url_for('static', filename='img/review.jpg')}}')">
+    <div class="overlay"></div>
 
-<!-- Page Header -->
-<header class="masthead" style="background-image: url('{{ url_for('static', filename='img/review.jpg')}}')">
-  <div class="overlay"></div>
-  <div class="container">
-    <div class="row">
-      <div class="col-lg-8 col-md-10 mx-auto">
-        <div class="page-heading">
+    <div class="container">
+      <div class="row">
+        <div class="col-lg-8 col-md-10 mx-auto">
+          <div class="page-heading">
+            {% if is_edit %}
+            <h1>ערוך חוות דעת</h1>
+            {% else: %}
+            <h1 style="color: white">הזן ציון</h1>
+            {% endif %}
+{#            <span class="subheading" style="direction: rtl; color: white">נשמח לשמוע את דעתך!</span>#}
+          </div>
         </div>
       </div>
     </div>
-  </div>
-</header>
+      <link href="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" rel="stylesheet">
+    <script src="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js"> </script>
+  </header>
+    <style>
+    label{
+  direction: rtl;
+  float: right;
+}</style>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
 
+
+    var stationField = document.getElementById('movementType');
+    var additionalField = document.getElementById('additionalField');
+    {% if other_flag == True %}
+        additionalField.style.display = 'none';
+        stationField.value = new_station;
+    {% endif %}
+    stationField.addEventListener('change', function() {
+      var selectedStation = stationField.value;
+      var additionalField = document.getElementById('additionalField');
+
+      if (selectedStation === 'ODT' || selectedStation === 'אחר') {
+        additionalField.style.display = 'block';
+      } else {
+        additionalField.style.display = 'none';
+      }
+    });
+  });
+</script>
 <div class="overlay"></div>
 <div class="container">
   <a href="{{ url_for('add_new_group_review') }}" class="btn btn-primary btn-lg btn-block ">
@@ -26,16 +62,25 @@
   <div class="row">
     <div class="col-lg-8 col-md-10 mx-auto" style="direction: rtl; float: right">
   <div class="text-center mb-3 mt-3"> <!-- Center the select field with margin -->
-    <div class="d-inline-block" style="text-align: right">
+    <div style="text-align: center">
       <label for="movementType" style="margin-right: 10px; font-size: 16px">סוג תחנה:</label>
       <select class="form-control d-inline-block" id="movementType">
         <option value="ספרינטים">ספרינט</option>
         <option value="זחילות">זחילות</option>
         <option value="אלונקה סוציומטרית">אלונקה סוציומטרית</option>
-
+          {% for station in physical_stations %}
+            <option value="{{ station }}">{{ station }}</option>
+        {% endfor %}
+        <option value="אחר">אחר</option>
       </select>
     </div>
+    <div id="additionalField" style="text-align: center; display: none">
+        <label for="additionalFieldText" style="margin-right: 10px; font-size: 16px">הזן שם תחנה:</label>
+        <input class="form-control d-inline-block" type="text" id="additionalFieldText">
     </div>
+    </div>
+    </div>
+
       <div id="row1" style="margin-top: 20px;">
         {% for circle in circles %}
         <div class="circle{% if circle.finished %} finished{% endif %} {% if circle.finished %} finished-{{ loop.index }}{% endif %}">
@@ -157,6 +202,10 @@ function resetCircles() {
   const selectedValue = movementTypeSelect.value;
   sessionStorage.setItem('selectedMovementType', selectedValue);
 
+  const otherField = document.getElementById('additionalFieldText');
+  const otherValue = otherField.value;
+  sessionStorage.setItem('selectedOther', otherValue);
+
   location.reload();
 }
 
@@ -166,7 +215,28 @@ window.addEventListener('load', () => {
   if (storedValue) {
     const movementTypeSelect = document.getElementById('movementType');
     movementTypeSelect.value = storedValue;
+
+    const otherField = document.getElementById('additionalFieldText');
+    otherField.value = sessionStorage.getItem('selectedOther');
+
+    if (movementTypeSelect.value === 'אחר') {
+        document.getElementById('additionalField').style.display = 'none';
+        const val = sessionStorage.getItem('selectedOther');
+        var option = document.createElement("option");
+
+        // Set the value and text of the option
+        option.value = val;
+        option.text = val;
+
+        // Append the option to the select field
+        movementTypeSelect.appendChild(option);
+        movementTypeSelect.value = sessionStorage.getItem('selectedOther');
+    }
+    sessionStorage.removeItem('selectedMovementType');
+    sessionStorage.removeItem('selectedOther');
   }
+
+
 });
 
 
@@ -192,10 +262,12 @@ window.addEventListener('load', () => {
 
 
  const movementType = document.getElementById('movementType').value; // Get the value of the select field
+ const other = document.getElementById('additionalFieldText').value; // Get the value of the additional field
 
   const data = {
     circle_numbers: circleNumbers,
-    movement_type: movementType // Include the movement type value in the data object
+    movement_type: movementType,
+    other: other
   };
 
  fetch('/circles/finished', { // Update the endpoint to '/circles/finished'
@@ -235,10 +307,12 @@ window.addEventListener('load', () => {
 
 
  const movementType = document.getElementById('movementType').value; // Get the value of the select field
+ const other = document.getElementById('additionalFieldText').value; // Get the value of the additional field
 
   const data = {
     circle_numbers: circleNumbers,
-    movement_type: movementType // Include the movement type value in the data object
+    movement_type: movementType,// Include the movement type value in the data object
+    other: other,
   };
 
  fetch('/circles/finished-act', { // Update the endpoint to '/circles/finished'
