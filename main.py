@@ -509,6 +509,19 @@ def subject(group):
 
     return jsonify({'subjects' : subjectsArray})
 
+@app.route('/physicals/<group>')
+def physicals(group):
+    stations = ["ספרינטים", "זחילות", "אלונקה סוציומטרית"] + getPhysicalStationsGroup(int(group))
+    stationsArray = []
+
+    for station in stations:
+        stationObj = {}
+        stationObj['id'] = station
+
+        stationsArray.append(stationObj)
+
+    return jsonify({'stations': stationsArray})
+
 @app.route("/new-review", methods=["GET", "POST"])
 def add_new_review():
     stations = ["משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "מעגל זנבות", "ODT", "הרצאות", "בניית שוח", "חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול" , "נאסא", "אחר"]
@@ -696,6 +709,9 @@ def search_reviews():
                 return render_template("search.html", form=form)
     return render_template("search.html", form=form)
 
+@app.context_processor
+def inject_debug():
+    return dict(debug=app.debug)
 
 @app.route("/reviews/<int:user_id>", methods=["GET", "POST"])
 @admin_only
@@ -711,7 +727,8 @@ def show_reviews(user_id):
 def showPhysicalReviews():
     update_avgs_nf()
     form = SelectPhysicalReviewsForm()
-    form.station.choices = ["ספרינטים", "גם וגם","זחילות"]
+    choices = ["ספרינטים", "זחילות", "אלונקה סוציומטרית"] + getPhysicalStations()
+    form.station.choices = choices
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     candidate_nums = []
     for candidate in candidates:
@@ -720,24 +737,11 @@ def showPhysicalReviews():
     candidate_nums.sort()
     form.subject.choices = candidate_nums
     if form.validate_on_submit():
-        form = SelectPhysicalReviewsForm()
-        form.station.choices = ["ספרינטים", "גם וגם", "זחילות"]
-        candidates = Candidate.query.filter_by(group_id=current_user.id).all()
-        candidate_nums = []
-        for candidate in candidates:
-            if candidate.status != "פרש":
-                candidate_nums.append(int(candidate.id.split("/")[1]))
-        candidate_nums.sort()
-        form.subject.choices = candidate_nums
         candidate = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(form.subject.data)).first()
-        if(form.station.data == "גם וגם"):
-            reviews = Review.query.filter_by(subject_id=candidate.id).all()
-            reviews = [review for review in reviews if "סיכום" in review.station and ("זחילות" in review.station or "ספרינטים" in review.station)]
-        else:
-            reviews = Review.query.filter_by(subject_id=candidate.id).all()
-            reviews = [review for review in reviews if "סיכום" in review.station and form.station.data in review.station]
-        return render_template('physical-reviews.html', reviews=reviews, candidate_id=candidate.id.split("/")[1], form=form)
-    return render_template('physical-reviews.html', form=form)
+        reviews = Review.query.filter_by(subject_id=candidate.id).all()
+        reviews = [review for review in reviews if "סיכום" in review.station and f" {form.station.data} " in f" {review.station} "]
+        return render_template('physical-reviews.html', reviews=reviews, candidate_id=candidate.id.split("/")[1], form=form, choices = choices)
+    return render_template('physical-reviews.html', form=form, choices=choices)
 
 
 @app.route("/physical-reviews-admin/", methods=["GET", "POST"])
@@ -746,7 +750,8 @@ def showPhysicalReviewsAdmin():
     update_avgs_nf()
     form = SelectPhysicalReviewsFormAdmin()
     form.group.choices = get_groups()
-    form.station.choices = ["ספרינטים", "גם וגם","זחילות"]
+    choices = ["ספרינטים", "זחילות", "אלונקה סוציומטרית"] + getPhysicalStations()
+    form.station.choices = choices
     if form.group.data:
         candidates = [candidate.id.split("/")[1] for candidate in Candidate.query.filter_by(group_id=int(form.group.data)).all() if candidate.status != "פרש"]
     else:
@@ -755,12 +760,8 @@ def showPhysicalReviewsAdmin():
     form.subject.choices = candidates
     if request.method == "POST":
         candidate = Candidate.query.filter_by(id=str(form.group.data) + "/" + str(form.subject.data)).first()
-        if(form.station.data == "גם וגם"):
-            reviews = Review.query.filter_by(subject_id=candidate.id).all()
-            reviews = [review for review in reviews if "סיכום" in review.station and ("זחילות" in review.station or "ספרינטים" in review.station)]
-        else:
-            reviews = Review.query.filter_by(subject_id=candidate.id).all()
-            reviews = [review for review in reviews if "סיכום" in review.station and form.station.data in review.station]
+        reviews = Review.query.filter_by(subject_id=candidate.id).all()
+        reviews = [review for review in reviews if "סיכום" in review.station and f" {form.station.data} " in f" {review.station} "]
         return render_template('show-physical-admin.html', reviews=reviews, candidate_id=candidate.id.split("/")[1], form=form)
     return render_template('show-physical-admin.html', form=form)
 
@@ -1145,6 +1146,17 @@ def getStationName(review):
 
 def getPhysicalStations():
     reviews = Review.query.filter_by(author_id=current_user.id).filter(Review.station.like(f'%אקט%')).all()
+    physical_stations = [review.station for review in reviews]
+    physical_stations = [station.split(" - ")[0] for station in physical_stations if "אקט" in station]
+    physical_stations = [station for station in physical_stations if "ספרינטים" not in station and "זחילות" not in station and "אלונקה סוציומטרית" not in station]
+    physical_stations = [station.split(" סיכום")[0] for station in physical_stations]
+    physical_stations = [station for station in physical_stations if station != '"' and station != " " and "סיכום" not in station.split()]
+    physical_stations = list(set(physical_stations))
+    physical_stations = physical_stations
+    return physical_stations
+
+def getPhysicalStationsGroup(group):
+    reviews = Review.query.filter_by(author_id=group).filter(Review.station.like(f'%אקט%')).all()
     physical_stations = [review.station for review in reviews]
     physical_stations = [station.split(" - ")[0] for station in physical_stations if "אקט" in station]
     physical_stations = [station for station in physical_stations if "ספרינטים" not in station and "זחילות" not in station and "אלונקה סוציומטרית" not in station]
