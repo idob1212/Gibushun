@@ -131,7 +131,7 @@ select{
     <script>
         var group_select = document.getElementById("group");
         var subject_select = document.getElementById("subject");
-
+        var station_select = document.getElementById("station");
         group_select.onchange = function() {
 
             group = group_select.value;
@@ -148,6 +148,19 @@ select{
                 })
 
             });
+
+            fetch('/physicals/' + group).then(function(response) {
+
+            response.json().then(function(data) {
+                var optionHTML = '';
+
+                for (var station of data.stations) {
+                    optionHTML += '<option value="' + station.id + '">' + station.id + '</option>';
+                }
+                station_select.innerHTML = optionHTML;
+            })
+
+        });
         }
     </script>
 </body>
