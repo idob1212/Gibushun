@@ -1,6 +1,7 @@
 from datetime import date
 from flask_wtf import FlaskForm
 from wtforms import StringField, SubmitField, PasswordField, SelectField, IntegerField, BooleanField, FloatField, TextAreaField
+from wtforms.fields import RadioField
 from wtforms.validators import DataRequired, URL, NumberRange, InputRequired
 from wtforms.fields.html5 import DateField
 
@@ -12,6 +13,13 @@ class CreateReviewForm(FlaskForm):
     grade = SelectField("ציון", choices=[(1, '1'), (2, '2'), (3, '3'), (4, '4')], validators=[DataRequired()])
     note = TextAreaField("הערות")
     submit = SubmitField("הוסף תוצאה")
+
+class CreateNoteForm(FlaskForm):
+    subject = SelectField("מספר מגובש", validators=[DataRequired()])
+    type = RadioField("סוג הערה", choices=[('טובה', 'טובה'), ('רעה', 'רעה')], validators=[DataRequired()])
+    text = TextAreaField("הערה")
+    location = StringField("מיקום")
+    submit = SubmitField("הוסף הערה")
 
 
 class SelectPhysicalReviewsForm(FlaskForm):

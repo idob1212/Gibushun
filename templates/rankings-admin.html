@@ -79,6 +79,28 @@ select{
 
 </style>
 {{ wtf.quick_form(form, novalidate=True, button_map={"submit": "primary"}) }}
+    <script>
+        var group_select = document.getElementById("group");
+        var station_select = document.getElementById("station");
+        group_select.onchange = function() {
+
+            group = group_select.value;
+
+            fetch('/stations/' + group).then(function(response) {
+
+            response.json().then(function(data) {
+                var optionHTML = '';
+
+                for (var station of data.stations) {
+                    optionHTML += '<option value="' + station.id + '">' + station.id + '</option>';
+                }
+
+                station_select.innerHTML = optionHTML;
+            })
+
+        });
+        }
+    </script>
 {% if reviews %}
 <table class = "table table-bordered" style="width:100%; direction: rtl;">
     <thead>
