@@ -1,0 +1,181 @@
+{#{% extends 'bootstrap/base.html' %}#}
+{#{% import "bootstrap/wtf.html" as wtf %}#}
+{% import "bootstrap/wtf.html" as wtf %}
+
+{% block content %}
+{% include "header.html" %}
+
+  <!-- Page Header -->
+  <header class="masthead" style="background-image: url('{{ url_for('static', filename='img/my-group.jpg')}}')">
+    <div class="overlay"></div>
+    <div class="container">
+      <div class="row">
+        <div class="col-lg-8 col-md-10 mx-auto">
+          <div class="page-heading">
+            <h1>לוח הערות</h1>
+            {% if everyone%}
+                <span class="subheading" style="direction: rtl">הערות לכל המועמדים </span>
+          {% elif candidate_id %}
+          <span class="subheading" style="direction: rtl">הערות  למועמד מס'  {{ candidate_id }} </span>
+                {% endif %}
+
+          </div>
+        </div>
+      </div>
+    </div>
+      <link href="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" rel="stylesheet">
+    <script src="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js"> </script>
+  </header>
+
+<head>
+    <meta charset="UTF-8">
+    <title>לוח הערות</title>
+</head>
+<style>
+    .table{
+        float: right;
+        {#size: auto;#}
+        table-layout: fixed;
+    }
+    td {
+    border: 1px solid #000;
+    text-align: right;
+}
+
+tr td {
+    {#width: 1%;#}
+    {#white-space: nowrap;#}
+    text-align: right;
+}
+
+th{
+    text-align: right;
+}
+        label{
+        float: right;
+        direction: rtl;
+    }
+
+.btn{
+    float: right;
+    direction: rtl;
+    padding: 10px;
+    margin: 10px;
+    margin-right: 50%;
+}
+
+#station{
+    float: right;
+    direction: rtl;
+}
+#subject{
+    float: right;
+    direction: rtl;
+}
+
+.form-control{
+    float: right;
+    direction: rtl;
+    width: 100%;
+}
+</style>
+<body>
+<div class="container">
+
+    <a href = "{{ url_for('add_new_note') }}"><button class=" btn-primary btn-lg btn-block" style="margin-bottom: 10px;"> כתוב הערה</button></a>
+
+<div class="row">
+        <div class="col-lg-8 col-md-10 mx-auto" style="direction: rtl; float: right">
+                {{ wtf.quick_form(form, novalidate=True, button_map={"submit": "primary"}) }}
+            </div>
+    </div>
+<div class="row">
+        <div class="col-lg-8 col-md-10 mx-auto" style="direction: rtl; float: right">
+{#  <form method="POST">#}
+{#    {{ form.hidden_tag() }}#}
+{#    <div class="form-group">#}
+{#      <label for="subject">מספר מגובש</label>#}
+{#      {{ form.id(class="form-control", required="required") }}#}
+{#    </div>#}
+
+{% if everyone %}
+    {% for list in all_notes %}
+        <div class="mx-auto">
+        {% if list|length > 0 %}
+            <h4 style="text-align: right"> מועמד מספר {{ list[0].subject_id.split("/")[1] }} </h4>
+                <table class = "table table-bordered" style="direction: rtl;">
+                    <thead>
+                    <tr>
+                        <th>סוג הערה</th>
+                        <th>הערה</th>
+                        <th>מיקום</th>
+                        <th>תאריך</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for note in list %}
+                    <tr>
+                    {% if note.type == "טובה" %}
+                        <td class="block" style="background-color: forestgreen"></td>
+                    {% else %}
+                        <td class="block" style="background-color: red"></td>
+                    {% endif %}
+                        <td class="block">{{ note.text }}</td>
+                        <td class="block">{{ note.location }}</td>
+                        <td class="block">{{ note.date }}</td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+        {% endif %}
+        </div>
+    {%  endfor %}
+
+{% else %}
+<table class = "table table-bordered" style="width:100%; direction: rtl;">
+    <thead>
+    {% if candidate_id %}
+
+    <tr>
+            <th>סוג הערה</th>
+            <th>הערה</th>
+            <th>מיקום</th>
+            <th>תאריך</th>
+    </tr>
+    </thead>
+    <tbody>
+        {% for note in notes %}
+        <tr>
+        {% if note.type == "טובה" %}
+            <td class="block" style="color: forestgreen; background-color: forestgreen"></td>
+        {% else %}
+            <td class="block" style="background-color: red"></td>
+        {% endif %}
+            <td class="block">{{ note.text }}</td>
+            <td class="block">{{ note.location }}</td>
+            <td class="block">{{ note.date }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+{% endif %}
+
+</table>
+{% endif %}
+</div>
+</div>
+</div>
+</body>
+
+<style>
+footer{
+position: fixed;
+    left:0px;
+   bottom:0px;
+   height:50px;
+   width:100%;
+    padding-top: 20px;
+}
+</style>
+</html>
+{% endblock %}
+{#{% include "footer.html" %}#}

@@ -1,0 +1,94 @@
+{#{% extends 'bootstrap/base.html' %}#}
+{% import "bootstrap/wtf.html" as wtf %}
+
+{% block content %}
+{% include "header.html" %}
+  <!-- Page Header -->
+  <header class="masthead" style="background-image: url('{{ url_for('static', filename='img/review.jpg')}}')">
+    <div class="overlay"></div>
+
+    <div class="container">
+      <div class="row">
+        <div class="col-lg-8 col-md-10 mx-auto">
+          <div class="page-heading">
+            <h1 style="color: white">הזן הערה</h1>
+{#            <span class="subheading" style="direction: rtl; color: white">נשמח לשמוע את דעתך!</span>#}
+          </div>
+        </div>
+      </div>
+    </div>
+      <link href="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" rel="stylesheet">
+    <script src="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js"> </script>
+  </header>
+    <style>
+    .radio-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.radio-item {
+    margin-bottom: 10px;
+}
+
+    label{
+  direction: rtl;
+  float: right;
+}</style>
+  <div class="overlay"></div>
+  <div class="container">
+        <a href = "{{ url_for('show_notes') }}"><button class="btn btn-primary btn-lg btn-block" style="margin-bottom: 10px;"> הצג הערות</button></a>
+
+    <div class="row">
+        <div class="col-lg-8 col-md-10 mx-auto" style="direction: rtl; float: right">
+  <form method="POST">
+    {{ form.hidden_tag() }}
+
+      <div class="form-group">
+      <label for="subject">מספר מגובש</label>
+      {{ form.subject(class="form-control", required="required") }}
+      </div>
+
+    <div class="form-group">
+        <label>סוג הערה</label>
+        <div class="radio-group">
+            {% for choice in form.type %}
+                <div class="form-check form-check-inline">
+                    {{ choice(class="form-check-input") }}
+                    {% if choice.label.text == "טובה" %}
+                        <label class="form-check-label" for="{{ choice.id }}" style="color: forestgreen">{{ choice.label.text }}</label>
+                    {% else %}
+                        <label class="form-check-label" for="{{ choice.id }}" style="color: red">{{ choice.label.text }}</label>
+                    {% endif %}
+
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+  <div class="form-group">
+      <label for="location">מיקום</label>
+      {{ form.location(class="form-control", required="required") }}
+    </div>
+
+    <div class="form-group">
+      <label for="text">הערה</label>
+      {{ form.text(class="form-control", required="required") }}
+    </div>
+
+
+
+    <div class="form-group">
+      {{ form.submit(class="btn btn-primary") }}
+    </div>
+  </form>
+</div>
+    </div>
+  </div>
+
+{% include "footer.html" %}
+{% endblock %}
+
+
+
+
+
