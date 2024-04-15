@@ -123,7 +123,7 @@ db.create_all()
 def admin_only(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if current_user.id != 0:
+        if not current_user.is_authenticated or current_user.id != 0:
             return abort(403)
         return f(*args, **kwargs)
     return decorated_function
