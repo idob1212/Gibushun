@@ -59,7 +59,6 @@ def load_user(user_id):
     return User.query.get(int(user_id))
 
 
-##CONFIGURE TABLE
 
 
 class User(UserMixin, db.Model):
@@ -1132,6 +1131,8 @@ def edit_odt_review(review_id):
     form = CreateReviewForm(station="ODT", grade=review.grade, note=review.note, subject=review.subject_id.split("/")[1], odt=review.station.split("T ")[1])
     form.subject.choices = candidate_nums
     form.station.choices = stations
+    form.odt.data = review.station.split("T ")[1]
+    form.note.data = review.note
     if form.validate_on_submit():
         review.station = form.station.data + " " + form.odt.data
         review.subject_id = str(current_user.id) + "/" + str(form.subject.data)
@@ -1140,7 +1141,7 @@ def edit_odt_review(review_id):
         db.session.commit()
         update_avgs(form)
         return redirect(url_for("showODTReviews"))
-    return render_template("make-post.html", form=form, current_user=current_user)
+    return render_template("make-post.html", form=form, current_user=current_user, odt_val = review.station.split("T ")[1], grade = int(review.grade), note = review.note)
 
 
 @app.route("/delete-review/<int:review_id>")
