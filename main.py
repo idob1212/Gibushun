@@ -1141,15 +1141,6 @@ def edit_odt_review(review_id):
         db.session.commit()
         update_avgs(form)
         return redirect(url_for("showODTReviews"))
-    else:
-        # Form did not validate
-        for field, errors in form.errors.items():
-            for error in errors:
-                field_errors = getattr(form, field).errors
-                detailed_error = field_errors[0] if field_errors else "Unknown error"
-                print(f"Error in {getattr(form, field).label.text}: {detailed_error}")
-                field_value = getattr(form, field).data
-                print(f"Value: {field_value}")
     return render_template("make-post.html", form=form, current_user=current_user, odt_val = review.station.split("T ")[1], grade = int(review.grade), note = review.note)
 
 
