@@ -116,7 +116,7 @@ select{
         {% for review in reviews %}
             {% if review.subject.status != "פרש" %}
     <tr>
-    {% if review %}
+    {% if review.subject_id %}
         <td class="block">{{ review.subject_id.split("/")[1] }}</td>
         <td class="block">{{ review.grade|round(2) }}</td>
         <td class="block">{{ review.note }}</td>
