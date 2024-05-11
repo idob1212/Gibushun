@@ -31,8 +31,6 @@
 }</style>
 <script>
   document.addEventListener('DOMContentLoaded', function() {
-
-
     var stationField = document.getElementById('movementType');
     var additionalField = document.getElementById('additionalField');
     {% if other_flag == True %}
@@ -273,7 +271,10 @@ window.addEventListener('load', () => {
  fetch('/circles/finished', { // Update the endpoint to '/circles/finished'
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*', // Allow requests from any origin
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS', // Allow these HTTP methods
+      'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept' // Allow these headers
     },
     body: JSON.stringify(data)
   })
@@ -282,7 +283,8 @@ window.addEventListener('load', () => {
       console.log(data.message);
     })
     .catch(error => {
-      console.error('Error:', error);
+      console.error('JavaScript Error Message:', error.message);
+      console.error('JavaScript Error Stack Trace:', error.stack);
     });
 }
 
@@ -318,7 +320,10 @@ window.addEventListener('load', () => {
  fetch('/circles/finished-act', { // Update the endpoint to '/circles/finished'
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*', // Allow requests from any origin
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS', // Allow these HTTP methods
+      'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept' // Allow these headers
     },
     body: JSON.stringify(data)
   })
@@ -327,7 +332,8 @@ window.addEventListener('load', () => {
       console.log(data.message);
     })
     .catch(error => {
-      console.error('Error:', error);
+      console.error('JavaScript Error Message:', error.message);
+      console.error('JavaScript Error Stack Trace:', error.stack);
     });
 }
 

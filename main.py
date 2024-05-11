@@ -1370,15 +1370,6 @@ def circles_finished():
     else:
         act_num = 1
         station = f"{station} - אקט {act_num}"
-    # if station == "ספרינטים":
-    #     sprint_num = User.query.get(current_user.id).sprint_num
-    #     station = f"ספרינטים - אקט {sprint_num}"
-    # if station == "זחילות":
-    #     crawl_num = User.query.get(current_user.id).crawl_num
-    #     station = f"זחילות - אקט {crawl_num}"
-    # if station == "אלונקה סוציומטרית":
-    #     alonka_num = User.query.get(current_user.id).alonka_num
-    #     station = f"אלונקה סוציומטרית - אקט {alonka_num}"
     for circle_number in circle_numbers:
         counter += 1
         if circle_number == 0:
@@ -1393,12 +1384,12 @@ def circles_finished():
         review = Review(station=station, author=current_user, subject_id=str(current_user.id) + "/" + str(circle_number), grade= 1, subject=Candidate.query.filter_by(id=str(current_user.id) + "/" + str(circle_number)).first())
         db.session.add(review)
         db.session.commit()
-    update_avgs_nf()
     # Process the finished circle numbers as desired
     physical_stations = getPhysicalStations()
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     candidates = [candidate.id.split("/")[1] for candidate in candidates if candidate.status != "פרש"]
     circles = [{'id': i, 'clicked': False, 'finished': False} for i in candidates]
+    update_avgs_nf()
     return redirect(url_for('reset_circles', other_flag=other_flag, new_station=station))
 
 
@@ -1429,15 +1420,6 @@ def circles_finished_act():
     else:
         act_num = 1
         station = f"{station} - אקט {act_num}"
-    # if station == "ספרינטים":
-    #     sprint_num = User.query.get(current_user.id).sprint_num
-    #     station = f"ספרינטים - אקט {sprint_num}"
-    # if station == "זחילות":
-    #     crawl_num = User.query.get(current_user.id).crawl_num
-    #     station = f"זחילות - אקט {crawl_num}"
-    # if station == "אלונקה סוציומטרית":
-    #     alonka_num = User.query.get(current_user.id).alonka_num
-    #     station = f"אלונקה סוציומטרית - אקט {alonka_num}"
     for circle_number in circle_numbers:
         counter += 1
         if circle_number == 0:
@@ -1453,20 +1435,10 @@ def circles_finished_act():
         db.session.add(review)
         db.session.commit()
     updateActAvgs()
-    # if original_station == "ספרינטים":
-    #     current_user.sprint_num += 1
-    #     db.session.commit()
-    # if original_station == "זחילות":
-    #     current_user.crawl_num += 1
-    #     db.session.commit()
-    # if original_station == "אלונקה סוציומטרית":
-    #     current_user.alonka_num += 1
-    #     db.session.commit()
-
-    # Process the finished circle numbers as desired
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     candidates = [candidate.id.split("/")[1] for candidate in candidates if candidate.status != "פרש"]
     circles = [{'id': i, 'clicked': False, 'finished': False} for i in candidates]
+    updateActAvgs()
     return redirect(url_for('reset_circles'))
 
 
