@@ -288,7 +288,7 @@ fetch('/circles/finished', {
     console.log(data.message);
   })
   .catch(error => {
-    console.error('Error:', error.message);
+    console.error('Error:', error);
     // Optionally, log the server response if available
     if (error.response) {
       console.error('Server Response:', error.response);
