@@ -1348,6 +1348,10 @@ def circles():
 def circles_finished():
     print(f"request: {request.json}")
     circle_numbers = request.json['circle_numbers']
+    circle_numbers = circle_numbers[:circle_numbers.index(0)]
+    candidates = Candidate.query.filter_by(group_id=current_user.id).all()
+    full_candidates = [int(candidate.id.split("/")[1]) for candidate in candidates if candidate.status != "פרש"]
+    candidates = [candidate for candidate in full_candidates if candidate not in circle_numbers]
     station = request.json['movement_type']
     other_flag = False
     if station == "אחר":
@@ -1356,7 +1360,6 @@ def circles_finished():
     num_of_circles = len(circle_numbers) - 1
     counter = -1
     penalty = 4 / num_of_circles
-    not_participated_idx = 0
     reviews = Review.query.filter_by(author_id=current_user.id).filter(Review.station.like(f'%{station}%')).all()
     reviews = [review for review in reviews if "סיכום" in review.station.split() and "אקט" in review.station.split()]
     reviews = [review for review in reviews if getStationName(review) == station]
@@ -1373,23 +1376,18 @@ def circles_finished():
         station = f"{station} - אקט {act_num}"
     for circle_number in circle_numbers:
         counter += 1
-        if circle_number == 0:
-            not_participated_idx = counter + 1
-            break
         candidate = Candidate.query.get(str(current_user.id) + "/" + str(circle_number))
-        review = Review(station=station, author=current_user, subject_id=str(current_user.id) + "/" + str(circle_number), grade=4 - counter * penalty, subject=Candidate.query.filter_by(id=str(current_user.id) + "/" + str(circle_number)).first())
+        review = Review(station=station, author=current_user, subject_id=str(current_user.id) + "/" + str(circle_number), grade=max(1,4 - counter * penalty), subject=Candidate.query.filter_by(id=str(current_user.id) + "/" + str(circle_number)).first())
         db.session.add(review)
         db.session.commit()
-    for circle_number in circle_numbers[not_participated_idx:]:
+    for circle_number in candidates:
         candidate = Candidate.query.get(str(current_user.id) + "/" + str(circle_number))
         review = Review(station=station, author=current_user, subject_id=str(current_user.id) + "/" + str(circle_number), grade= 1, subject=Candidate.query.filter_by(id=str(current_user.id) + "/" + str(circle_number)).first())
         db.session.add(review)
         db.session.commit()
     # Process the finished circle numbers as desired
     physical_stations = getPhysicalStations()
-    candidates = Candidate.query.filter_by(group_id=current_user.id).all()
-    candidates = [candidate.id.split("/")[1] for candidate in candidates if candidate.status != "פרש"]
-    circles = [{'id': i, 'clicked': False, 'finished': False} for i in candidates]
+    circles = [{'id': i, 'clicked': False, 'finished': False} for i in full_candidates]
     update_avgs_nf()
     return redirect(url_for('reset_circles', other_flag=other_flag, new_station=station))
 
@@ -1398,6 +1396,10 @@ def circles_finished():
 def circles_finished_act():
     print(f"request: {request.json}")
     circle_numbers = request.json['circle_numbers']
+    circle_numbers = circle_numbers[:circle_numbers.index(0)]
+    candidates = Candidate.query.filter_by(group_id=current_user.id).all()
+    full_candidates = [int(candidate.id.split("/")[1]) for candidate in candidates if candidate.status != "פרש"]
+    candidates = [candidate for candidate in full_candidates if candidate not in circle_numbers]
     station = request.json['movement_type']
     other_flag = False
     if station == "אחר":
@@ -1407,7 +1409,6 @@ def circles_finished_act():
     num_of_circles = len(circle_numbers) - 1
     counter = -1
     penalty = 4 / num_of_circles
-    not_participated_idx = 0
     reviews = Review.query.filter_by(author_id=current_user.id).filter(Review.station.like(f'%{station}%')).all()
     reviews = [review for review in reviews if "סיכום" in review.station.split() and "אקט" in review.station.split()]
     reviews = [review for review in reviews if getStationName(review) == station]
@@ -1424,22 +1425,17 @@ def circles_finished_act():
         station = f"{station} - אקט {act_num}"
     for circle_number in circle_numbers:
         counter += 1
-        if circle_number == 0:
-            not_participated_idx = counter + 1
-            break
         candidate = Candidate.query.get(str(current_user.id) + "/" + str(circle_number))
-        review = Review(station=station, author=current_user, subject_id=str(current_user.id) + "/" + str(circle_number), grade=4 - counter * penalty, subject=Candidate.query.filter_by(id=str(current_user.id) + "/" + str(circle_number)).first())
+        review = Review(station=station, author=current_user, subject_id=str(current_user.id) + "/" + str(circle_number), grade=max(1,4 - counter * penalty), subject=Candidate.query.filter_by(id=str(current_user.id) + "/" + str(circle_number)).first())
         db.session.add(review)
         db.session.commit()
-    for circle_number in circle_numbers[not_participated_idx:]:
+    for circle_number in candidates:
         candidate = Candidate.query.get(str(current_user.id) + "/" + str(circle_number))
         review = Review(station=station, author=current_user, subject_id=str(current_user.id) + "/" + str(circle_number), grade= 1, subject=Candidate.query.filter_by(id=str(current_user.id) + "/" + str(circle_number)).first())
         db.session.add(review)
         db.session.commit()
     updateActAvgs()
-    candidates = Candidate.query.filter_by(group_id=current_user.id).all()
-    candidates = [candidate.id.split("/")[1] for candidate in candidates if candidate.status != "פרש"]
-    circles = [{'id': i, 'clicked': False, 'finished': False} for i in candidates]
+    circles = [{'id': i, 'clicked': False, 'finished': False} for i in full_candidates]
     updateActAvgs()
     return redirect(url_for('reset_circles'))
 

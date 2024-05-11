@@ -122,117 +122,85 @@
   function sendCircleNumbers() {
     const movementType = movementTypeSelect.value;
     const other = additionalFieldText.value;
+    const remainingCircles = circles.filter(circle => !circle.classList.contains('finished'));
     const data = {
-      circle_numbers: [...finishedCircles, 0, ...circles.map(circle => parseInt(circle.textContent))],
+      circle_numbers: [...finishedCircles, 0, ...remainingCircles.map(circle => parseInt(circle.textContent))],
       movement_type: movementType,
       other: other
     };
 
-  fetch('/circles/finished', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(data)
-  })
-  .then(response => {
-    if (!response.ok) {
-      throw new Error('Network response was not ok');
-    }
-    return response.text().then(text => {
-      try {
-        return JSON.parse(text);
-      } catch (err) {
-        console.error('Error parsing JSON:', err);
-        return { message: 'Invalid JSON response' };
-      }
-    });
-  })
-  .then(data => {
-    console.log(data.message);
+    // Reset circles without waiting for response
     resetCircles();
-  })
-  .catch(error => {
-    console.error('Error:', error);
-  });
-}
-function sendCircleNumbersAct() {
-  const movementType = movementTypeSelect.value;
-  const other = additionalFieldText.value;
-  const data = {
-    circle_numbers: [...finishedCircles, 0, ...circles.map(circle => parseInt(circle.textContent))],
-    movement_type: movementType,
-    other: other
-  };
 
-  fetch('/circles/finished-act', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(data)
-  })
-  .then(response => {
-    if (!response.ok) {
-      throw new Error('Network response was not ok');
-    }
-    return response.text().then(text => {
-      try {
-        return JSON.parse(text);
-      } catch (err) {
-        console.error('Error parsing JSON:', err);
-        return { message: 'Invalid JSON response' };
-      }
+    // Example of posting data, you'll need to handle the response accordingly
+    fetch('/circles/finished', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
     });
-  })
-  .then(data => {
-    console.log(data.message);
-    resetCircles();
-  })
-  .catch(error => {
-    console.error('JavaScript Error Message:', error.message);
-    console.error('JavaScript Error Stack Trace:', error.stack);
-  });
-}
-function resetCircles() {
-  const selectedValue = movementTypeSelect.value;
-  const otherValue = additionalFieldText.value;
-  sessionStorage.setItem('selectedMovementType', selectedValue);
-  sessionStorage.setItem('selectedOther', otherValue);
-  // Remove finished circles from the DOM
-  const finishedCirclesElements = document.querySelectorAll('.circle.finished');
-  finishedCirclesElements.forEach(circle => circle.remove());
-  // Reset finishedCircles array
-  finishedCircles = [];
-  // Reset circle colors
-  circles.forEach(circle => {
-    circle.classList.remove('finished');
-    circle.style.backgroundColor = 'blue';
-  });
-  // Move circles back to row1
-  circles.forEach(circle => row1.appendChild(circle));
-  // Hide finish buttons
-  redHeader.style.display = 'none';
-  finishButton.style.display = 'none';
-  finishActButton.style.display = 'none';
-}
-window.addEventListener('load', () => {
-  const storedValue = sessionStorage.getItem('selectedMovementType');
-  if (storedValue) {
-    movementTypeSelect.value = storedValue;
-    additionalFieldText.value = sessionStorage.getItem('selectedOther');
-
-    if (movementTypeSelect.value === 'אחר') {
-      additionalField.style.display = 'none';
-      const val = sessionStorage.getItem('selectedOther');
-      const option = document.createElement("option");
-      option.value = val;
-      option.text = val;
-      movementTypeSelect.appendChild(option);
-      movementTypeSelect.value = sessionStorage.getItem('selectedOther');
-    }
   }
-});
+
+  function sendCircleNumbersAct() {
+    const movementType = movementTypeSelect.value;
+    const other = additionalFieldText.value;
+    const remainingCircles = circles.filter(circle => !circle.classList.contains('finished'));
+    const data = {
+      circle_numbers: [...finishedCircles, 0, ...remainingCircles.map(circle => parseInt(circle.textContent))],
+      movement_type: movementType,
+      other: other
+    };
+
+    // Reset circles without waiting for response
+    resetCircles();
+
+    // Example of posting data, you'll need to handle the response accordingly
+    fetch('/circles/finished-act', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    });
+  }
+
+  function resetCircles() {
+    // Remove finished circles from the DOM
+    const finishedCirclesElements = document.querySelectorAll('.circle.finished');
+    finishedCirclesElements.forEach(circle => circle.remove());
+    // Reset finishedCircles array
+    finishedCircles = [];
+    // Reset circle colors
+    circles.forEach(circle => {
+      circle.classList.remove('finished');
+      circle.style.backgroundColor = 'blue';
+    });
+    // Move circles back to row1
+    circles.forEach(circle => row1.appendChild(circle));
+    // Hide finish buttons
+    redHeader.style.display = 'none';
+    finishButton.style.display = 'none';
+    finishActButton.style.display = 'none';
+  }
+
+  window.addEventListener('load', () => {
+    const storedValue = sessionStorage.getItem('selectedMovementType');
+    if (storedValue) {
+      movementTypeSelect.value = storedValue;
+      additionalFieldText.value = sessionStorage.getItem('selectedOther');
+
+      if (movementTypeSelect.value === 'אחר') {
+        additionalField.style.display = 'none';
+        const val = sessionStorage.getItem('selectedOther');
+        const option = document.createElement("option");
+        option.value = val;
+        option.text = val;
+        movementTypeSelect.appendChild(option);
+        movementTypeSelect.value = sessionStorage.getItem('selectedOther');
+      }
+    }
+  });
 </script>
 <style>
   .circle {
