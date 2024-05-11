@@ -240,61 +240,61 @@ window.addEventListener('load', () => {
 
 
   function sendCircleNumbers() {
-  const circlesContainer = document.getElementById('row1');
-  const circles = Array.from(circlesContainer.getElementsByClassName('circle'));
-  const circleNumbers = [];
+      const circlesContainer = document.getElementById('row1');
+      const circles = Array.from(circlesContainer.getElementsByClassName('circle'));
+      const circleNumbers = [];
 
-  const greenCircles = document.querySelectorAll('.circle.finished');
-  greenCircles.forEach(circle => {
-    const number = circle.querySelector('span').textContent;
-    circleNumbers.push(number);
-  });
+      const greenCircles = document.querySelectorAll('.circle.finished');
+      greenCircles.forEach(circle => {
+          const number = circle.querySelector('span').textContent;
+          circleNumbers.push(number);
+      });
 
-  circleNumbers.push(0);
-
-
-  circles.forEach(circle => {
-    const number = circle.querySelector('span').textContent;
-    circleNumbers.push(number);
-  });
+      circleNumbers.push(0);
 
 
- const movementType = document.getElementById('movementType').value; // Get the value of the select field
- const other = document.getElementById('additionalFieldText').value; // Get the value of the additional field
+      circles.forEach(circle => {
+          const number = circle.querySelector('span').textContent;
+          circleNumbers.push(number);
+      });
 
-  const data = {
-    circle_numbers: circleNumbers,
-    movement_type: movementType,
-    other: other
-  };
 
-fetch('/circles/finished', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*', // Allow requests from any origin
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS', // Allow these HTTP methods
-    'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept' // Allow these headers
-  },
-  body: JSON.stringify(data)
-})
-  .then(response => {
-    if (!response.ok) {
-      throw new Error('Network response was not ok');
-    }
-    return response.json();
-  })
-  .then(data => {
-    console.log(data.message);
-  })
-  .catch(error => {
-    console.error('Error:', error);
-    // Optionally, log the server response if available
-    if (error.response) {
-      console.error('Server Response:', error.response);
-    }
-  });
-}
+      const movementType = document.getElementById('movementType').value; // Get the value of the select field
+      const other = document.getElementById('additionalFieldText').value; // Get the value of the additional field
+
+      const data = {
+          circle_numbers: circleNumbers,
+          movement_type: movementType,
+          other: other
+      };
+
+      fetch('/circles/finished', {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': '*', // Allow requests from any origin
+              'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS', // Allow these HTTP methods
+              'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept' // Allow these headers
+          },
+          mode: 'cors', // Explicitly set CORS mode
+          body: JSON.stringify(data)
+      })
+          .then(response => {
+              if (!response.ok) {
+                  throw new Error('Network response was not ok');
+              }
+              return response.json();
+          })
+          .then(data => {
+              console.log(data.message);
+          })
+          .catch(error => {
+              console.error('Error:', error);
+              if (error.response) {
+                  console.error('Server Response:', error.response);
+              }
+          });
+  }
 
   function sendCircleNumbersAct() {
   const circlesContainer = document.getElementById('row1');
