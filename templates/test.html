@@ -175,7 +175,6 @@
     }
   }
 
-
   // Call the function initially on page load
   updateFinishButtonVisibility();
 
@@ -187,37 +186,37 @@
     resetCircles();
   });
 
-    finishActButton.addEventListener('click', () => {
+  finishActButton.addEventListener('click', () => {
     // Perform the desired action when the button is clicked
     console.log('Finish button clicked!');
     sendCircleNumbersAct();
     resetCircles();
   });
 
-function resetCircles() {
-  // Store the selected value of the select field in sessionStorage
-  const movementTypeSelect = document.getElementById('movementType');
-  const selectedValue = movementTypeSelect.value;
-  sessionStorage.setItem('selectedMovementType', selectedValue);
-
-  const otherField = document.getElementById('additionalFieldText');
-  const otherValue = otherField.value;
-  sessionStorage.setItem('selectedOther', otherValue);
-
-  location.reload();
-}
-
-// Retrieve the stored value and set it as the selected value of the select field
-window.addEventListener('load', () => {
-  const storedValue = sessionStorage.getItem('selectedMovementType');
-  if (storedValue) {
+  function resetCircles() {
+    // Store the selected value of the select field in sessionStorage
     const movementTypeSelect = document.getElementById('movementType');
-    movementTypeSelect.value = storedValue;
+    const selectedValue = movementTypeSelect.value;
+    sessionStorage.setItem('selectedMovementType', selectedValue);
 
     const otherField = document.getElementById('additionalFieldText');
-    otherField.value = sessionStorage.getItem('selectedOther');
+    const otherValue = otherField.value;
+    sessionStorage.setItem('selectedOther', otherValue);
 
-    if (movementTypeSelect.value === 'אחר') {
+    location.reload();
+  }
+
+  // Retrieve the stored value and set it as the selected value of the select field
+  window.addEventListener('load', () => {
+    const storedValue = sessionStorage.getItem('selectedMovementType');
+    if (storedValue) {
+      const movementTypeSelect = document.getElementById('movementType');
+      movementTypeSelect.value = storedValue;
+
+      const otherField = document.getElementById('additionalFieldText');
+      otherField.value = sessionStorage.getItem('selectedOther');
+
+      if (movementTypeSelect.value === 'אחר') {
         document.getElementById('additionalField').style.display = 'none';
         const val = sessionStorage.getItem('selectedOther');
         var option = document.createElement("option");
@@ -229,122 +228,105 @@ window.addEventListener('load', () => {
         // Append the option to the select field
         movementTypeSelect.appendChild(option);
         movementTypeSelect.value = sessionStorage.getItem('selectedOther');
+      }
+      sessionStorage.removeItem('selectedMovementType');
+      sessionStorage.removeItem('selectedOther');
     }
-    sessionStorage.removeItem('selectedMovementType');
-    sessionStorage.removeItem('selectedOther');
-  }
-
-
-});
-
-
+  });
 
   function sendCircleNumbers() {
-      const circlesContainer = document.getElementById('row1');
-      const circles = Array.from(circlesContainer.getElementsByClassName('circle'));
-      const circleNumbers = [];
+    const circlesContainer = document.getElementById('row1');
+    const circles = Array.from(circlesContainer.getElementsByClassName('circle'));
+    const circleNumbers = [];
 
-      const greenCircles = document.querySelectorAll('.circle.finished');
-      greenCircles.forEach(circle => {
-          const number = circle.querySelector('span').textContent;
-          circleNumbers.push(number);
-      });
+    const greenCircles = document.querySelectorAll('.circle.finished');
+    greenCircles.forEach(circle => {
+      const number = circle.querySelector('span').textContent;
+      circleNumbers.push(number);
+    });
 
-      circleNumbers.push(0);
+    circleNumbers.push(0);
 
+    circles.forEach(circle => {
+      const number = circle.querySelector('span').textContent;
+      circleNumbers.push(number);
+    });
 
-      circles.forEach(circle => {
-          const number = circle.querySelector('span').textContent;
-          circleNumbers.push(number);
-      });
+    const movementType = document.getElementById('movementType').value; // Get the value of the select field
+    const other = document.getElementById('additionalFieldText').value; // Get the value of the additional field
 
+    const data = {
+      circle_numbers: circleNumbers,
+      movement_type: movementType,
+      other: other
+    };
 
-      const movementType = document.getElementById('movementType').value; // Get the value of the select field
-      const other = document.getElementById('additionalFieldText').value; // Get the value of the additional field
+    // Instead of using fetch, you can create a new XMLHttpRequest object
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/circles/finished', true); // Replace '/circles/finished' with your desired endpoint
 
-      const data = {
-          circle_numbers: circleNumbers,
-          movement_type: movementType,
-          other: other
-      };
+    // Set request headers
+    xhr.setRequestHeader('Content-Type', 'application/json');
 
-      fetch('/circles/finished', {
-          method: 'POST',
-          headers: {
-              'Content-Type': 'application/json',
-              'Access-Control-Allow-Origin': '*', // Allow requests from any origin
-              'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS', // Allow these HTTP methods
-              'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept' // Allow these headers
-          },
-          mode: 'cors', // Explicitly set CORS mode
-          body: JSON.stringify(data)
-      })
-          .then(response => {
-              if (!response.ok) {
-                  throw new Error('Network response was not ok');
-              }
-              return response.json();
-          })
-          .then(data => {
-              console.log(data.message);
-          })
-          .catch(error => {
-              console.error('Error:', error);
-              if (error.response) {
-                  console.error('Server Response:', error.response);
-              }
-          });
+    // Handle response
+    xhr.onreadystatechange = function() {
+      if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+        console.log(JSON.parse(xhr.responseText).message);
+      } else if (xhr.readyState === XMLHttpRequest.DONE) {
+        console.error('Error:', xhr.status);
+      }
+    };
+
+    // Send the request
+    xhr.send(JSON.stringify(data));
   }
 
   function sendCircleNumbersAct() {
-  const circlesContainer = document.getElementById('row1');
-  const circles = Array.from(circlesContainer.getElementsByClassName('circle'));
-  const circleNumbers = [];
+    const circlesContainer = document.getElementById('row1');
+    const circles = Array.from(circlesContainer.getElementsByClassName('circle'));
+    const circleNumbers = [];
 
-  const greenCircles = document.querySelectorAll('.circle.finished');
-  greenCircles.forEach(circle => {
-    const number = circle.querySelector('span').textContent;
-    circleNumbers.push(number);
-  });
-
-  circleNumbers.push(0);
-
-
-  circles.forEach(circle => {
-    const number = circle.querySelector('span').textContent;
-    circleNumbers.push(number);
-  });
-
-
- const movementType = document.getElementById('movementType').value; // Get the value of the select field
- const other = document.getElementById('additionalFieldText').value; // Get the value of the additional field
-
-  const data = {
-    circle_numbers: circleNumbers,
-    movement_type: movementType,// Include the movement type value in the data object
-    other: other,
-  };
-
- fetch('/circles/finished-act', { // Update the endpoint to '/circles/finished'
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*', // Allow requests from any origin
-      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS', // Allow these HTTP methods
-      'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept' // Allow these headers
-    },
-    body: JSON.stringify(data)
-  })
-    .then(response => response.json())
-    .then(data => {
-      console.log(data.message);
-    })
-    .catch(error => {
-      console.error('JavaScript Error Message:', error.message);
-      console.error('JavaScript Error Stack Trace:', error.stack);
+    const greenCircles = document.querySelectorAll('.circle.finished');
+    greenCircles.forEach(circle => {
+      const number = circle.querySelector('span').textContent;
+      circleNumbers.push(number);
     });
-}
 
+    circleNumbers.push(0);
+
+    circles.forEach(circle => {
+      const number = circle.querySelector('span').textContent;
+      circleNumbers.push(number);
+    });
+
+    const movementType = document.getElementById('movementType').value; // Get the value of the select field
+    const other = document.getElementById('additionalFieldText').value; // Get the value of the additional field
+
+    const data = {
+      circle_numbers: circleNumbers,
+      movement_type: movementType,
+      other: other
+    };
+
+    // Instead of using fetch, you can create a new XMLHttpRequest object
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/circles/finished-act', true); // Replace '/circles/finished-act' with your desired endpoint
+
+    // Set request headers
+    xhr.setRequestHeader('Content-Type', 'application/json');
+
+    // Handle response
+    xhr.onreadystatechange = function() {
+      if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+        console.log(JSON.parse(xhr.responseText).message);
+      } else if (xhr.readyState === XMLHttpRequest.DONE) {
+        console.error('Error:', xhr.status);
+      }
+    };
+
+    // Send the request
+    xhr.send(JSON.stringify(data));
+  }
 </script>
 
 <style>
