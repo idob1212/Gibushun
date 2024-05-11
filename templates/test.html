@@ -128,58 +128,72 @@
       other: other
     };
 
-    fetch('/circles/finished', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(data)
-    })
-    .then(response => {
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
+  fetch('/circles/finished', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(data)
+  })
+  .then(response => {
+    if (!response.ok) {
+      throw new Error('Network response was not ok');
+    }
+    return response.text().then(text => {
+      try {
+        return JSON.parse(text);
+      } catch (err) {
+        console.error('Error parsing JSON:', err);
+        return { message: 'Invalid JSON response' };
       }
-      return response.json();
-    })
-    .then(data => {
-      console.log(data.message);
-      resetCircles();
-    })
-    .catch(error => {
-      console.error('Error:', error);
-      resetCircles();
-
     });
-  }
+  })
+  .then(data => {
+    console.log(data.message);
+    resetCircles();
+  })
+  .catch(error => {
+    console.error('Error:', error);
+  });
+}
+function sendCircleNumbersAct() {
+  const movementType = movementTypeSelect.value;
+  const other = additionalFieldText.value;
+  const data = {
+    circle_numbers: [...finishedCircles, 0, ...circles.map(circle => parseInt(circle.textContent))],
+    movement_type: movementType,
+    other: other
+  };
 
-  function sendCircleNumbersAct() {
-    const movementType = movementTypeSelect.value;
-    const other = additionalFieldText.value;
-    const data = {
-      circle_numbers: [...finishedCircles, 0, ...circles.map(circle => parseInt(circle.textContent))],
-      movement_type: movementType,
-      other: other
-    };
-
-    fetch('/circles/finished-act', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(data)
-    })
-    .then(response => response.json())
-    .then(data => {
-      console.log(data.message);
-      resetCircles();
-    })
-    .catch(error => {
-      console.error('JavaScript Error Message:', error.message);
-      console.error('JavaScript Error Stack Trace:', error.stack);
-      resetCircles();
+  fetch('/circles/finished-act', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(data)
+  })
+  .then(response => {
+    if (!response.ok) {
+      throw new Error('Network response was not ok');
+    }
+    return response.text().then(text => {
+      try {
+        return JSON.parse(text);
+      } catch (err) {
+        console.error('Error parsing JSON:', err);
+        return { message: 'Invalid JSON response' };
+      }
     });
-  }
-
+  })
+  .then(data => {
+    console.log(data.message);
+    resetCircles();
+  })
+  .catch(error => {
+    console.error('JavaScript Error Message:', error.message);
+    console.error('JavaScript Error Stack Trace:', error.stack);
+  });
+}
 function resetCircles() {
   const selectedValue = movementTypeSelect.value;
   const otherValue = additionalFieldText.value;
