@@ -1,343 +1,217 @@
-{#{% extends 'bootstrap/base.html' %}#}
-{#{% import "bootstrap/wtf.html" as wtf %}#}
-
 {% block content %}
 {% include "header.html" %}
-  <!-- Page Header -->
-  <header class="masthead" style="background-image: url('{{ url_for('static', filename='img/review.jpg')}}')">
-    <div class="overlay"></div>
-
-    <div class="container">
-      <div class="row">
-        <div class="col-lg-8 col-md-10 mx-auto">
-          <div class="page-heading">
-            {% if is_edit %}
-            <h1>ערוך חוות דעת</h1>
-            {% else: %}
-            <h1 style="color: white">הזן ציון</h1>
-            {% endif %}
-{#            <span class="subheading" style="direction: rtl; color: white">נשמח לשמוע את דעתך!</span>#}
-          </div>
+<!-- Page Header -->
+<header class="masthead" style="background-image: url('{{ url_for('static', filename='img/review.jpg')}}')">
+  <div class="overlay"></div>
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8 col-md-10 mx-auto">
+        <div class="page-heading">
+          {% if is_edit %}
+          <h1>ערוך חוות דעת</h1>
+          {% else: %}
+          <h1 style="color: white">הזן ציון</h1>
+          {% endif %}
         </div>
       </div>
     </div>
-      <link href="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" rel="stylesheet">
-    <script src="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js"> </script>
-  </header>
-    <style>
-    label{
-  direction: rtl;
-  float: right;
-}</style>
-<script>
-  document.addEventListener('DOMContentLoaded', function() {
-    var stationField = document.getElementById('movementType');
-    var additionalField = document.getElementById('additionalField');
-    {% if other_flag == True %}
-        additionalField.style.display = 'none';
-        stationField.value = new_station;
-    {% endif %}
-    stationField.addEventListener('change', function() {
-      var selectedStation = stationField.value;
-      var additionalField = document.getElementById('additionalField');
+  </div>
+</header>
 
-      if (selectedStation === 'ODT' || selectedStation === 'אחר') {
-        additionalField.style.display = 'block';
-      } else {
-        additionalField.style.display = 'none';
-      }
-    });
-  });
-</script>
-<div class="overlay"></div>
 <div class="container">
-  <a href="{{ url_for('add_new_group_review') }}" class="btn btn-primary btn-lg btn-block ">
-    <span class="btn-text">עבור למצב קבוצתי</span>
-  </a>
-  <a href="{{ url_for('add_new_review') }}" class="btn btn-primary btn-lg btn-block mt-3">
-    <span class="btn-text">עבור למצב יחיד</span>
-  </a>
+  <a href="{{ url_for('add_new_group_review') }}" class="btn btn-primary btn-lg btn-block">עבור למצב קבוצתי</a>
+  <a href="{{ url_for('add_new_review') }}" class="btn btn-primary btn-lg btn-block mt-3">עבור למצב יחיד</a>
   <div class="row">
     <div class="col-lg-8 col-md-10 mx-auto" style="direction: rtl; float: right">
-  <div class="text-center mb-3 mt-3"> <!-- Center the select field with margin -->
-    <div style="text-align: center">
-      <label for="movementType" style="margin-right: 10px; font-size: 16px">סוג תחנה:</label>
-      <select class="form-control d-inline-block" id="movementType">
-        <option value="ספרינטים">ספרינט</option>
-        <option value="זחילות">זחילות</option>
-        <option value="אלונקה סוציומטרית">אלונקה סוציומטרית</option>
+      <div class="text-center mb-3 mt-3">
+        <label for="movementType" style="margin-right: 10px; font-size: 16px">סוג תחנה:</label>
+        <select class="form-control d-inline-block" id="movementType">
+          <option value="ספרינטים">ספרינט</option>
+          <option value="זחילות">זחילות</option>
+          <option value="אלונקה סוציומטרית">אלונקה סוציומטרית</option>
           {% for station in physical_stations %}
-            <option value="{{ station }}">{{ station }}</option>
-        {% endfor %}
-        <option value="אחר">אחר</option>
-      </select>
-    </div>
-    <div id="additionalField" style="text-align: center; display: none">
-        <label for="additionalFieldText" style="margin-right: 10px; font-size: 16px">הזן שם תחנה:</label>
-        <input class="form-control d-inline-block" type="text" id="additionalFieldText">
-    </div>
-    </div>
-    </div>
-
-      <div id="row1" style="margin-top: 20px;">
-        {% for circle in circles %}
-        <div class="circle{% if circle.finished %} finished{% endif %} {% if circle.finished %} finished-{{ loop.index }}{% endif %}">
-          <span>{{ circle.id }}</span>
-          {% if circle.finished %}<span class="finished-text">סיימו</span>{% endif %}
+          <option value="{{ station }}">{{ station }}</option>
+          {% endfor %}
+          <option value="אחר">אחר</option>
+        </select>
+        <div id="additionalField" style="display: none">
+          <label for="additionalFieldText" style="margin-right: 10px; font-size: 16px">הזן שם תחנה:</label>
+          <input class="form-control d-inline-block" type="text" id="additionalFieldText">
         </div>
-        {% endfor %}
       </div>
+      <div id="row1" style="margin-top: 20px; text-align: right; direction: rtl;"></div>
       <h2 id="redHeader" style="margin-top: 40px; display: none; text-align: right;">סיימו</h2>
       <div id="row2" class="row"></div>
       <button id="finishButton" class="btn btn-primary btn-lg" style="margin-top: 20px; display: none;">סיום סיבוב</button>
       <button id="finishActButton" class="btn btn-primary btn-lg" style="margin-top: 20px; display: none;">סיום אקט</button>
-
     </div>
   </div>
 </div>
 
 {% include "footer.html" %}
 
-<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js"></script>
 <script>
-  const circles = document.querySelectorAll('.circle');
+  const movementTypeSelect = document.getElementById('movementType');
+  const additionalField = document.getElementById('additionalField');
+  const additionalFieldText = document.getElementById('additionalFieldText');
+  const row1 = document.getElementById('row1');
   const redHeader = document.getElementById('redHeader');
   const finishButton = document.getElementById('finishButton');
   const finishActButton = document.getElementById('finishActButton');
 
-  circles.forEach(circle => {
-    circle.addEventListener('click', () => {
-      if (circle.classList.contains('finished')) {
-        circle.classList.remove('finished');
-        const finishedText = circle.querySelector('.finished-text');
-        if (finishedText) {
-          finishedText.remove();
-        }
-        circle.style.backgroundColor = 'blue';
-        document.getElementById('row1').insertBefore(circle, document.getElementById('row1').firstChild);
-        if (document.querySelectorAll('.circle.finished').length === 0) {
-          redHeader.style.display = 'none';
-          finishButton.style.display = 'none';
-          finishActButton.style.display = 'none';
-        }
-        reorderCircles(); // Reorder circles in row1 after turning a circle back to blue
-      } else {
-        if (circle.classList.contains('finished')) {
-          circle.classList.remove('finished');
-        } else {
-          circle.classList.add('finished');
-        }
-        document.getElementById('row2').appendChild(circle);
-        redHeader.style.display = 'block';
-        finishButton.style.display = 'block';
-        finishActButton.style.display = 'block';
-      }
-      updateCircleColors(); // Update circle colors after each click
-    });
-  });
+  let circles = [];
+  let finishedCircles = [];
 
-  // Reorder circles in row1 based on their number value in ascending order
-  function reorderCircles() {
-    const circlesContainer = document.getElementById('row1');
-    const circles = Array.from(circlesContainer.getElementsByClassName('circle'));
-
-    circles.sort((a, b) => {
-      const aNumber = parseInt(a.querySelector('span').textContent);
-      const bNumber = parseInt(b.querySelector('span').textContent);
-      return aNumber - bNumber;
-    });
-
-    circles.forEach(circle => {
-      circlesContainer.appendChild(circle);
-    });
+  // Generate circles
+  for (let i = 1; i <= {{ circles|length }}; i++) {
+    const circle = document.createElement('div');
+    circle.classList.add('circle');
+    circle.textContent = i;
+    circle.addEventListener('click', toggleCircle);
+    row1.appendChild(circle);
+    circles.push(circle);
   }
 
-  // Update circle colors based on their position
+  function toggleCircle() {
+    const circleId = parseInt(this.textContent);
+    if (this.classList.contains('finished')) {
+      this.classList.remove('finished');
+      finishedCircles = finishedCircles.filter(id => id !== circleId);
+      row1.appendChild(this);
+    } else {
+      this.classList.add('finished');
+      finishedCircles.push(circleId);
+      document.getElementById('row2').appendChild(this);
+    }
+    updateCircleColors();
+    updateFinishButtonVisibility();
+  }
+
   function updateCircleColors() {
-    const finishedCircles = document.querySelectorAll('.circle.finished');
-    finishedCircles.forEach((circle, index) => {
-      const shade = 255 - (index * 25); // Adjust the color shade value based on the desired range
-      const color = `rgb(0, ${shade}, 0)`; // Create the color string
+    const greenCircles = document.querySelectorAll('.circle.finished');
+    greenCircles.forEach((circle, index) => {
+      const shade = 255 - (index * 25);
+      const color = `rgb(0, ${shade}, 0)`;
       circle.style.backgroundColor = color;
     });
   }
 
-  // Reorder circles initially on page load
-  reorderCircles();
-
   function updateFinishButtonVisibility() {
-    if (document.querySelectorAll('.circle.finished').length > 0) {
+    if (finishedCircles.length > 0) {
+      redHeader.style.display = 'block';
       finishButton.style.display = 'block';
       finishActButton.style.display = 'block';
     } else {
+      redHeader.style.display = 'none';
       finishButton.style.display = 'none';
       finishActButton.style.display = 'none';
     }
   }
 
-  // Call the function initially on page load
-  updateFinishButtonVisibility();
-
-  // Add an event listener to the "Finish" button
-  finishButton.addEventListener('click', () => {
-    // Perform the desired action when the button is clicked
-    console.log('Finish button clicked!');
-    sendCircleNumbers();
-    resetCircles();
-  });
-
-  finishActButton.addEventListener('click', () => {
-    // Perform the desired action when the button is clicked
-    console.log('Finish button clicked!');
-    sendCircleNumbersAct();
-    resetCircles();
-  });
-
-  function resetCircles() {
-    // Store the selected value of the select field in sessionStorage
-    const movementTypeSelect = document.getElementById('movementType');
-    const selectedValue = movementTypeSelect.value;
-    sessionStorage.setItem('selectedMovementType', selectedValue);
-
-    const otherField = document.getElementById('additionalFieldText');
-    const otherValue = otherField.value;
-    sessionStorage.setItem('selectedOther', otherValue);
-
-    location.reload();
-  }
-
-  // Retrieve the stored value and set it as the selected value of the select field
-  window.addEventListener('load', () => {
-    const storedValue = sessionStorage.getItem('selectedMovementType');
-    if (storedValue) {
-      const movementTypeSelect = document.getElementById('movementType');
-      movementTypeSelect.value = storedValue;
-
-      const otherField = document.getElementById('additionalFieldText');
-      otherField.value = sessionStorage.getItem('selectedOther');
-
-      if (movementTypeSelect.value === 'אחר') {
-        document.getElementById('additionalField').style.display = 'none';
-        const val = sessionStorage.getItem('selectedOther');
-        var option = document.createElement("option");
-
-        // Set the value and text of the option
-        option.value = val;
-        option.text = val;
-
-        // Append the option to the select field
-        movementTypeSelect.appendChild(option);
-        movementTypeSelect.value = sessionStorage.getItem('selectedOther');
-      }
-      sessionStorage.removeItem('selectedMovementType');
-      sessionStorage.removeItem('selectedOther');
+  movementTypeSelect.addEventListener('change', () => {
+    if (movementTypeSelect.value === 'ODT' || movementTypeSelect.value === 'אחר') {
+      additionalField.style.display = 'block';
+    } else {
+      additionalField.style.display = 'none';
     }
   });
 
+  finishButton.addEventListener('click', sendCircleNumbers);
+  finishActButton.addEventListener('click', sendCircleNumbersAct);
+
   function sendCircleNumbers() {
-    const circlesContainer = document.getElementById('row1');
-    const circles = Array.from(circlesContainer.getElementsByClassName('circle'));
-    const circleNumbers = [];
-
-    const greenCircles = document.querySelectorAll('.circle.finished');
-    greenCircles.forEach(circle => {
-      const number = circle.querySelector('span').textContent;
-      circleNumbers.push(number);
-    });
-
-    circleNumbers.push(0);
-
-    circles.forEach(circle => {
-      const number = circle.querySelector('span').textContent;
-      circleNumbers.push(number);
-    });
-
-    const movementType = document.getElementById('movementType').value; // Get the value of the select field
-    const other = document.getElementById('additionalFieldText').value; // Get the value of the additional field
-
+    const movementType = movementTypeSelect.value;
+    const other = additionalFieldText.value;
     const data = {
-      circle_numbers: circleNumbers,
+      circle_numbers: [...finishedCircles, 0, ...circles.map(circle => parseInt(circle.textContent))],
       movement_type: movementType,
       other: other
     };
 
-    // Instead of using fetch, you can create a new XMLHttpRequest object
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', '/circles/finished', true); // Replace '/circles/finished' with your desired endpoint
-
-    // Set request headers
-    xhr.setRequestHeader('Content-Type', 'application/json');
-
-    // Handle response
-    xhr.onreadystatechange = function() {
-      if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
-        console.log(JSON.parse(xhr.responseText).message);
-      } else if (xhr.readyState === XMLHttpRequest.DONE) {
-        console.error('Error:', xhr.status);
+    fetch('/circles/finished', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    })
+    .then(response => {
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
       }
-    };
-
-    // Send the request
-    xhr.send(JSON.stringify(data));
+      return response.json();
+    })
+    .then(data => {
+      console.log(data.message);
+      resetCircles();
+    })
+    .catch(error => {
+      console.error('Error:', error);
+    });
   }
 
   function sendCircleNumbersAct() {
-    const circlesContainer = document.getElementById('row1');
-    const circles = Array.from(circlesContainer.getElementsByClassName('circle'));
-    const circleNumbers = [];
-
-    const greenCircles = document.querySelectorAll('.circle.finished');
-    greenCircles.forEach(circle => {
-      const number = circle.querySelector('span').textContent;
-      circleNumbers.push(number);
-    });
-
-    circleNumbers.push(0);
-
-    circles.forEach(circle => {
-      const number = circle.querySelector('span').textContent;
-      circleNumbers.push(number);
-    });
-
-    const movementType = document.getElementById('movementType').value; // Get the value of the select field
-    const other = document.getElementById('additionalFieldText').value; // Get the value of the additional field
-
+    const movementType = movementTypeSelect.value;
+    const other = additionalFieldText.value;
     const data = {
-      circle_numbers: circleNumbers,
+      circle_numbers: [...finishedCircles, 0, ...circles.map(circle => parseInt(circle.textContent))],
       movement_type: movementType,
       other: other
     };
 
-    // Instead of using fetch, you can create a new XMLHttpRequest object
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', '/circles/finished-act', true); // Replace '/circles/finished-act' with your desired endpoint
-
-    // Set request headers
-    xhr.setRequestHeader('Content-Type', 'application/json');
-
-    // Handle response
-    xhr.onreadystatechange = function() {
-      if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
-        console.log(JSON.parse(xhr.responseText).message);
-      } else if (xhr.readyState === XMLHttpRequest.DONE) {
-        console.error('Error:', xhr.status);
-      }
-    };
-
-    // Send the request
-    xhr.send(JSON.stringify(data));
+    fetch('/circles/finished-act', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+      console.log(data.message);
+      resetCircles();
+    })
+    .catch(error => {
+      console.error('JavaScript Error Message:', error.message);
+      console.error('JavaScript Error Stack Trace:', error.stack);
+    });
   }
-</script>
 
+function resetCircles() {
+    const selectedValue = movementTypeSelect.value;
+    const otherValue = additionalFieldText.value;
+    sessionStorage.setItem('selectedMovementType', selectedValue);
+    sessionStorage.setItem('selectedOther', otherValue);
+    location.reload();
+}
+    window.addEventListener('load', () => {
+    const storedValue = sessionStorage.getItem('selectedMovementType');
+if (storedValue) {
+    movementTypeSelect.value = storedValue;
+    additionalFieldText.value = sessionStorage.getItem('selectedOther');
+if (movementTypeSelect.value === 'אחר') {
+    additionalField.style.display = 'none';
+    const val = sessionStorage.getItem('selectedOther');
+    const option = document.createElement("option");
+    option.value = val;
+    option.text = val;
+    movementTypeSelect.appendChild(option);
+    movementTypeSelect.value = sessionStorage.getItem('selectedOther');
+  }
+
+  sessionStorage.removeItem('selectedMovementType');
+  sessionStorage.removeItem('selectedOther');
+}});
+</script>
 <style>
   .circle {
     display: inline-block;
-    width: 60px;
-    height: 60px;
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
     background-color: blue;
     text-align: center;
-    line-height: 60px;
+    line-height: 40px;
     color: white;
     margin: 5px;
     cursor: pointer;
@@ -349,71 +223,23 @@
     background-color: green;
   }
 
-  .circle.finished-1 {
-    background-color: #004d00; /* Darkest shade of green */
-  }
-
-  .circle.finished-2 {
-    background-color: #006600;
-  }
-
-  .circle.finished-3 {
-    background-color: #008000;
-  }
-
-  .circle.finished-4 {
-    background-color: #009900;
-  }
-
-  .circle.finished-5 {
-    background-color: #00b300;
-  }
-
-  .circle span {
-    display: inline-block;
-    font-size: 16px;
-    font-weight: bold;
-  }
-  .btn-text {
-    font-size: 20px; /* Adjust the font size to your preference */
-  }
-  .circle .finished-text {
-    display: block;
-    font-size: 12px;
-    font-weight: normal;
-    margin-top: 5px;
-  }
-
   .form-control {
     width: auto;
     display: inline-block;
     margin-bottom: 0;
     vertical-align: middle;
-    padding: 0.5rem 1rem; /* Increase padding for a bigger select field */
-    font-size: 16px; /* Adjust font size for better clarity */
+    padding: 0.5rem 1rem;
+    font-size: 16px;
   }
 
-  /* Optional: Increase the width of the select field */
   #movementType {
     width: 200px;
-      font-size: 16px;
+    font-size: 16px;
   }
 
-  #row1 {
-    margin-top: 20px;
-    text-align: right; /* Align blue circles to the right */
-    direction: rtl; /* Set the right-to-left direction */
-  }
-
-    #finishButton {
-    padding: 12px 24px;
-    font-size: 18px;
-  }
-
-    #finishActButton {
+  #finishButton, #finishActButton {
     padding: 12px 24px;
     font-size: 18px;
   }
 </style>
-
 {% endblock %}
