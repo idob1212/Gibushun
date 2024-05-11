@@ -1346,6 +1346,7 @@ def circles():
 
 @app.route('/circles/finished', methods=['POST'])
 def circles_finished():
+    print(f"request: {request.json}")
     circle_numbers = request.json['circle_numbers']
     station = request.json['movement_type']
     other_flag = False
@@ -1395,6 +1396,7 @@ def circles_finished():
 
 @app.route('/circles/finished-act', methods=['POST'])
 def circles_finished_act():
+    print(f"request: {request.json}")
     circle_numbers = request.json['circle_numbers']
     station = request.json['movement_type']
     other_flag = False
