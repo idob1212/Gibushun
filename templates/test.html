@@ -147,6 +147,8 @@
     })
     .catch(error => {
       console.error('Error:', error);
+      resetCircles();
+
     });
   }
 
@@ -174,6 +176,7 @@
     .catch(error => {
       console.error('JavaScript Error Message:', error.message);
       console.error('JavaScript Error Stack Trace:', error.stack);
+      resetCircles();
     });
   }
 
