@@ -66,7 +66,7 @@
   for (let i = 1; i <= {{ circles|length }}; i++) {
     const circle = document.createElement('div');
     circle.classList.add('circle');
-    circle.textContent = i;
+    circle.textContent = {{ circles|tojson }}[i - 1].id;
     circle.addEventListener('click', toggleCircle);
     row1.appendChild(circle);
     circles.push(circle);
