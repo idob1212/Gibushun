@@ -79,7 +79,7 @@ th{
         {% endif %}
         <td>{{ candidate.name }}</td>
         {%   if candidate.status != "פרש" %}
-        <td><a href="{{url_for('delete_candidate', candidate_id=candidate.id.split("/")[1]) }}">פרש</a></td>
+        <td><a href="#" onclick="confirmDelete('{{url_for('delete_candidate', candidate_id=candidate.id.split('/')[1]) }}')" class="delete-btn">פרש</a></td>
             {% else %}
         <td><a href="{{url_for('return_candidate', candidate_id= candidate.id.split("**")[0].split("/")[1]) }}">הפוך לפעיל</a></td>
         {% endif %}
@@ -97,7 +97,7 @@ th{
         {% endif %}
         <td>{{ candidate.name }}</td>
         {%   if candidate.status != "פרש" %}
-        <td><a href="{{url_for('delete_candidate', candidate_id=candidate.id.split("/")[1]) }}">פרש</a></td>
+        <td><a href="#" onclick="confirmDelete('{{url_for('delete_candidate', candidate_id=candidate.id.split('/')[1]) }}')" class="delete-btn">פרש</a></td>
             {% else %}
         <td><a href="{{url_for('return_candidate', candidate_id= candidate.id.split("**")[0].split("/")[1]) }}">הפוך לפעיל</a></td>
         {% endif %}
@@ -105,6 +105,13 @@ th{
         {% endfor %}
     </tbody>
 </table>
+<script>
+function confirmDelete(deleteUrl) {
+    if (confirm('האם אתה בטוח שברצונך לסמן מועמד זה כפורש?')) {
+        window.location.href = deleteUrl;
+    }
+}
+</script>
 </body>
 </html>
 {% include "footer.html" %}
