@@ -34,13 +34,18 @@
   <div class="container">
     <div class="row">
       <div class="col-lg-8 col-md-10 mx-auto" style="direction: rtl">
-                {% with messages = get_flashed_messages() %}
-        {% if messages %}
-          {% for message in messages %}
-           <p style="color: red">{{ message }}</p>
-          {% endfor %}
-        {% endif %}
-      {% endwith %}
+        <!-- Add the batch addition button -->
+        <div class="text-center mb-4">
+          <a href="{{ url_for('addCandidateBatch') }}" class="btn btn-primary">מצב קבוצתי</a>
+        </div>
+        
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            {% for message in messages %}
+             <p style="color: red">{{ message }}</p>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
         {{ wtf.quick_form(form, novalidate=True, button_map={"submit": "primary"}) }}
       </div>
     </div>

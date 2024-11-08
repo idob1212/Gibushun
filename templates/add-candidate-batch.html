@@ -1,0 +1,196 @@
+{% block content %}
+{% include "header.html" %}
+
+  <!-- Page Header -->
+  <header class="masthead" style="background-image: url({{ url_for('static', filename='img/add.jpg')}})">
+    <div class="overlay"></div>
+    <div class="container">
+      <div class="row">
+        <div class="col-lg-8 col-md-10 mx-auto">
+          <div class="page-heading">
+              {% if is_edit %}
+              <h1>ערוך מגובש</h1>
+            {% else %}
+            <h1>הוסף מגובש לקבוצה</h1>
+              {% endif %}
+{#            <span class="subheading">Start Contributing to the Blog!</span>#}
+          </div>
+        </div>
+      </div>
+    </div>
+      <link href="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" rel="stylesheet">
+    <script src="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js"> </script>
+  </header>
+
+<style>
+    label, th {
+        direction: rtl;
+        text-align: right;
+    }
+    
+    .candidate-table {
+        width: 100%;
+        margin-bottom: 20px;
+        direction: rtl;
+        border-collapse: collapse;
+    }
+    
+    .candidate-table th, .candidate-table td {
+        padding: 8px;
+        text-align: right;
+        vertical-align: middle;
+    }
+    
+    .remove-row {
+        color: red;
+        cursor: pointer;
+    }
+</style>
+
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8 col-md-10 mx-auto" style="direction: rtl">
+        <!-- Add the single addition button -->
+        <div class="text-center mb-4">
+          <a href="{{ url_for('addCandidate') }}" class="btn btn-primary">מצב יחיד</a>
+        </div>
+
+        {% with messages = get_flashed_messages() %}
+          <!-- ... existing flash messages ... -->
+        {% endwith %}
+        
+        {% if duplicates %}
+        <div class="alert alert-warning">
+            המספרים הבאים כבר קיימים במערכת: {{ duplicates|join(', ') }}
+        </div>
+        {% endif %}
+
+        <form method="POST" id="batch-form">
+          <table class="table table-striped" style="width:100%; direction: rtl;">
+            <thead>
+                <tr>
+                    {% for field in form if field.name != 'csrf_token' and field.name != 'submit' %}
+                        <th>{{ field.label.text }}</th>
+                    {% endfor %}
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="candidates-tbody">
+                {% if duplicates %}
+                    {% for duplicate in duplicates %}
+                    <tr class="candidate-row">
+                        <td><input type="text" name="id" class="form-control" value="{{ duplicate }}" /></td>
+                        <td><input type="text" name="name" class="form-control" /></td>
+                        <td><span class="remove-row">❌</span></td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr class="candidate-row">
+                        {% for field in form if field.name != 'csrf_token' and field.name != 'submit' %}
+                            <td>{{ field(class="form-control") }}</td>
+                        {% endfor %}
+                        <td><span class="remove-row">❌</span></td>
+                    </tr>
+                {% endif %}
+            </tbody>
+          </table>
+          
+          <button type="button" class="btn btn-secondary" id="add-row">הוסף מגובש נוסף</button>
+          <button type="submit" class="btn btn-primary">שמור מגובשים</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+<script>
+document.getElementById('add-row').addEventListener('click', function() {
+    const tbody = document.getElementById('candidates-tbody');
+    const template = tbody.querySelector('.candidate-row').cloneNode(true);
+    
+    // Clear the values in the cloned row
+    template.querySelectorAll('input, select').forEach(input => {
+        input.value = '';
+    });
+    
+    tbody.appendChild(template);
+});
+
+document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('remove-row')) {
+        const tbody = document.getElementById('candidates-tbody');
+        if (tbody.children.length > 1) {
+            e.target.closest('tr').remove();
+        }
+    }
+});
+
+// Add form submission handler
+document.getElementById('batch-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const rows = document.querySelectorAll('.candidate-row');
+    const candidates = [];
+    
+    rows.forEach(row => {
+        const inputs = row.querySelectorAll('input, select');
+        const candidate = {};
+        
+        inputs.forEach(input => {
+            candidate[input.name] = input.value;
+        });
+        
+        candidates.push(candidate);
+    });
+    
+    fetch('/add-candidate-batch', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(candidates)
+    })
+    .then(response => response.json())
+    .then(data => {
+        const tbody = document.getElementById('candidates-tbody');
+        
+        if (data.success) {
+            if (data.duplicates && data.duplicates.length > 0) {
+                // Filter out successful entries while keeping duplicates
+                const remainingRows = [];
+                document.querySelectorAll('.candidate-row').forEach(row => {
+                    const idInput = row.querySelector('input[name="id"]');
+                    const nameInput = row.querySelector('input[name="name"]');
+                    if (data.duplicates.includes(idInput.value)) {
+                        remainingRows.push({
+                            id: idInput.value,
+                            name: nameInput.value
+                        });
+                    }
+                });
+                
+                // Clear and rebuild table with remaining rows
+                tbody.innerHTML = '';
+                remainingRows.forEach(candidate => {
+                    const newRow = document.createElement('tr');
+                    newRow.className = 'candidate-row';
+                    newRow.innerHTML = `
+                        <td><input type="text" name="id" class="form-control" value="${candidate.id}" /></td>
+                        <td><input type="text" name="name" class="form-control" value="${candidate.name}" /></td>
+                        <td><span class="remove-row">❌</span></td>
+                    `;
+                    tbody.appendChild(newRow);
+                });
+            } else {
+                // All candidates were added successfully
+                window.location.href = '/add-candidate-batch';
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+    });
+});
+</script>
+
+{% include "footer.html" %}
+{% endblock %}
