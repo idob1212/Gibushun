@@ -282,7 +282,8 @@ def register():
 def addCandidate():
     form = NewCandidateForm()
     if form.validate_on_submit():
-        if Candidate.query.filter_by(id=str(current_user.id) + "/" + str(form.id.data), group_id=current_user.id).first():
+        new_id = str(form.id.data).strip()
+        if Candidate.query.filter_by(id=str(current_user.id) + "/" + new_id, group_id=current_user.id).first():
             # print(User.query.filter_by(id=form.id.data).first())
             #User already exists
             flash("מגובש כבר קיים!")
@@ -294,7 +295,7 @@ def addCandidate():
         #     salt_length=8
         # )
         new_candidate = Candidate(
-            id=str(current_user.id) + "/" + str(form.id.data),
+            id=str(current_user.id) + "/" + new_id,
             name=form.name.data,
             group_id=current_user.id,
             group=current_user
@@ -345,15 +346,16 @@ def addCandidateBatch():
                 continue
                 
             # Check if candidate already exists
+            new_id = str(candidate['id']).strip()
             if Candidate.query.filter_by(
-                id=f"{current_user.id}/{candidate['id']}", 
+                id=f"{current_user.id}/{new_id}", 
                 group_id=current_user.id
             ).first():
                 continue
             
             try:
                 new_candidate = Candidate(
-                    id=f"{current_user.id}/{candidate['id']}",
+                    id=f"{current_user.id}/{new_id}",
                     name=candidate['name'],
                     group_id=current_user.id,
                     group=current_user
