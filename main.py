@@ -16,7 +16,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import relationship
 from flask_login import UserMixin, login_user, LoginManager, login_required, current_user, logout_user
-from forms import LoginForm, RegisterForm, CreateReviewForm, EditUserForm, Search_review, EditReviewForm, \
+from forms import CounterReviewForm, LoginForm, RegisterForm, CreateReviewForm, EditUserForm, Search_review, EditReviewForm, \
     UpdateDateForm, NewCandidateForm, SelectPhysicalReviewsForm, ShowStaionForm, selectCandidate, AddFinalStatusForm, \
     SelectPhysicalReviewsFormAdmin, ShowStaionFormAdmin, selectCandidateAdmin, selectGroup, AddNameForm, InterviewForm, \
     GroupReviewForm, CreateNoteForm
@@ -314,9 +314,9 @@ def addCandidate():
 def addCandidateBatch():
     if not current_user.is_authenticated:
         return redirect(url_for("login"))
-        
+
     form = NewCandidateForm()
-    
+
     if request.method == "POST":
         try:
             data = request.get_json()
@@ -325,34 +325,34 @@ def addCandidateBatch():
                     "success": False,
                     "error": "Invalid JSON data received"
                 }), 400
-                
+
         except Exception as e:
             return jsonify({
                 "success": False,
                 "error": f"Error parsing JSON: {str(e)}"
             }), 400
-            
+
         if not isinstance(data, list):
             return jsonify({
                 "success": False,
                 "error": "Expected JSON array of candidates"
             }), 400
-            
+
         successful_adds = []
-        
+
         for candidate in data:
             # Validate required fields
             if not all(k in candidate for k in ['id', 'name']):
                 continue
-                
+
             # Check if candidate already exists
             new_id = str(candidate['id']).strip()
             if Candidate.query.filter_by(
-                id=f"{current_user.id}/{new_id}", 
+                id=f"{current_user.id}/{new_id}",
                 group_id=current_user.id
             ).first():
                 continue
-            
+
             try:
                 new_candidate = Candidate(
                     id=f"{current_user.id}/{new_id}",
@@ -363,19 +363,19 @@ def addCandidateBatch():
                 db.session.add(new_candidate)
                 db.session.commit()
                 successful_adds.append(candidate['id'])
-                
+
             except Exception as e:
                 db.session.rollback()
                 # Handle error if needed
-        
+
         return jsonify({
             "success": True,
             "added": successful_adds
         })
-        
+
     return render_template(
-        "add-candidate-batch.html", 
-        form=form, 
+        "add-candidate-batch.html",
+        form=form,
         current_user=current_user
     )
 
@@ -483,7 +483,7 @@ def update_avgs(form):
             review = Review.query.filter_by(station=f"{form.station.data} סיכום", subject_id=str(current_user.id) + "/" + form.subject.data).first()
             review.grade = (review.grade * (count - 1) + int(form.grade.data)) / count
             db.session.commit()
-    
+
     if "ODT" in form.station.data:
         if not Review.query.filter_by(station="ODT סיכום", subject_id = str(current_user.id) + "/" + form.subject.data).first():
             new_review = Review(station="ODT סיכום", subject_id=str(current_user.id) + "/" + str(form.subject.data),
@@ -593,6 +593,20 @@ def add_new_group_review():
     candidates = [int(candidate.id.split("/")[1]) for candidate in candidates if candidate.status != "פרש"]
     candidates.sort()
     return render_template('make-post-group.html', candidates=candidates, user_form=form, current_user=current_user)
+
+@app.route('/counter-review', methods=["GET", "POST"])
+def counter_review():
+    counter_stations = ["מסע 1", "מסע 2", "מסע 3", "שקי חול"]
+    form = CounterReviewForm()
+    form.station.choices = counter_stations
+    candidates = Candidate.query.filter_by(group_id=current_user.id).all()
+    candidates = [int(candidate.id.split("/")[1]) for candidate in candidates if candidate.status != "פרש"]
+    candidates.sort()
+    form.subject.choices = candidates
+    if form.validate_on_submit():
+        return render_template('counter-review.html', form=form)
+
+    return render_template('counter-review.html', form=form)
 
 @app.route('/add-review-candidate', methods=['POST'])
 def addOneReview():
@@ -947,6 +961,7 @@ def Interview():
     candidate_nums.sort()
     form.id.choices = candidate_nums
     form.grade.choices = ["לא לגעת - קו אדום", "בלית ברירה", "כן, אבל", "להתאבד"]
+
     if form.validate_on_submit():
         candidate = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(form.id.data)).first()
         candidate.interviewer = form.interviewer.data
@@ -1346,10 +1361,10 @@ def circles_finished():
     circle_numbers = request.json['circle_numbers']
     circle_numbers = circle_numbers[:circle_numbers.index(0)]
     reverse_mode = request.json.get('reverse_mode', False)
-    
+
     if reverse_mode:
         circle_numbers = circle_numbers[::-1]  # Reverse the order
-        
+
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     full_candidates = [int(candidate.id.split("/")[1]) for candidate in candidates if candidate.status != "פרש"]
     candidates = [candidate for candidate in full_candidates if candidate not in circle_numbers]
@@ -1399,10 +1414,10 @@ def circles_finished_act():
     circle_numbers = request.json['circle_numbers']
     circle_numbers = circle_numbers[:circle_numbers.index(0)]
     reverse_mode = request.json.get('reverse_mode', False)
-    
+
     if reverse_mode:
         circle_numbers = circle_numbers[::-1]  # Reverse the order
-        
+
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     full_candidates = [int(candidate.id.split("/")[1]) for candidate in candidates if candidate.status != "פרש"]
     candidates = [candidate for candidate in full_candidates if candidate not in circle_numbers]
@@ -1549,7 +1564,6 @@ def showNotesAdmin():
         notes = Note.query.filter_by(subject_id=candidate.id).all()
         return render_template('notes-admin.html', notes=notes, candidate_id=candidate.id.split("/")[1], form=form, group = form.group.data)
     return render_template('notes-admin.html', form=form)
-
 
 @app.route('/download-sheet/')
 @admin_only

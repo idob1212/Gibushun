@@ -75,33 +75,23 @@
 
                   <li class="nav-item">
                     <a class="nav-link active" href="{{ url_for('showCandidateAdmin') }}">צפייה במגובש</a>
-              </li>
+            </li>
 
               <li class="nav-item">
                     <a class="nav-link active" href="{{ url_for('showNotesAdmin') }}">פתקים</a>
-              </li>
+            </li>
 
-                  <li class="nav-item">
-                    <a class="nav-link active" href="{{ url_for('showPhysicalReviewsAdmin') }}">סיכום פיזי</a>
-              </li>
-
-                              <li class="nav-item">
+            <li class="nav-item">
                     <a class="nav-link active" href="{{ url_for('showStationReviewsAdmin') }}">דירוג לפי תחנה</a>
-              </li>
+            </li>
 
-                              <li class="nav-item">
-                    <a class="nav-link active" href="{{ url_for('showODTReviewsAdmin') }}" style="direction: ltr">ODT </a>
-              </li>
-
-                              <li class="nav-item">
+            <li class="nav-item">
                     <a class="nav-link active" href="{{ url_for('manageGroups') }}">ניהול קבוצות</a>
-              </li>
+            </li>
 
-                                <li class="nav-item">
+            <li class="nav-item">
                     <a class="nav-link active" href="{{ url_for('showInterviewAdmin') }}">ראיונות</a>
-              </li>
-
-
+            </li>
             <li class="nav-item">
                 <a class="nav-link active" href="{{ url_for('logout') }}">התנתק</a>
             </li>
@@ -113,7 +103,7 @@
                 </li>
 
               <li class="nav-item">
-                    <a class="nav-link active" href="{{ url_for('add_new_review') }}">הזן ציונים</a>
+                    <a class="nav-link active" href="{{ url_for('circles') }}">הזן ציונים</a>
               </li>
 
               <li class="nav-item">
@@ -122,43 +112,35 @@
 
             <li class="nav-item">
                     <a class="nav-link active" href="{{ url_for('addCandidate') }}">הוסף מגובש</a>
-              </li>
+            </li>
 
             <li class="nav-item">
                     <a class="nav-link active" href="{{ url_for('showCandidate') }}">הקבוצה שלי</a>
-              </li>
+            </li>
 
-              <li class="nav-item">
-                    <a class="nav-link active" href="{{ url_for('showPhysicalReviews') }}">סיכום פיזי</a>
-              </li>
-
-                  <li class="nav-item">
+            <li class="nav-item">
                     <a class="nav-link active" href="{{ url_for('showStationReviews') }}">דירוג לפי תחנה</a>
-              </li>
-
-                              <li class="nav-item">
-                    <a class="nav-link active" href="{{ url_for('showODTReviews') }}" style="direction: ltr">ODT </a>
-              </li>
+            </li>
 
               <li class="nav-item">
                     <a class="nav-link active" href="{{ url_for('manageCandidates') }}">ניהול קבוצה</a>
-              </li>
+            </li>
 
               <li class="nav-item">
                     <a class="nav-link active" href="{{ url_for('AddStatus') }}">הזן חוות דעת </a>
-              </li>
+            </li>
 
                               <li class="nav-item">
                     <a class="nav-link active" href="{{ url_for('Interview') }}">הזן ראיון </a>
-              </li>
+            </li>
 
-              <li class="nav-item">
+            <li class="nav-item">
                     <a class="nav-link active" href="{{ url_for('showInterview') }}">סיכומי ראיונות </a>
-              </li>
+            </li>
 
-              <li class="nav-item">
+            <li class="nav-item">
                     <a class="nav-link active" href="{{ url_for('addName') }}"> ערוך פרטים</a>
-              </li>
+            </li>
 
             <li class="nav-item">
                 <a class="nav-link active" href="{{ url_for('logout') }}">התנתק</a>
@@ -166,16 +148,13 @@
 
             {% else %}
             <li class="nav-item">
-            <a class="nav-link active" href="{{ url_for('home') }}">בית</a>
-          </li>
-
-              <li class="nav-item">
-            <a class="nav-link active" href="{{ url_for('login') }}">התחבר</a>
+                  <a class="nav-link active" href="{{ url_for('home') }}">בית</a>
             </li>
 
-{#           <li class="nav-item">#}
-{#                <a class="nav-link active" href="{{ url_for('register') }}">הוסף משתמש</a>#}
-{#            </li>#}
+            <li class="nav-item">
+                  <a class="nav-link active" href="{{ url_for('login') }}">התחבר</a>
+            </li>
+
 
           {% endif %}
         </ul>

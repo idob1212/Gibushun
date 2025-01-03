@@ -1,0 +1,160 @@
+{% block content %}
+{% include "header.html" %}
+<!-- Page Header -->
+<header class="masthead" style="background-image: url('{{ url_for('static', filename='img/review.jpg')}}')">
+  <div class="overlay"></div>
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8 col-md-10 mx-auto">
+        <div class="page-heading">
+          <h1 style="color: white">הזן ציונים</h1>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="container">
+  <div class="row">
+    <div class="col-lg-12 mx-auto" style="direction: rtl;">
+      <!-- Station Selection -->
+      <div class="form-group text-center mb-4">
+        <label for="station" style="font-size: 18px">בחר תחנה:</label>
+        <select class="form-control d-inline-block" id="station" name="station" style="width: 200px; margin-right: 10px;">
+          {% for station in form.station.choices %}
+          <option value="{{ station }}">{{ station }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Candidates Table -->
+      <table class="table table-bordered">
+        <thead>
+          <tr>
+            <th>מספר מועמד</th>
+            <th>ציון</th>
+            <th>הערות</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for candidate in form.subject.choices %}
+          <tr>
+            <td>{{ candidate }}</td>
+            <td class="d-flex justify-content-center align-items-center">
+              <button type="button" class="btn btn-danger minus-btn" data-candidate="{{ candidate }}">-</button>
+              <span class="grade-value mx-3" id="grade-{{ candidate }}">0</span>
+              <button type="button" class="btn btn-success plus-btn" data-candidate="{{ candidate }}">+</button>
+            </td>
+            <td>
+              <input type="text" class="form-control note-input" id="note-{{ candidate }}" name="note-{{ candidate }}">
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <button id="submitAll" class="btn btn-primary btn-lg btn-block mt-4">שמור את כל הציונים</button>
+    </div>
+  </div>
+</div>
+
+{% include "footer.html" %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle plus/minus buttons
+    document.querySelectorAll('.plus-btn, .minus-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const candidateId = this.dataset.candidate;
+            const gradeSpan = document.getElementById(`grade-${candidateId}`);
+            let currentGrade = parseInt(gradeSpan.textContent);
+            
+            if (this.classList.contains('plus-btn')) {
+                currentGrade = Math.min(currentGrade + 1, 100);
+            } else {
+                currentGrade = Math.max(currentGrade - 1, 0);
+            }
+            
+            gradeSpan.textContent = currentGrade;
+            
+            // Submit individual update
+            submitUpdate(candidateId, currentGrade);
+        });
+    });
+
+    // Handle submit all button
+    document.getElementById('submitAll').addEventListener('click', function() {
+        const data = {
+            station: document.getElementById('station').value,
+            reviews: []
+        };
+
+        // Collect all grades and notes
+        document.querySelectorAll('tbody tr').forEach(row => {
+            const candidateId = row.querySelector('.plus-btn').dataset.candidate;
+            const grade = document.getElementById(`grade-${candidateId}`).textContent;
+            const note = document.getElementById(`note-${candidateId}`).value;
+
+            data.reviews.push({
+                subject: candidateId,
+                grade: parseInt(grade),
+                note: note
+            });
+        });
+
+        // Submit all reviews
+        fetch('/add-all', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => {
+            if (response.ok) {
+                window.location.reload();
+            }
+        });
+    });
+
+    function submitUpdate(candidateId, grade) {
+        const data = {
+            station: document.getElementById('station').value,
+            subject: candidateId,
+            grade: grade,
+            note: document.getElementById(`note-${candidateId}`).value
+        };
+
+        fetch('/add-review-candidate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        });
+    }
+});
+</script>
+
+<style>
+.grade-value {
+    min-width: 30px;
+    text-align: center;
+    font-size: 18px;
+    font-weight: bold;
+}
+
+.plus-btn, .minus-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    font-size: 20px;
+    line-height: 1;
+    padding: 0;
+}
+
+.table td {
+    vertical-align: middle;
+}
+</style>
+{% endblock %}
