@@ -22,6 +22,14 @@ class CreateNoteForm(FlaskForm):
     submit = SubmitField("הוסף הערה")
 
 
+class CounterReviewForm(FlaskForm):
+    station = SelectField("תחנה", validators=[DataRequired()])
+    subject = SelectField("מספר מגובש", validators=[DataRequired()])
+    counter = IntegerField("כמות", validators=[DataRequired()], default=0)
+    note = TextAreaField("הערה")
+    submit = SubmitField("הצג תוצאה")
+
+
 class SelectPhysicalReviewsForm(FlaskForm):
     station = SelectField("תחנה", validators=[DataRequired()])
     subject = SelectField("מספר מגובש", validators=[DataRequired()])
@@ -75,8 +83,8 @@ class InterviewForm(FlaskForm):
     interviewer = StringField("שם מראיין", validators=[DataRequired("זהו סעיף חובה")])
     grade = SelectField("ציון ראיון", validators=[DataRequired("זהו סעיף חובה")])
     note = TextAreaField("סיכום ראיון", validators=[DataRequired("זהו סעיף חובה")])
-    tash = TextAreaField('בעיות ת"ש')
-    medical = TextAreaField("בעיות רפואיות")
+    tash = TextAreaField('בעיות ת"ש', default="אין")
+    medical = TextAreaField("בעיות רפואיות", default="אין")
     submit = SubmitField("הוסף מגובש")
 
 class AddFinalStatusForm(FlaskForm):
