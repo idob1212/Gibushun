@@ -102,6 +102,7 @@ class Review(db.Model):
     subject = relationship("Candidate", back_populates="reviews")
     grade = db.Column(db.Float, nullable=False)
     note = db.Column(db.String(1000))
+    counter_value = db.Column(db.Integer, nullable=False, default=0)
 
 class Note(db.Model):
     __tablename__ = "notes"
@@ -594,6 +595,47 @@ def add_new_group_review():
     candidates.sort()
     return render_template('make-post-group.html', candidates=candidates, user_form=form, current_user=current_user)
 
+def normalize_counter_reviews(station, candidates, current_user):
+    """
+    Normalizes review grades for a station based on counter values.
+    
+    Args:
+        station (str): The station name to normalize reviews for
+        candidates (list): List of candidate IDs
+        current_user: The current user object
+    """
+    # Get all reviews for the selected station
+    station_reviews = []
+    for candidate_id in candidates:
+        review = Review.query.filter_by(
+            station=station,
+            subject_id=f"{current_user.id}/{candidate_id}"
+        ).first()
+        
+        if not review:
+            # Create new review with counter=0 if it doesn't exist
+            review = Review(
+                station=station,
+                subject_id=f"{current_user.id}/{candidate_id}",
+                grade=1.0,  # Default minimum grade
+                counter_value=0,
+                author=current_user,
+                subject=Candidate.query.filter_by(id=f"{current_user.id}/{candidate_id}").first()
+            )
+            db.session.add(review)
+            db.session.commit()
+        
+        station_reviews.append(review)
+
+    # Find max counter value for normalization
+    max_counter = max(review.counter_value for review in station_reviews)
+    if max_counter > 0:
+        # Normalize grades based on counter values
+        for review in station_reviews:
+            normalized_grade = 1.0 + (3.0 * review.counter_value / max_counter)
+            review.grade = round(normalized_grade, 2)
+            db.session.commit()
+
 @app.route('/counter-review', methods=["GET", "POST"])
 def counter_review():
     counter_stations = ["מסע 1", "מסע 2", "מסע 3", "שקי חול"]
@@ -603,7 +645,9 @@ def counter_review():
     candidates = [int(candidate.id.split("/")[1]) for candidate in candidates if candidate.status != "פרש"]
     candidates.sort()
     form.subject.choices = candidates
+    
     if form.validate_on_submit():
+        normalize_counter_reviews(form.station.data, candidates, current_user)
         return render_template('counter-review.html', form=form)
 
     return render_template('counter-review.html', form=form)
