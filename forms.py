@@ -16,7 +16,7 @@ class CreateReviewForm(FlaskForm):
 
 class CreateNoteForm(FlaskForm):
     subject = SelectField("מספר מגובש", validators=[DataRequired()])
-    type = RadioField("סוג הערה", choices=[('טובה', 'טובה'), ('רעה', 'רעה')], validators=[DataRequired()])
+    type = RadioField("סוג הערה", choices=[('טובה', 'טובה'),('ניטרלית', 'ניטרלית'), ('רעה', 'רעה')], validators=[DataRequired()])
     text = TextAreaField("הערה")
     location = StringField("מיקום")
     submit = SubmitField("הוסף הערה")
@@ -85,7 +85,7 @@ class InterviewForm(FlaskForm):
     note = TextAreaField("סיכום ראיון", validators=[DataRequired("זהו סעיף חובה")])
     tash = TextAreaField('בעיות ת"ש', default="אין")
     medical = TextAreaField("בעיות רפואיות", default="אין")
-    submit = SubmitField("הוסף מגובש")
+    submit = SubmitField("שמור ראיון")
 
 class AddFinalStatusForm(FlaskForm):
     id = SelectField("מספר מגובש", validators=[DataRequired("זהו סעיף חובה")])

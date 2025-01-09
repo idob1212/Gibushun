@@ -19,6 +19,7 @@
 </header>
 
 <div class="container">
+  <a href = "{{ url_for('counter_review') }}"><button class="btn btn-primary btn-lg btn-block" style="margin-bottom: 10px;"> עבור למצב מסע</button></a>
   <a href="{{ url_for('add_new_group_review') }}" class="btn btn-primary btn-lg btn-block">עבור למצב קבוצתי</a>
   <a href="{{ url_for('add_new_review') }}" class="btn btn-primary btn-lg btn-block mt-3">עבור למצב יחיד</a>
   <div class="row">
@@ -85,6 +86,7 @@
       this.classList.remove('finished');
       finishedCircles = finishedCircles.filter(id => id !== circleId);
       row1.appendChild(this);
+      this.style.backgroundColor = 'blue';
     } else {
       this.classList.add('finished');
       finishedCircles.push(circleId);
