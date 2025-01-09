@@ -40,6 +40,19 @@
     </div>
   </div>
 
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Get the candidate select element
+    var candidateSelect = document.getElementById('id');
+    
+    // Add change event listener
+    candidateSelect.addEventListener('change', function() {
+        // Redirect to same page with candidate_id parameter
+        window.location.href = "{{ url_for('AddStatus') }}?candidate_id=" + this.value;
+    });
+});
+</script>
+
 {% include "footer.html" %}
 {% endblock %}
 

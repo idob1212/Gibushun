@@ -15,6 +15,9 @@
 </header>
 
 <div class="container">
+  <a href="{{ url_for('circles') }}"><button class="btn btn-primary btn-lg btn-block" style="margin-bottom: 10px;">עבור למצב סדרי הגעה</button></a>
+  <a href="{{ url_for('add_new_group_review') }}" class="btn btn-primary btn-lg btn-block">עבור למצב קבוצתי</a>
+  <a href="{{ url_for('add_new_review') }}" class="btn btn-primary btn-lg btn-block mt-3 mb-5">עבור למצב יחיד</a>
   <div class="row">
     <div class="col-lg-12 mx-auto" style="direction: rtl;">
       <!-- Station Selection -->
@@ -38,22 +41,23 @@
         </thead>
         <tbody>
           {% for candidate in form.subject.choices %}
+          {% set review = get_existing_review(candidate, form.station.choices[0]) %}
           <tr>
             <td>{{ candidate }}</td>
             <td class="d-flex justify-content-center align-items-center">
               <button type="button" class="btn btn-danger minus-btn" data-candidate="{{ candidate }}">-</button>
-              <span class="grade-value mx-3" id="grade-{{ candidate }}">0</span>
+              <span class="grade-value mx-3" id="grade-{{ candidate }}">{{ review.counter_value if review else 0 }}</span>
               <button type="button" class="btn btn-success plus-btn" data-candidate="{{ candidate }}">+</button>
             </td>
             <td>
-              <input type="text" class="form-control note-input" id="note-{{ candidate }}" name="note-{{ candidate }}">
+              <input type="text" class="form-control note-input" id="note-{{ candidate }}" name="note-{{ candidate }}" value="{{ review.note if review else '' }}">
             </td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
 
-      <button id="submitAll" class="btn btn-primary btn-lg btn-block mt-4">שמור את כל הציונים</button>
+      <button id="submitAll" class="btn btn-primary btn-lg btn-block mt-4">שמור</button>
     </div>
   </div>
 </div>
@@ -62,28 +66,7 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Handle plus/minus buttons
-    document.querySelectorAll('.plus-btn, .minus-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const candidateId = this.dataset.candidate;
-            const gradeSpan = document.getElementById(`grade-${candidateId}`);
-            let currentGrade = parseInt(gradeSpan.textContent);
-            
-            if (this.classList.contains('plus-btn')) {
-                currentGrade = Math.min(currentGrade + 1, 100);
-            } else {
-                currentGrade = Math.max(currentGrade - 1, 0);
-            }
-            
-            gradeSpan.textContent = currentGrade;
-            
-            // Submit individual update
-            submitUpdate(candidateId, currentGrade);
-        });
-    });
-
-    // Handle submit all button
-    document.getElementById('submitAll').addEventListener('click', function() {
+    function updateAllReviews() {
         const data = {
             station: document.getElementById('station').value,
             reviews: []
@@ -92,47 +75,81 @@ document.addEventListener('DOMContentLoaded', function() {
         // Collect all grades and notes
         document.querySelectorAll('tbody tr').forEach(row => {
             const candidateId = row.querySelector('.plus-btn').dataset.candidate;
-            const grade = document.getElementById(`grade-${candidateId}`).textContent;
+            const counter = parseInt(document.getElementById(`grade-${candidateId}`).textContent);
             const note = document.getElementById(`note-${candidateId}`).value;
 
             data.reviews.push({
                 subject: candidateId,
-                grade: parseInt(grade),
+                counter: counter,
                 note: note
             });
         });
 
-        // Submit all reviews
-        fetch('/add-all', {
+        // Submit all reviews for normalization and saving
+        fetch('/update-counter-reviews', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify(data)
         })
-        .then(response => {
-            if (response.ok) {
-                window.location.reload();
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Optional: Show success message
+                console.log('Reviews updated successfully');
             }
+        })
+        .catch(error => console.error('Error:', error));
+    }
+
+    // Handle plus/minus buttons
+    document.querySelectorAll('.plus-btn, .minus-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const candidateId = this.dataset.candidate;
+            const gradeSpan = document.getElementById(`grade-${candidateId}`);
+            let currentCounter = parseInt(gradeSpan.textContent);
+            
+            if (this.classList.contains('plus-btn')) {
+                currentCounter = Math.min(currentCounter + 1, 100);
+            } else {
+                currentCounter = Math.max(currentCounter - 1, 0);
+            }
+            
+            gradeSpan.textContent = currentCounter;
+            
+            // Update all reviews whenever a counter changes
+            updateAllReviews();
         });
     });
 
-    function submitUpdate(candidateId, grade) {
-        const data = {
-            station: document.getElementById('station').value,
-            subject: candidateId,
-            grade: grade,
-            note: document.getElementById(`note-${candidateId}`).value
-        };
+    // Handle submit all button
+    document.getElementById('submitAll').addEventListener('click', updateAllReviews);
 
-        fetch('/add-review-candidate', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(data)
-        });
+    // Function to load station reviews
+    function loadStationReviews(station) {
+        fetch(`/get-station-reviews/${station}`)
+            .then(response => response.json())
+            .then(data => {
+                data.reviews.forEach(review => {
+                    const gradeSpan = document.getElementById(`grade-${review.subject}`);
+                    const noteInput = document.getElementById(`note-${review.subject}`);
+                    
+                    if (gradeSpan) gradeSpan.textContent = review.counter_value || 0;
+                    if (noteInput) noteInput.value = review.note || '';
+                });
+            })
+            .catch(error => console.error('Error:', error));
     }
+
+    // Handle station changes
+    const stationSelect = document.getElementById('station');
+    stationSelect.addEventListener('change', function() {
+        loadStationReviews(this.value);
+    });
+
+    // Load initial station data
+    loadStationReviews(stationSelect.value);
 });
 </script>
 
