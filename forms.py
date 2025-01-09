@@ -16,10 +16,18 @@ class CreateReviewForm(FlaskForm):
 
 class CreateNoteForm(FlaskForm):
     subject = SelectField("מספר מגובש", validators=[DataRequired()])
-    type = RadioField("סוג הערה", choices=[('טובה', 'טובה'), ('רעה', 'רעה')], validators=[DataRequired()])
+    type = RadioField("סוג הערה", choices=[('טובה', 'טובה'),('ניטרלית', 'ניטרלית'), ('רעה', 'רעה')], validators=[DataRequired()])
     text = TextAreaField("הערה")
     location = StringField("מיקום")
     submit = SubmitField("הוסף הערה")
+
+
+class CounterReviewForm(FlaskForm):
+    station = SelectField("תחנה", validators=[DataRequired()])
+    subject = SelectField("מספר מגובש", validators=[DataRequired()])
+    counter = IntegerField("כמות", validators=[DataRequired()], default=0)
+    note = TextAreaField("הערה")
+    submit = SubmitField("הצג תוצאה")
 
 
 class SelectPhysicalReviewsForm(FlaskForm):
@@ -75,9 +83,9 @@ class InterviewForm(FlaskForm):
     interviewer = StringField("שם מראיין", validators=[DataRequired("זהו סעיף חובה")])
     grade = SelectField("ציון ראיון", validators=[DataRequired("זהו סעיף חובה")])
     note = TextAreaField("סיכום ראיון", validators=[DataRequired("זהו סעיף חובה")])
-    tash = TextAreaField('בעיות ת"ש')
-    medical = TextAreaField("בעיות רפואיות")
-    submit = SubmitField("הוסף מגובש")
+    tash = TextAreaField('בעיות ת"ש', default="אין")
+    medical = TextAreaField("בעיות רפואיות", default="אין")
+    submit = SubmitField("שמור ראיון")
 
 class AddFinalStatusForm(FlaskForm):
     id = SelectField("מספר מגובש", validators=[DataRequired("זהו סעיף חובה")])

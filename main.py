@@ -16,7 +16,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import relationship
 from flask_login import UserMixin, login_user, LoginManager, login_required, current_user, logout_user
-from forms import LoginForm, RegisterForm, CreateReviewForm, EditUserForm, Search_review, EditReviewForm, \
+from forms import CounterReviewForm, LoginForm, RegisterForm, CreateReviewForm, EditUserForm, Search_review, EditReviewForm, \
     UpdateDateForm, NewCandidateForm, SelectPhysicalReviewsForm, ShowStaionForm, selectCandidate, AddFinalStatusForm, \
     SelectPhysicalReviewsFormAdmin, ShowStaionFormAdmin, selectCandidateAdmin, selectGroup, AddNameForm, InterviewForm, \
     GroupReviewForm, CreateNoteForm
@@ -102,6 +102,7 @@ class Review(db.Model):
     subject = relationship("Candidate", back_populates="reviews")
     grade = db.Column(db.Float, nullable=False)
     note = db.Column(db.String(1000))
+    counter_value = db.Column(db.Integer, nullable=True)
 
 class Note(db.Model):
     __tablename__ = "notes"
@@ -156,17 +157,24 @@ def homeAdmin(group_id):
     total_avgs = []
     physical_stations = getPhysicalStationsGroup(int(group_id))
     physical_stations = physical_stations + ["ספרינטים", "זחילות", "אלונקה סוציומטרית", "מתלה שזיפים"]
+    counter_stations = ["מסע 1","מסע 2","מסע 3","שקי חול"]
     station_reviews = []
+    counter_reviews = []
+
     if candidates:
         update_avgs_nf()
         for candidate in candidates:
             station_reviews = []
+            counter_reviews = []
             curr_avg = 0
             elements_num = 0
             for station in physical_stations:
                 station_reviews.append(Review.query.filter_by(subject_id=candidate.id, station=f"{station} סיכום").first())
+            
+            for station in counter_stations:
+                counter_reviews.append(Review.query.filter_by(subject_id=candidate.id, station=f"{station}").first())
 
-            for review in station_reviews:
+            for review in station_reviews + counter_reviews:
                 if review:
                     curr_avg += review.grade
                     elements_num += 1
@@ -182,6 +190,7 @@ def homeAdmin(group_id):
                 if review.station not in physical_stations and "אקט" not in review.station and ("ODT" not in review.station or review.station == "ODT סיכום"):
                     total_sum += review.grade
                     total_count += 1
+                    
             if total_count == 0:
                 total_avgs.append(0)
             else:
@@ -205,18 +214,23 @@ def home():
     tiz_avgs = []
     total_avgs = []
     physical_stations = getPhysicalStations()
+    counter_stations = ["מסע 1","מסע 2","מסע 3","שקי חול"]
     physical_stations = physical_stations + ["ספרינטים", "זחילות", "אלונקה סוציומטרית", "מתלה שזיפים"]
     station_reviews = []
+    counter_reviews = []
     if candidates:
         update_avgs_nf()
         for candidate in candidates:
             station_reviews = []
+            counter_reviews = []
             curr_avg = 0
             elements_num = 0
             for station in physical_stations:
                 station_reviews.append(Review.query.filter_by(subject_id=candidate.id, station=f"{station} סיכום").first())
+            for station in counter_stations:
+                counter_reviews.append(Review.query.filter_by(subject_id=candidate.id, station=f"{station}").first())
 
-            for review in station_reviews:
+            for review in station_reviews + counter_reviews:
                 if review:
                     curr_avg += review.grade
                     elements_num += 1
@@ -314,9 +328,9 @@ def addCandidate():
 def addCandidateBatch():
     if not current_user.is_authenticated:
         return redirect(url_for("login"))
-        
+
     form = NewCandidateForm()
-    
+
     if request.method == "POST":
         try:
             data = request.get_json()
@@ -325,34 +339,34 @@ def addCandidateBatch():
                     "success": False,
                     "error": "Invalid JSON data received"
                 }), 400
-                
+
         except Exception as e:
             return jsonify({
                 "success": False,
                 "error": f"Error parsing JSON: {str(e)}"
             }), 400
-            
+
         if not isinstance(data, list):
             return jsonify({
                 "success": False,
                 "error": "Expected JSON array of candidates"
             }), 400
-            
+
         successful_adds = []
-        
+
         for candidate in data:
             # Validate required fields
             if not all(k in candidate for k in ['id', 'name']):
                 continue
-                
+
             # Check if candidate already exists
             new_id = str(candidate['id']).strip()
             if Candidate.query.filter_by(
-                id=f"{current_user.id}/{new_id}", 
+                id=f"{current_user.id}/{new_id}",
                 group_id=current_user.id
             ).first():
                 continue
-            
+
             try:
                 new_candidate = Candidate(
                     id=f"{current_user.id}/{new_id}",
@@ -363,19 +377,19 @@ def addCandidateBatch():
                 db.session.add(new_candidate)
                 db.session.commit()
                 successful_adds.append(candidate['id'])
-                
+
             except Exception as e:
                 db.session.rollback()
                 # Handle error if needed
-        
+
         return jsonify({
             "success": True,
             "added": successful_adds
         })
-        
+
     return render_template(
-        "add-candidate-batch.html", 
-        form=form, 
+        "add-candidate-batch.html",
+        form=form,
         current_user=current_user
     )
 
@@ -414,7 +428,7 @@ def logout():
     logout_user()
     return redirect(url_for('home'))
 
-stations = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "ODT", "מעגל זנבות", "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול", "נאסא","מתלה שזיפים", "אחר"]
+stations = ["ספרינטים", "זחילות", "משימת מחשבה", "דיון מילוט", "פירוק והרכבת נשק", "מסע", "שקים", "ODT", "מעגל זנבות", "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול", "נאסא","מתלה שזיפים", "אחר"]
 def update_avgs_nf():
     physical_stations = getPhysicalStations()
     physical_stations = physical_stations + ["ספרינטים", "זחילות", "אלונקה סוציומטרית", "מתלה שזיפים"]
@@ -483,7 +497,7 @@ def update_avgs(form):
             review = Review.query.filter_by(station=f"{form.station.data} סיכום", subject_id=str(current_user.id) + "/" + form.subject.data).first()
             review.grade = (review.grade * (count - 1) + int(form.grade.data)) / count
             db.session.commit()
-    
+
     if "ODT" in form.station.data:
         if not Review.query.filter_by(station="ODT סיכום", subject_id = str(current_user.id) + "/" + form.subject.data).first():
             new_review = Review(station="ODT סיכום", subject_id=str(current_user.id) + "/" + str(form.subject.data),
@@ -535,7 +549,7 @@ def physicals(group):
 def getStations(group):
     unique_stations = db.session.query(distinct(Review.station)).all()
     unique_station_values = [station[0] for station in unique_stations]
-    stations = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "ODT", "מעגל זנבות",
+    stations = ["ספרינטים", "זחילות", "משימת מחשבה", "דיון מילוט", "פירוק והרכבת נשק", "מסע", "שקים", "ODT", "מעגל זנבות",
                 "אלונקה סוציומטרית","מתלה שזיפים", "הרצאות", "בניית שוח","חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול","נאסא"]
     unique_station_values = [station for station in unique_station_values if "אקט" not in station and "סיכום" not in station]
     final_stations = [station for station in unique_station_values if station not in stations]
@@ -553,7 +567,7 @@ def getStations(group):
 
 @app.route("/new-review", methods=["GET", "POST"])
 def add_new_review():
-    stations = ["משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "מעגל זנבות", "ODT", "הרצאות", "בניית שוח", "חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול" , "נאסא", "אחר"]
+    stations = ["משימת מחשבה", "דיון מילוט", "פירוק והרכבת נשק", "מסע", "שקים", "מעגל זנבות", "ODT", "הרצאות", "בניית שוח", "חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול" , "נאסא", "אחר"]
     form = CreateReviewForm()
     form.station.choices = stations
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
@@ -587,12 +601,117 @@ def add_new_review():
 @app.route("/new-group-review", methods=["GET", "POST"])
 def add_new_group_review():
     form = GroupReviewForm()
-    stations = ["משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "מעגל זנבות","ODT", "הרצאות", "בניית שוח", "חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול" , "נאסא", "אחר"]
+    stations = ["משימת מחשבה", "דיון מילוט", "פירוק והרכבת נשק", "מסע", "שקים", "מעגל זנבות","ODT", "הרצאות", "בניית שוח", "חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול" , "נאסא", "אחר"]
     form.station.choices = stations
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     candidates = [int(candidate.id.split("/")[1]) for candidate in candidates if candidate.status != "פרש"]
     candidates.sort()
     return render_template('make-post-group.html', candidates=candidates, user_form=form, current_user=current_user)
+
+def normalize_counter_reviews(station, candidates, current_user):
+    """
+    Normalizes review grades for a station based on counter values.
+    
+    Args:
+        station (str): The station name to normalize reviews for
+        candidates (list): List of candidate IDs
+        current_user: The current user object
+    """
+    # Get all reviews for the selected station
+    station_reviews = []
+    for candidate_id in candidates:
+        review = Review.query.filter_by(
+            station=station,
+            subject_id=f"{current_user.id}/{candidate_id}"
+        ).first()
+        
+        if not review:
+            # Create new review with counter=0 if it doesn't exist
+            review = Review(
+                station=station,
+                subject_id=f"{current_user.id}/{candidate_id}",
+                grade=1.0,  # Default minimum grade
+                counter_value=0,
+                author=current_user,
+                subject=Candidate.query.filter_by(id=f"{current_user.id}/{candidate_id}").first()
+            )
+            db.session.add(review)
+            db.session.commit()
+        
+        station_reviews.append(review)
+
+    # Find max counter value for normalization
+    max_counter = max(review.counter_value for review in station_reviews)
+    if max_counter > 0:
+        # Normalize grades based on counter values
+        for review in station_reviews:
+            normalized_grade = 1.0 + (3.0 * review.counter_value / max_counter)
+            review.grade = round(normalized_grade, 2)
+            db.session.commit()
+
+def get_existing_review(candidate_id, station):
+    """Helper function to get existing review for a candidate and station"""
+    return Review.query.filter_by(
+        station=station,
+        subject_id=f"{current_user.id}/{candidate_id}",
+        author_id=current_user.id
+    ).first()
+
+@app.route('/counter-review', methods=["GET", "POST"])
+def counter_review():
+    counter_stations = ["מסע 1", "מסע 2", "מסע 3", "שקי חול"]
+    form = CounterReviewForm()
+    form.station.choices = counter_stations
+    candidates = Candidate.query.filter_by(group_id=current_user.id).all()
+    candidates = [int(candidate.id.split("/")[1]) for candidate in candidates if candidate.status != "פרש"]
+    candidates.sort()
+    form.subject.choices = candidates
+    
+    return render_template('counter-review.html', form=form, get_existing_review=get_existing_review)
+
+@app.route('/update-counter-reviews', methods=["POST"])
+def update_counter_reviews():
+    data = request.get_json()
+    station = data['station']
+    reviews = data['reviews']
+    
+    # Find max counter value for normalization
+    max_counter = max(review['counter'] for review in reviews)
+    
+    # Update or create reviews with normalized grades
+    for review_data in reviews:
+        candidate_id = f"{current_user.id}/{review_data['subject']}"
+        
+        # Calculate normalized grade (1-4 scale)
+        normalized_grade = 1.0
+        if max_counter > 0:
+            normalized_grade = 1.0 + (3.0 * review_data['counter'] / max_counter)
+        
+        # Find existing review or create new one
+        review = Review.query.filter_by(
+            station=station,
+            subject_id=candidate_id,
+            author_id=current_user.id
+        ).first()
+        
+        if review:
+            review.grade = round(normalized_grade, 2)
+            review.counter_value = review_data['counter']
+            review.note = review_data['note']
+        else:
+            review = Review(
+                station=station,
+                subject_id=candidate_id,
+                author_id=current_user.id,
+                grade=round(normalized_grade, 2),
+                counter_value=review_data['counter'],
+                note=review_data['note'],
+                subject=Candidate.query.get(candidate_id)
+            )
+            db.session.add(review)
+            
+    db.session.commit()
+    return jsonify({'success': True})
 
 @app.route('/add-review-candidate', methods=['POST'])
 def addOneReview():
@@ -861,7 +980,6 @@ def showCandidate():
         if form.id.data == "כולם":
             for candidate_num in candidate_nums[:-1]:
                 candidate = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(candidate_num)).first()
-
                 reviews = Review.query.filter_by(subject_id=candidate.id).all()
                 clean_reviews = [review for review in reviews if
                                  "אקט" not in review.station and review.station != "זחילות" and (
@@ -873,6 +991,7 @@ def showCandidate():
         candidate = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(form.id.data)).first()
         reviews = Review.query.filter_by(subject_id=candidate.id).all()
         clean_reviews = [review for review in reviews if review.station not in physical_stations and ("ODT" not in review.station or review.station == "ODT סיכום")]
+        clean_reviews = [review for review in clean_reviews if ("אקט" not in review.station) or ("אקט" in review.station and "סיכום" in review.station)]
         return render_template('candidate.html', reviews=clean_reviews, candidate_id=candidate.id.split("/")[1], form=form, all_reviews=all_reviews)
     return render_template('candidate.html', form=form)
 
@@ -885,7 +1004,7 @@ def showCandidateAdmin():
     clean_reviews = []
     candidates = []
     if form.group.data:
-        candidates = [int(candidate.id.split("/")[1]) for candidate in Candidate.query.filter_by(group_id=int(form.group.data)).all() if candidate.status != "פרש"]
+        candidates = [candidate.id.split("/")[1] for candidate in Candidate.query.filter_by(group_id=int(form.group.data)).all() if candidate.status != "פרש"]
         candidates.sort()
         candidates.append("כולם")
         form.id.choices = candidates
@@ -913,6 +1032,7 @@ def showCandidateAdmin():
             return render_template('candidate-admin.html', form=form)
         reviews = Review.query.filter_by(subject_id=candidate.id).all()
         clean_reviews = [review for review in reviews if review.station not in physical_stations and ("ODT" not in review.station or review.station == "ODT סיכום")]
+        clean_reviews = [review for review in clean_reviews if ("אקט" not in review.station) or ("אקט" in review.station and "סיכום" in review.station)]
         clean_reviews.sort(key=lambda x: x.grade, reverse=True)
         return render_template('candidate-admin.html', reviews=clean_reviews, candidate_id=candidate.id.split("/")[1], form=form)
     return render_template('candidate-admin.html', form=form)
@@ -928,12 +1048,32 @@ def AddStatus():
     candidate_nums.sort()
     form.id.choices = candidate_nums
     form.final_status.choices = ["לא לגעת - קו אדום", "בלית ברירה", "כן, אבל", "להתאבד"]
+
+    # Get selected_id from URL or form data
+    selected_id = request.args.get('candidate_id')
+    if form.is_submitted():
+        selected_id = form.id.data
+    elif selected_id is None and candidate_nums:
+        selected_id = candidate_nums[0]
+    
+    # Set form defaults based on selected candidate
+    if selected_id:
+        candidate = Candidate.query.filter_by(id=f"{current_user.id}/{selected_id}").first()
+        if candidate:
+            # Set form defaults before form validation
+            if not form.is_submitted():
+                form.id.default = int(selected_id)
+                form.final_status.default = candidate.final_status
+                form.final_note.default = candidate.final_note
+                form.process()  # This is crucial - it processes the defaults
+
     if form.validate_on_submit():
-        candidate = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(form.id.data)).first()
+        candidate = Candidate.query.filter_by(id=f"{current_user.id}/{form.id.data}").first()
         candidate.final_status = form.final_status.data
         candidate.final_note = form.final_note.data
         db.session.commit()
-        return redirect(url_for('AddStatus'))
+        return redirect(url_for('AddStatus', candidate_id=form.id.data))
+
     return render_template('add-status.html', form=form)
 
 @app.route("/interview/", methods=["GET", "POST"])
@@ -947,6 +1087,7 @@ def Interview():
     candidate_nums.sort()
     form.id.choices = candidate_nums
     form.grade.choices = ["לא לגעת - קו אדום", "בלית ברירה", "כן, אבל", "להתאבד"]
+
     if form.validate_on_submit():
         candidate = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(form.id.data)).first()
         candidate.interviewer = form.interviewer.data
@@ -957,6 +1098,33 @@ def Interview():
         db.session.commit()
         return redirect(url_for('Interview'))
     return render_template('interview.html', form=form)
+
+@app.route("/edit-interview/<string:candidate_id>", methods=["GET", "POST"])
+def edit_interview(candidate_id):
+    candidate_id = candidate_id.replace("-", "/")
+    candidate = Candidate.query.get(candidate_id)
+
+    form = InterviewForm(id=int(candidate_id.split("/")[1]), interviewer=candidate.interviewer, grade=candidate.interview_grade, note=candidate.interview_note, tash=candidate.tash_prob, medical=candidate.medical_prob)
+    form.grade.choices = ["לא לגעת - קו אדום", "בלית ברירה", "כן, אבל", "להתאבד"]
+    form.id.choices = [int(candidate_id.split("/")[1])]
+
+    if form.validate_on_submit():
+        candidate.interviewer = form.interviewer.data
+        candidate.interview_grade = form.grade.data
+        candidate.interview_note = form.note.data
+        candidate.tash_prob = form.tash.data
+        candidate.medical_prob = form.medical.data
+        
+        try:
+            db.session.commit()
+            flash('הראיון עודכן בהצלחה', 'success')  # Success message in Hebrew
+            return redirect(url_for('showInterview'))
+        except Exception as e:
+            db.session.rollback()
+            flash('שגיאה בשמירת הנתונים', 'error')  # Error message in Hebrew
+            print(f"Error saving interview: {e}")
+            
+    return render_template("interview.html", form=form, is_edit=True)
 
 @app.route("/show-interview/", methods=["GET", "POST"])
 def showInterview():
@@ -999,7 +1167,7 @@ def showStationReviewsAdmin():
     form.group.choices = get_groups()
     unique_stations = db.session.query(distinct(Review.station)).all()
     unique_station_values = [station[0] for station in unique_stations]
-    stations = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "ODT", "מעגל זנבות",
+    stations = ["ספרינטים", "זחילות", "משימת מחשבה", "דיון מילוט", "פירוק והרכבת נשק", "מסע", "שקים", "ODT", "מעגל זנבות",
                 "אלונקה סוציומטרית","מתלה שזיפים", "הרצאות", "בניית שוח","חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול","נאסא"]
     unique_station_values = [station for station in unique_station_values if "אקט" not in station and "סיכום" not in station]
     final_stations = [station for station in unique_station_values if station not in stations]
@@ -1030,8 +1198,8 @@ def showStationReviews():
     update_avgs_nf()
     unique_stations = db.session.query(distinct(Review.station)).filter(Review.author_id == current_user.id).all()
     unique_station_values = [station[0] for station in unique_stations]
-    stations = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "ODT", "מעגל זנבות",
-                "אלונקה סוציומט��ית","מתלה שזיפים", "הרצאות", "בניית שוח", "חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול","נאסא"] + getPhysicalStations()
+    stations = ["ספרינטים", "זחילות", "משימת מחשבה", "דיון מילוט", "פירוק והרכבת נשק", "מסע", "שקים", "ODT", "מעגל זנבות",
+                "אלונקה סוציומטרית","מתלה שזיפים", "הרצאות", "בניית שוח", "חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול","נאסא"] + getPhysicalStations()
     unique_station_values = [station for station in unique_station_values if "אקט" not in station and "סיכום" not in station]
     final_stations = [station for station in unique_station_values if station not in stations]
     unique_station_values = stations + final_stations
@@ -1054,7 +1222,7 @@ def showStationReviews():
 def edit_review(review_id):
     unique_stations = db.session.query(distinct(Review.station)).filter(Review.author_id == current_user.id).all()
     unique_station_values = [station[0] for station in unique_stations]
-    stations = ["ספרינטים", "זחילות", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "ODT", "מעגל זנבות",
+    stations = ["ספרינטים", "זחילות", "משימת מחשבה", "דיון מילוט", "פירוק והרכבת נשק", "מסע", "שקים", "ODT", "מעגל זנבות",
                 "אלונקה סוציומטרית","מתלה שזיפים", "הרצאות", "בניית שוח", "חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול","נאסא"]
     unique_station_values = [station for station in unique_station_values if "אקט" not in station and "סיכום" not in station]
     final_stations = [station for station in unique_station_values if station not in stations]
@@ -1093,7 +1261,7 @@ def edit_review(review_id):
 
 @app.route("/edit-physical-review/<int:review_id>", methods=["GET", "POST"])
 def edit_physical_review(review_id):
-    stations = ["ספרינטים", "זחילות", "ODT", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "מעגל זנבות", "אלונקה סוציומטרית", "מתלה שזיפים", "הרצאות", "בניית שוח", "חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול", "נאסא", "אחר"]
+    stations = ["ספרינטים", "זחילות", "ODT", "משימת מחשבה", "דיון מילוט", "פירוק והרכבת נשק", "מסע", "שקים", "מעגל זנבות", "אלונקה סוציומטרית", "מתלה שזיפים", "הרצאות", "בניית שוח", "חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול", "נאסא", "אחר"]
     review = Review.query.get(review_id)
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     candidate_nums = []
@@ -1116,7 +1284,7 @@ def edit_physical_review(review_id):
 
 @app.route("/edit-odt-review/<int:review_id>", methods=["GET", "POST"])
 def edit_odt_review(review_id):
-    stations = ["ספרינטים", "זחילות", "ODT", "משימת מחשבה", "פירוק והרכבת נשק", "מסע", "שקים", "מעגל זנבות", "אלונקה סוציומטרית", "מתלה שזיפים", "הרצאות", "בניית שוח", "חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול", "נאסא", "אחר"]
+    stations = ["ספרינטים", "זחילות", "ODT", "משימת מחשבה", "דיון מילוט", "פירוק והרכבת נשק", "מסע", "שקים", "מעגל זנבות", "אלונקה סוציומטרית", "מתלה שזיפים", "הרצאות", "בניית שוח", "חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול", "נאסא", "אחר"]
     review = Review.query.get(review_id)
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     candidate_nums = []
@@ -1346,10 +1514,10 @@ def circles_finished():
     circle_numbers = request.json['circle_numbers']
     circle_numbers = circle_numbers[:circle_numbers.index(0)]
     reverse_mode = request.json.get('reverse_mode', False)
-    
+
     if reverse_mode:
         circle_numbers = circle_numbers[::-1]  # Reverse the order
-        
+
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     full_candidates = [int(candidate.id.split("/")[1]) for candidate in candidates if candidate.status != "פרש"]
     candidates = [candidate for candidate in full_candidates if candidate not in circle_numbers]
@@ -1399,10 +1567,10 @@ def circles_finished_act():
     circle_numbers = request.json['circle_numbers']
     circle_numbers = circle_numbers[:circle_numbers.index(0)]
     reverse_mode = request.json.get('reverse_mode', False)
-    
+
     if reverse_mode:
         circle_numbers = circle_numbers[::-1]  # Reverse the order
-        
+
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     full_candidates = [int(candidate.id.split("/")[1]) for candidate in candidates if candidate.status != "פרש"]
     candidates = [candidate for candidate in full_candidates if candidate not in circle_numbers]
@@ -1487,6 +1655,41 @@ def add_new_note():
         return render_template("make-note.html", form=form, current_user=current_user)
     return render_template("make-note.html", form=form, current_user=current_user)
 
+@app.route("/edit-note/<int:note_id>", methods=["GET", "POST"])
+def edit_note(note_id):
+    note = Note.query.get(note_id)
+    form = CreateNoteForm(
+        subject=int(note.subject_id.split("/")[1]),
+        type=note.type,
+        text=note.text,
+        location=note.location
+    )
+    
+    candidates = Candidate.query.filter_by(group_id=current_user.id).all()
+    candidate_nums = []
+    for candidate in candidates:
+        if candidate.status != "פרש":
+            candidate_nums.append(int(candidate.id.split("/")[1]))
+    candidate_nums.sort()
+    form.subject.choices = candidate_nums
+
+    israel_tz = pytz.timezone('Israel')
+    if form.validate_on_submit():
+        note.subject_id = str(current_user.id) + "/" + str(form.subject.data)
+        note.type = form.type.data
+        note.text = form.text.data
+        note.location = form.location.data
+        note.subject = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(form.subject.data)).first()
+        current_time_israel = datetime.now(israel_tz)
+        formatted_time = current_time_israel.strftime('%d-%m-%Y %H:%M')
+        note.date = formatted_time
+
+        
+        db.session.commit()
+        return redirect(url_for('show_notes'))
+        
+    return render_template("make-note.html", form=form, current_user=current_user, is_edit=True)
+
 @app.route("/show-notes", methods=["GET", "POST"])
 def show_notes():
     form = selectCandidate()
@@ -1505,12 +1708,22 @@ def show_notes():
             for candidate_num in candidate_nums[:-1]:
                 candidate = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(candidate_num)).first()
                 notes = Note.query.filter_by(subject_id=candidate.id).all()
+                reviews = Review.query.filter_by(subject_id=candidate.id).all()
+                reviews = [review for review in reviews if review.note != None and review.note not in["", "אקט"]]
+                for review in reviews:
+                    template_note = Note(type="ניטרלית", text=review.note, location=review.station, date="", subject_id=candidate.id, subject=candidate, author=current_user, author_id=current_user.id)
+                    notes.append(template_note)
                 all_notes.append(notes)
             if len(candidate_nums) == 1:
                 return render_template('show-notes.html', form=form)
             return render_template('show-notes.html', notes=all_notes, candidate_id=candidate.id.split("/")[1], form=form, all_notes=all_notes, everyone=True)
         candidate = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(form.id.data)).first()
         notes = Note.query.filter_by(subject_id=candidate.id).all()
+        reviews = Review.query.filter_by(subject_id=candidate.id).all()
+        reviews = [review for review in reviews if review.note != None and review.note not in["", "אקט"]]
+        for review in reviews:
+            template_note = Note(type="ניטרלית", text=review.note, location=review.station, date="", subject_id=candidate.id, subject=candidate, author=current_user, author_id=current_user.id)
+            notes.append(template_note)
         return render_template('show-notes.html', notes=notes, candidate_id=candidate.id.split("/")[1], form=form, all_notes=all_notes, everyone=False)
     return render_template('show-notes.html', form=form, everyone=False)
 
@@ -1539,6 +1752,11 @@ def showNotesAdmin():
             for candidate_num in candidates[:-1]:
                 candidate = Candidate.query.filter_by(id=str(form.group.data) + "/" + str(candidate_num)).first()
                 notes = Note.query.filter_by(subject_id=candidate.id).all()
+                reviews = Review.query.filter_by(subject_id=candidate.id).all()
+                reviews = [review for review in reviews if review.note != None and review.note not in["", "אקט"]]
+                for review in reviews:
+                    template_note = Note(type="ניטרלית", text=review.note, location=review.station, date="", subject_id=candidate.id, subject=candidate, author=current_user, author_id=current_user.id)
+                    notes.append(template_note)
                 all_notes.append(notes)
             if len(candidates) == 1:
                 return render_template('notes-admin.html', form=form)
@@ -1547,9 +1765,13 @@ def showNotesAdmin():
         if not candidate:
             return render_template('notes-admin.html', form=form)
         notes = Note.query.filter_by(subject_id=candidate.id).all()
+        reviews = Review.query.filter_by(subject_id=candidate.id).all()
+        reviews = [review for review in reviews if review.note != None and review.note not in["", "אקט"]]
+        for review in reviews:
+            template_note = Note(type="ניטרלית", text=review.note, location=review.station, date="", subject_id=candidate.id, subject=candidate, author=current_user, author_id=current_user.id)
+            notes.append(template_note)
         return render_template('notes-admin.html', notes=notes, candidate_id=candidate.id.split("/")[1], form=form, group = form.group.data)
     return render_template('notes-admin.html', form=form)
-
 
 @app.route('/download-sheet/')
 @admin_only
@@ -1629,6 +1851,35 @@ def downloadb():
     # file_stream.seek(0)
     return send_file("multiple.xlsx", as_attachment=True, attachment_filename="data.xlsx", cache_timeout=5, )
 
+@app.route('/get-station-reviews/<station>')
+def get_station_reviews(station):
+    candidates = Candidate.query.filter_by(group_id=current_user.id).all()
+    candidates = [int(candidate.id.split("/")[1]) for candidate in candidates if candidate.status != "פרש"]
+    candidates.sort()  # Ensure consistent ordering
+    
+    reviews = []
+    for candidate_id in candidates:
+        full_id = f"{current_user.id}/{candidate_id}"
+        review = Review.query.filter_by(
+            station=station,
+            subject_id=full_id,
+            author_id=current_user.id
+        ).first()
+        
+        if review:
+            reviews.append({
+                'subject': candidate_id,
+                'counter_value': review.counter_value or 0,
+                'note': review.note or ''
+            })
+        else:
+            reviews.append({
+                'subject': candidate_id,
+                'counter_value': 0,
+                'note': ''
+            })
+    
+    return jsonify({'reviews': reviews})
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=3000)
