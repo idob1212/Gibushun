@@ -100,6 +100,7 @@ th{
                     <tr>
                         <th>סוג תחנה</th>
                         <th>ציון</th>
+                        <th>ספירה</th>
                         <th>הערה</th>
                     </tr>
                     </thead>
@@ -108,7 +109,8 @@ th{
                     <tr>
                         <td class="block">{{ review.station }}</td>
                         <td class="block">{{ review.grade|round(2) }}</td>
-                        <td class="block">{{ review.note }}</td>
+                        <td class="block">{{ review.counter_value if review.counter_value is not none else '' }}</td>
+                        <td class="block">{{ review.note if review.note is not none else '' }}</td>
                     </tr>
                     {% endfor %}
                     </tbody>
@@ -126,6 +128,7 @@ th{
     <tr>
         <th>סוג תחנה</th>
         <th>ציון</th>
+        <th>ספירה</th>
         <th>הערה</th>
 {#        <th>עריכה</th>#}
 {#        <th>מחק</th>#}
@@ -136,8 +139,9 @@ th{
     <tr>
         <td class="block">{{ review.station }}</td>
         <td class="block">{{ review.grade|round(2) }}</td>
-        <td class="block">{{ review.note }}</td>
-        {% if "אקט" not in review.station and "סיכום" not in review.station %}
+        <td class="block">{{ review.counter_value if review.counter_value is not none else '' }}</td>
+        <td class="block">{{ review.note if review.note is not none else '' }}</td>
+        {% if "אקט" not in review.station and "סיכום" not in review.station and "מסע" not in review.station and "שקי חול" not in review.station %}
         <td class="block"><a href="{{ url_for('edit_review', review_id=review.id) }}">עריכה</a></td>
         <td class="block"><a href="{{ url_for('delete_review', review_id=review.id) }}">מחק</a></td>
         {% endif %}
