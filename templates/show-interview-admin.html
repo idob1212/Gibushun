@@ -13,10 +13,12 @@
         <div class="col-lg-8 col-md-10 mx-auto">
           <div class="page-heading">
             <h1>סיכום ראיון</h1>
-              {% if candidate %}
-          <span class="subheading" style="direction: rtl"> ראיון מועמד מס'  {{ candidate_id }} </span>
+              {% if all_candidates|length > 0 %}
+                <span class="subheading" style="direction: rtl">ראיונות כל המועמדים</span>
+              {% elif candidate %}
+                <span class="subheading" style="direction: rtl"> ראיון מועמד מס'  {{ candidate_id }} </span>
               {% else %}
-{#         <span class="subheading" style="direction: rtl">חוות דעת על כולם </span>#}
+              {# <span class="subheading" style="direction: rtl">חוות דעת על כולם </span>#}
               {% endif %}
           </div>
         </div>
@@ -32,56 +34,84 @@
 </head>
 <body>
 <style>
-    .table{
+    .table {
         float: right;
-        {#size: auto;#}
         table-layout: fixed;
     }
     td {
-    border: 1px solid #000;
-    text-align: right;
-}
-
-tr td {
-    {#width: 1%;#}
-    {#white-space: nowrap;#}
-    text-align: right;
-}
-
-th{
-    text-align: right;
-}
-        label{
+        border: 1px solid #000;
+        text-align: right;
+    }
+    tr td {
+        text-align: right;
+    }
+    th {
+        text-align: right;
+    }
+    label {
         float: right;
         direction: rtl;
     }
-
-
-.btn{
-    float: right;
-    direction: rtl;
-    padding: 10px;
-    margin: 10px;
-    margin-right: 50%;
-}
-#station{
-    float: right;
-    direction: rtl;
-}
-#subject{
-    float: right;
-    direction: rtl;
-}
-
-.form-control{
-    float: right;
-    direction: rtl;
-}
+    .btn {
+        float: right;
+        direction: rtl;
+        padding: 10px;
+        margin: 10px;
+        margin-right: 50%;
+    }
+    #station {
+        float: right;
+        direction: rtl;
+    }
+    #subject {
+        float: right;
+        direction: rtl;
+    }
+    .form-control {
+        float: right;
+        direction: rtl;
+    }
+    footer {
+        position: fixed;
+        left: 0px;
+        bottom: 0px;
+        height: 50px;
+        width: 100%;
+        padding-top: 20px;
+    }
 </style>
+
 <div>
 {{ wtf.quick_form(form, novalidate=True, button_map={"submit": "primary"}) }}
-    </div>
-{% if candidate %}
+</div>
+
+{% if all_candidates|length > 0 %}
+    {% for candidate in all_candidates %}
+        <div class="mx-auto">
+            <h4 style="text-align: right"> מועמד מספר {{ candidate.id.split("/")[1] }} </h4>
+            <table class = "table table-bordered" style="width:100%; direction: rtl;">
+                <thead>
+                <tr>
+                    <th>ציון ראיון</th>
+                    <th>שם מראיין</th>
+                    <th>סיכום ראיון</th>
+                    <th>בעיות תש</th>
+                    <th>בעיות רפואיות</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr>
+                    <td class="block">{{ candidate.interview_grade }}</td>
+                    <td class="block">{{ candidate.interviewer }}</td>
+                    <td class="block">{{ candidate.interview_note }}</td>
+                    <td class="block">{{ candidate.tash_prob }}</td>
+                    <td class="block">{{ candidate.medical_prob }}</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    {% endfor %}
+{% elif candidate %}
 <table class = "table table-bordered" style="width:100%; direction: rtl;">
     <thead>
     <tr>
@@ -90,7 +120,6 @@ th{
         <th>סיכום ראיון</th>
         <th>בעיות תש</th>
         <th>בעיות רפואיות</th>
-
 {#        <th>עריכה</th>#}
 {#        <th>מחק</th>#}
     </tr>
@@ -106,7 +135,6 @@ th{
     </tr>
     {% endif %}
     </tbody>
-
 </table>
 {% endif %}
 </div>
@@ -126,6 +154,10 @@ th{
                     for (var candidate of data.subjects) {
                         optionHTML += '<option value="' + candidate.id + '">' + candidate.id + '</option>';
                     }
+                    
+                    // Add "כולם" option
+                    optionHTML += '<option value="כולם">כולם</option>';
+                    
                     subject_select.innerHTML = optionHTML;
                 })
 
@@ -134,16 +166,6 @@ th{
     </script>
 </body>
 
-<style>
-footer{
-position: fixed;
-    left:0px;
-   bottom:0px;
-   height:50px;
-   width:100%;
-    padding-top: 20px;
-}
-</style>
 </html>
 {% endblock %}
 {#{% include "footer.html" %}#}
