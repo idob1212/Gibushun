@@ -157,7 +157,7 @@ def homeAdmin(group_id):
     total_avgs = []
     physical_stations = getPhysicalStationsGroup(int(group_id))
     physical_stations = physical_stations + ["ספרינטים", "זחילות", "אלונקה סוציומטרית", "מתלה שזיפים"]
-    counter_stations = ["מסע 1","מסע 2","מסע 3","שקי חול"]
+    counter_stations = ["מסע 1", "מסע 2", "מסע 3", "שקי חול", "שקי חול 2"]
     station_reviews = []
     counter_reviews = []
 
@@ -170,7 +170,7 @@ def homeAdmin(group_id):
             elements_num = 0
             for station in physical_stations:
                 station_reviews.append(Review.query.filter_by(subject_id=candidate.id, station=f"{station} סיכום").first())
-            
+
             for station in counter_stations:
                 counter_reviews.append(Review.query.filter_by(subject_id=candidate.id, station=f"{station}").first())
 
@@ -190,7 +190,7 @@ def homeAdmin(group_id):
                 if review.station not in physical_stations and "אקט" not in review.station and ("ODT" not in review.station or review.station == "ODT סיכום"):
                     total_sum += review.grade
                     total_count += 1
-                    
+
             if total_count == 0:
                 total_avgs.append(0)
             else:
@@ -214,7 +214,7 @@ def home():
     tiz_avgs = []
     total_avgs = []
     physical_stations = getPhysicalStations()
-    counter_stations = ["מסע 1","מסע 2","מסע 3","שקי חול"]
+    counter_stations = ["מסע 1", "מסע 2", "מסע 3", "שקי חול", "שקי חול 2"]
     physical_stations = physical_stations + ["ספרינטים", "זחילות", "אלונקה סוציומטרית", "מתלה שזיפים"]
     station_reviews = []
     counter_reviews = []
@@ -611,7 +611,7 @@ def add_new_group_review():
 def normalize_counter_reviews(station, candidates, current_user):
     """
     Normalizes review grades for a station based on counter values.
-    
+
     Args:
         station (str): The station name to normalize reviews for
         candidates (list): List of candidate IDs
@@ -624,7 +624,7 @@ def normalize_counter_reviews(station, candidates, current_user):
             station=station,
             subject_id=f"{current_user.id}/{candidate_id}"
         ).first()
-        
+
         if not review:
             # Create new review with counter=0 if it doesn't exist
             review = Review(
@@ -637,7 +637,7 @@ def normalize_counter_reviews(station, candidates, current_user):
             )
             db.session.add(review)
             db.session.commit()
-        
+
         station_reviews.append(review)
 
     # Find max counter value for normalization
@@ -659,14 +659,14 @@ def get_existing_review(candidate_id, station):
 
 @app.route('/counter-review', methods=["GET", "POST"])
 def counter_review():
-    counter_stations = ["מסע 1", "מסע 2", "מסע 3", "שקי חול"]
+    counter_stations = ["מסע 1", "מסע 2", "מסע 3", "שקי חול", "שקי חול 2"]
     form = CounterReviewForm()
     form.station.choices = counter_stations
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     candidates = [int(candidate.id.split("/")[1]) for candidate in candidates if candidate.status != "פרש"]
     candidates.sort()
     form.subject.choices = candidates
-    
+
     return render_template('counter-review.html', form=form, get_existing_review=get_existing_review)
 
 @app.route('/update-counter-reviews', methods=["POST"])
@@ -674,26 +674,26 @@ def update_counter_reviews():
     data = request.get_json()
     station = data['station']
     reviews = data['reviews']
-    
+
     # Find max counter value for normalization
     max_counter = max(review['counter'] for review in reviews)
-    
+
     # Update or create reviews with normalized grades
     for review_data in reviews:
         candidate_id = f"{current_user.id}/{review_data['subject']}"
-        
+
         # Calculate normalized grade (1-4 scale)
         normalized_grade = 1.0
         if max_counter > 0:
             normalized_grade = 1.0 + (3.0 * review_data['counter'] / max_counter)
-        
+
         # Find existing review or create new one
         review = Review.query.filter_by(
             station=station,
             subject_id=candidate_id,
             author_id=current_user.id
         ).first()
-        
+
         if review:
             review.grade = round(normalized_grade, 2)
             review.counter_value = review_data['counter']
@@ -709,7 +709,7 @@ def update_counter_reviews():
                 subject=Candidate.query.get(candidate_id)
             )
             db.session.add(review)
-            
+
     db.session.commit()
     return jsonify({'success': True})
 
@@ -984,6 +984,7 @@ def showCandidate():
                 clean_reviews = [review for review in reviews if
                                  "אקט" not in review.station and review.station != "זחילות" and (
                                              "ODT" not in review.station or review.station == "ODT סיכום")]
+                clean_reviews.sort(key=lambda x: x.grade, reverse=True)
                 all_reviews.append(clean_reviews)
             if len(candidate_nums) == 1:
                 return render_template('candidate.html', form=form)
@@ -992,6 +993,7 @@ def showCandidate():
         reviews = Review.query.filter_by(subject_id=candidate.id).all()
         clean_reviews = [review for review in reviews if review.station not in physical_stations and ("ODT" not in review.station or review.station == "ODT סיכום")]
         clean_reviews = [review for review in clean_reviews if ("אקט" not in review.station) or ("אקט" in review.station and "סיכום" in review.station)]
+        clean_reviews.sort(key=lambda x: x.grade, reverse=True)
         return render_template('candidate.html', reviews=clean_reviews, candidate_id=candidate.id.split("/")[1], form=form, all_reviews=all_reviews)
     return render_template('candidate.html', form=form)
 
@@ -1023,6 +1025,7 @@ def showCandidateAdmin():
                 clean_reviews = [review for review in reviews if
                                  "אקט" not in review.station and review.station != "זחילות" and (
                                              "ODT" not in review.station or review.station == "ODT סיכום")]
+                clean_reviews.sort(key=lambda x: x.grade, reverse=True)
                 all_reviews.append(clean_reviews)
             if len(candidates) == 1 :
                 return render_template('candidate-admin.html', form=form)
@@ -1055,7 +1058,7 @@ def AddStatus():
         selected_id = form.id.data
     elif selected_id is None and candidate_nums:
         selected_id = candidate_nums[0]
-    
+
     # Set form defaults based on selected candidate
     if selected_id:
         candidate = Candidate.query.filter_by(id=f"{current_user.id}/{selected_id}").first()
@@ -1114,7 +1117,7 @@ def edit_interview(candidate_id):
         candidate.interview_note = form.note.data
         candidate.tash_prob = form.tash.data
         candidate.medical_prob = form.medical.data
-        
+
         try:
             db.session.commit()
             flash('הראיון עודכן בהצלחה', 'success')  # Success message in Hebrew
@@ -1123,7 +1126,7 @@ def edit_interview(candidate_id):
             db.session.rollback()
             flash('שגיאה בשמירת הנתונים', 'error')  # Error message in Hebrew
             print(f"Error saving interview: {e}")
-            
+
     return render_template("interview.html", form=form, is_edit=True)
 
 @app.route("/show-interview/", methods=["GET", "POST"])
@@ -1131,12 +1134,22 @@ def showInterview():
     form = selectCandidate()
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     candidate_nums = []
+    all_interviews = []
     for candidate in candidates:
         if candidate.status != "פרש":
             candidate_nums.append(int(candidate.id.split("/")[1]))
     candidate_nums.sort()
+    candidate_nums.append("כולם")
     form.id.choices = candidate_nums
     if form.validate_on_submit():
+        if form.id.data == "כולם":
+            for candidate_num in candidate_nums[:-1]:
+                candidate = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(candidate_num)).first()
+                if candidate.interview_grade:
+                    all_interviews.append(candidate)
+            if len(candidate_nums) == 1:
+                return render_template('show-interview.html', form=form)
+            return render_template('show-interview.html', form=form, all_candidates=all_interviews)
         candidate = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(form.id.data)).first()
         return render_template('show-interview.html', form=form, candidate=candidate, candidate_id=candidate.id.split("/")[1])
     return render_template('show-interview.html', form=form)
@@ -1147,15 +1160,27 @@ def showInterview():
 def showInterviewAdmin():
     form = selectCandidateAdmin()
     form.group.choices = get_groups()
+    all_interviews = []
     if form.group.data:
         candidates = [candidate.id.split("/")[1] for candidate in Candidate.query.filter_by(group_id=int(form.group.data)).all() if candidate.status != "פרש"]
         candidates.sort()
+        candidates.append("כולם")
         form.id.choices = candidates
     elif len(get_groups()) >0:
         candidates = [int(candidate.id.split("/")[1]) for candidate in Candidate.query.filter_by(group_id=get_groups()[0]).all() if candidate.status != "פרש"]
         candidates.sort()
+        candidates.append("כולם")
         form.id.choices = candidates
     if form.validate_on_submit():
+        if form.id.data == "כולם":
+            candidates_list = [c for c in form.id.choices if c != "כולם"]
+            for candidate_num in candidates_list:
+                candidate = Candidate.query.filter_by(id=str(form.group.data) + "/" + str(candidate_num)).first()
+                if candidate and candidate.interview_grade:
+                    all_interviews.append(candidate)
+            if len(candidates_list) == 0:
+                return render_template('show-interview-admin.html', form=form)
+            return render_template('show-interview-admin.html', form=form, all_candidates=all_interviews, group=form.group.data)
         candidate = Candidate.query.filter_by(id=str(form.group.data) + "/" + str(form.id.data)).first()
         return render_template('show-interview-admin.html', form=form, candidate=candidate, candidate_id=candidate.id.split("/")[1])
     return render_template('show-interview-admin.html', form=form)
@@ -1182,13 +1207,13 @@ def showStationReviewsAdmin():
         form.group.choices = get_groups()
         form.station.choices = unique_station_values + getPhysicalStationsGroup(int(form.group.data))
         reviews = Review.query.filter_by(author_id=form.group.data, station=form.station.data).all()
-        reviews.sort(key=lambda x: x.grade)
+        reviews.sort(key=lambda x: x.grade, reverse=True)
         if form.station.data == "זחילות" or form.station.data == "ספרינטים" or form.station.data in getPhysicalStationsGroup(form.group.data) + ["אלונקה סוציומטרית", "מתלה שזיפים"]:
             reviews = Review.query.filter_by(author_id=form.group.data, station=form.station.data + " סיכום").all()
-            reviews.sort(key=lambda x: x.grade)
+            reviews.sort(key=lambda x: x.grade, reverse=True)
         if "ODT" == form.station.data:
             reviews = Review.query.filter_by(author_id=form.group.data, station="ODT סיכום").all()
-            reviews.sort(key=lambda x: x.grade)
+            reviews.sort(key=lambda x: x.grade, reverse=True)
         return render_template('rankings-admin.html', reviews=reviews, form=form, stations=unique_station_values)
     return render_template('rankings-admin.html', form=form, stations=unique_station_values)
 
@@ -1206,15 +1231,15 @@ def showStationReviews():
     form.station.choices = unique_station_values
     if form.validate_on_submit():
         reviews = Review.query.filter_by(author_id=current_user.id, station=form.station.data).all()
-        reviews.sort(key=lambda x: x.grade)
+        reviews.sort(key=lambda x: x.grade, reverse=True)
         if(form.station.data == "זחילות" or form.station.data == "ספרינטים" or form.station.data in getPhysicalStations() +["אלונקה סוציומטרית", "מתלה שזיפים"]):
             reviews = Review.query.filter_by(station=form.station.data + " סיכום").all()
             reviews = [review for review in reviews if str(review.author_id) == str(current_user.id)]
-            reviews.sort(key=lambda x: x.grade)
+            reviews.sort(key=lambda x: x.grade, reverse=True)
         if "ODT" == form.station.data:
             reviews = Review.query.filter_by(station="ODT סיכום").all()
             reviews = [review for review in reviews if str(review.author_id) == str(current_user.id)]
-            reviews.sort(key=lambda x: x.grade)
+            reviews.sort(key=lambda x: x.grade, reverse=True)
         return render_template('rankings.html', reviews=reviews, form=form)
     return render_template('rankings.html', form=form)
 
@@ -1664,7 +1689,7 @@ def edit_note(note_id):
         text=note.text,
         location=note.location
     )
-    
+
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     candidate_nums = []
     for candidate in candidates:
@@ -1684,10 +1709,10 @@ def edit_note(note_id):
         formatted_time = current_time_israel.strftime('%d-%m-%Y %H:%M')
         note.date = formatted_time
 
-        
+
         db.session.commit()
         return redirect(url_for('show_notes'))
-        
+
     return render_template("make-note.html", form=form, current_user=current_user, is_edit=True)
 
 @app.route("/show-notes", methods=["GET", "POST"])
@@ -1856,7 +1881,7 @@ def get_station_reviews(station):
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     candidates = [int(candidate.id.split("/")[1]) for candidate in candidates if candidate.status != "פרש"]
     candidates.sort()  # Ensure consistent ordering
-    
+
     reviews = []
     for candidate_id in candidates:
         full_id = f"{current_user.id}/{candidate_id}"
@@ -1865,7 +1890,7 @@ def get_station_reviews(station):
             subject_id=full_id,
             author_id=current_user.id
         ).first()
-        
+
         if review:
             reviews.append({
                 'subject': candidate_id,
@@ -1878,7 +1903,7 @@ def get_station_reviews(station):
                 'counter_value': 0,
                 'note': ''
             })
-    
+
     return jsonify({'reviews': reviews})
 
 if __name__ == "__main__":
