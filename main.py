@@ -973,12 +973,12 @@ def showCandidate():
         if candidate.status != "פרש":
             candidate_nums.append(int(candidate.id.split("/")[1]))
     candidate_nums.sort()
-    candidate_nums.append("כולם")
+    candidate_nums = ["כולם"] + candidate_nums
     form.id.choices = candidate_nums
     physical_stations = getPhysicalStations() + ["ספרינטים", "זחילות", "אלונקה סוציומטרית", "מתלה שזיפים"]
     if form.validate_on_submit():
         if form.id.data == "כולם":
-            for candidate_num in candidate_nums[:-1]:
+            for candidate_num in candidate_nums[1:]:
                 candidate = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(candidate_num)).first()
                 reviews = Review.query.filter_by(subject_id=candidate.id).all()
                 clean_reviews = [review for review in reviews if
@@ -1004,22 +1004,22 @@ def showCandidateAdmin():
     update_avgs_nf()
     form.group.choices = get_groups()
     clean_reviews = []
-    candidates = []
+    candidate_nums = []
     if form.group.data:
         candidates = [candidate.id.split("/")[1] for candidate in Candidate.query.filter_by(group_id=int(form.group.data)).all() if candidate.status != "פרש"]
         candidates.sort()
-        candidates.append("כולם")
+        candidates = ["כולם"] + candidates
         form.id.choices = candidates
     elif len(get_groups()) > 0:
         candidates = [int(candidate.id.split("/")[1]) for candidate in Candidate.query.filter_by(group_id=get_groups()[0]).all() if candidate.status != "פרש"]
         candidates.sort()
-        candidates.append("כולם")
+        candidates = ["כולם"] + candidates
         form.id.choices = candidates
     physical_stations = getPhysicalStationsGroup(form.group.data) + ["ספרינטים", "זחילות", "אלונקה סוציומטרית", "מתלה שזיפים"]
     if request.method == "POST":
         if form.id.data == "כולם":
             all_reviews = []
-            for candidate_num in candidates[:-1]:
+            for candidate_num in candidates[1:]:
                 candidate = Candidate.query.filter_by(id=str(form.group.data) + "/" + str(candidate_num)).first()
                 reviews = Review.query.filter_by(subject_id=candidate.id).all()
                 clean_reviews = [review for review in reviews if
@@ -1139,11 +1139,11 @@ def showInterview():
         if candidate.status != "פרש":
             candidate_nums.append(int(candidate.id.split("/")[1]))
     candidate_nums.sort()
-    candidate_nums.append("כולם")
+    candidate_nums = ["כולם"] + candidate_nums
     form.id.choices = candidate_nums
     if form.validate_on_submit():
         if form.id.data == "כולם":
-            for candidate_num in candidate_nums[:-1]:
+            for candidate_num in candidate_nums[1:]:
                 candidate = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(candidate_num)).first()
                 if candidate.interview_grade:
                     all_interviews.append(candidate)
@@ -1164,12 +1164,12 @@ def showInterviewAdmin():
     if form.group.data:
         candidates = [candidate.id.split("/")[1] for candidate in Candidate.query.filter_by(group_id=int(form.group.data)).all() if candidate.status != "פרש"]
         candidates.sort()
-        candidates.append("כולם")
+        candidates = ["כולם"] + candidates
         form.id.choices = candidates
     elif len(get_groups()) >0:
         candidates = [int(candidate.id.split("/")[1]) for candidate in Candidate.query.filter_by(group_id=get_groups()[0]).all() if candidate.status != "פרש"]
         candidates.sort()
-        candidates.append("כולם")
+        candidates = ["כולם"] + candidates
         form.id.choices = candidates
     if form.validate_on_submit():
         if form.id.data == "כולם":
@@ -1725,12 +1725,12 @@ def show_notes():
         if candidate.status != "פרש":
             candidate_nums.append(int(candidate.id.split("/")[1]))
     candidate_nums.sort()
-    candidate_nums.append("כולם")
+    candidate_nums = ["כולם"] + candidate_nums
     candidate = ""
     form.id.choices = candidate_nums
     if form.validate_on_submit():
         if form.id.data == "כולם":
-            for candidate_num in candidate_nums[:-1]:
+            for candidate_num in candidate_nums[1:]:
                 candidate = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(candidate_num)).first()
                 notes = Note.query.filter_by(subject_id=candidate.id).all()
                 reviews = Review.query.filter_by(subject_id=candidate.id).all()
@@ -1763,18 +1763,18 @@ def showNotesAdmin():
     if form.group.data:
         candidates = [int(candidate.id.split("/")[1]) for candidate in Candidate.query.filter_by(group_id=int(form.group.data)).all() if candidate.status != "פרש"]
         candidates.sort()
-        candidates.append("כולם")
+        candidates = ["כולם"] + candidates
         form.id.choices = candidates
     elif len(get_groups()) > 0:
         candidates = [int(candidate.id.split("/")[1]) for candidate in Candidate.query.filter_by(group_id=get_groups()[0]).all() if candidate.status != "פרש"]
         candidates.sort()
-        candidates.append("כולם")
+        candidates = ["כולם"] + candidates
         form.id.choices = candidates
     if request.method == "POST":
         if form.id.data == "כולם":
             all_notes = []
             notes = []
-            for candidate_num in candidates[:-1]:
+            for candidate_num in candidates[1:]:
                 candidate = Candidate.query.filter_by(id=str(form.group.data) + "/" + str(candidate_num)).first()
                 notes = Note.query.filter_by(subject_id=candidate.id).all()
                 reviews = Review.query.filter_by(subject_id=candidate.id).all()
