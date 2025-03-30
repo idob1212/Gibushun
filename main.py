@@ -1004,7 +1004,7 @@ def showCandidateAdmin():
     update_avgs_nf()
     form.group.choices = get_groups()
     clean_reviews = []
-    candidate_nums = []
+    candidates = []
     if form.group.data:
         candidates = [candidate.id.split("/")[1] for candidate in Candidate.query.filter_by(group_id=int(form.group.data)).all() if candidate.status != "פרש"]
         candidates.sort()
