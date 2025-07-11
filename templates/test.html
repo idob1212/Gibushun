@@ -24,6 +24,8 @@
   <a href="{{ url_for('add_new_review') }}" class="btn btn-primary btn-lg btn-block mt-3">עבור למצב יחיד</a>
   <div class="row">
     <div class="col-lg-8 col-md-10 mx-auto" style="direction: rtl; float: right">
+      {% include "flash-messages.html" %}
+      <div id="flash-messages-target"></div>
       <div class="text-center mb-3 mt-3">
         <label for="movementType" style="margin-right: 10px; font-size: 16px">סוג תחנה:</label>
         <select class="form-control d-inline-block" id="movementType">
@@ -148,7 +150,38 @@
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(data)
-    });
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        // Show success message
+        const flashContainer = document.querySelector('.flash-messages-container') || document.createElement('div');
+        flashContainer.className = 'flash-messages-container';
+        flashContainer.innerHTML = `
+          <div class="alert alert-success alert-dismissible fade show" role="alert" style="direction: rtl; text-align: right;">
+            <i class="fas fa-check-circle" style="margin-left: 8px;"></i>
+            <strong>${data.message}</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        `;
+        
+        // Insert flash message at the correct location (same as regular flash messages)
+        const targetElement = document.querySelector('#flash-messages-target');
+        if (targetElement) {
+          targetElement.innerHTML = '';
+          targetElement.appendChild(flashContainer);
+        }
+        
+        // Auto-hide success message after 5 seconds
+        setTimeout(() => {
+          const alert = flashContainer.querySelector('.alert');
+          if (alert) {
+            alert.remove();
+          }
+        }, 5000);
+      }
+    })
+    .catch(error => console.error('Error:', error));
   }
 
   function sendCircleNumbersAct() {
@@ -173,7 +206,38 @@
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(data)
-    });
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        // Show success message
+        const flashContainer = document.querySelector('.flash-messages-container') || document.createElement('div');
+        flashContainer.className = 'flash-messages-container';
+        flashContainer.innerHTML = `
+          <div class="alert alert-success alert-dismissible fade show" role="alert" style="direction: rtl; text-align: right;">
+            <i class="fas fa-check-circle" style="margin-left: 8px;"></i>
+            <strong>${data.message}</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        `;
+        
+        // Insert flash message at the correct location (same as regular flash messages)
+        const targetElement = document.querySelector('#flash-messages-target');
+        if (targetElement) {
+          targetElement.innerHTML = '';
+          targetElement.appendChild(flashContainer);
+        }
+        
+        // Auto-hide success message after 5 seconds
+        setTimeout(() => {
+          const alert = flashContainer.querySelector('.alert');
+          if (alert) {
+            alert.remove();
+          }
+        }, 5000);
+      }
+    })
+    .catch(error => console.error('Error:', error));
   }
 
   function resetCircles() {

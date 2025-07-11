@@ -20,6 +20,9 @@
   <a href="{{ url_for('add_new_review') }}" class="btn btn-primary btn-lg btn-block mt-3 mb-5">עבור למצב יחיד</a>
   <div class="row">
     <div class="col-lg-12 mx-auto" style="direction: rtl;">
+      <!-- Flash Messages Container -->
+      <div id="flash-messages-container"></div>
+      
       <!-- Station Selection -->
       <div class="form-group text-center mb-4">
         <label for="station" style="font-size: 18px">בחר תחנה:</label>
@@ -96,8 +99,24 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                // Optional: Show success message
-                console.log('Reviews updated successfully');
+                // Show success message
+                const flashContainer = document.getElementById('flash-messages-container');
+                flashContainer.innerHTML = `
+                    <div class="alert alert-success alert-dismissible fade show" role="alert" style="direction: rtl; text-align: right;">
+                        <i class="fas fa-check-circle" style="margin-left: 8px;"></i>
+                        <strong>${data.message}</strong>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                `;
+                
+                // Auto-hide success message after 3 seconds
+                setTimeout(() => {
+                    const alert = flashContainer.querySelector('.alert');
+                    if (alert) {
+                        const bsAlert = new bootstrap.Alert(alert);
+                        bsAlert.close();
+                    }
+                }, 3000);
             }
         })
         .catch(error => console.error('Error:', error));
