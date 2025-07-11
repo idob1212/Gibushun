@@ -39,13 +39,14 @@
           <a href="{{ url_for('addCandidateBatch') }}" class="btn btn-primary">מצב קבוצתי</a>
         </div>
         
-        {% with messages = get_flashed_messages() %}
-          {% if messages %}
-            {% for message in messages %}
-             <p style="color: red">{{ message }}</p>
-            {% endfor %}
-          {% endif %}
-        {% endwith %}
+        <!-- Display existing candidate numbers -->
+        {% if existing_numbers %}
+        <div class="alert alert-info">
+          <strong>מספרי מגובשים קיימים:</strong> {{ existing_numbers|join(', ') }}
+        </div>
+        {% endif %}
+        
+        {% include "flash-messages.html" %}
         {{ wtf.quick_form(form, novalidate=True, button_map={"submit": "primary"}) }}
       </div>
     </div>
