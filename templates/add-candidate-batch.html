@@ -55,9 +55,14 @@
           <a href="{{ url_for('addCandidate') }}" class="btn btn-primary">מצב יחיד</a>
         </div>
 
-        {% with messages = get_flashed_messages() %}
-          <!-- ... existing flash messages ... -->
-        {% endwith %}
+        <!-- Display existing candidate numbers -->
+        {% if existing_numbers %}
+        <div class="alert alert-info">
+          <strong>מספרי מגובשים קיימים:</strong> {{ existing_numbers|join(', ') }}
+        </div>
+        {% endif %}
+
+        {% include "flash-messages.html" %}
         
         {% if duplicates %}
         <div class="alert alert-warning">
@@ -103,6 +108,116 @@
   </div>
 
 <script>
+// Function to check for duplicate IDs in the form
+function checkDuplicateIds() {
+    const rows = document.querySelectorAll('.candidate-row');
+    const ids = {};
+    const duplicates = [];
+    
+    rows.forEach((row, index) => {
+        const idInput = row.querySelector('input[name="id"]');
+        const id = idInput.value.trim();
+        
+        // Reset styling
+        idInput.classList.remove('is-invalid');
+        idInput.style.backgroundColor = '';
+        
+        if (id) {
+            if (ids[id]) {
+                // Mark both current and previous as duplicates
+                duplicates.push(index);
+                duplicates.push(ids[id].index);
+            } else {
+                ids[id] = { index: index, input: idInput };
+            }
+        }
+    });
+    
+    // Highlight duplicates
+    duplicates.forEach(index => {
+        const row = document.querySelectorAll('.candidate-row')[index];
+        const idInput = row.querySelector('input[name="id"]');
+        idInput.classList.add('is-invalid');
+        idInput.style.backgroundColor = '#ffe6e6';
+    });
+    
+    return duplicates.length === 0;
+}
+
+// Function to show validation results
+function showValidationResults(data) {
+    const existingAlerts = document.querySelectorAll('.validation-alert');
+    existingAlerts.forEach(alert => alert.remove());
+    
+    const container = document.querySelector('.col-lg-8.col-md-10.mx-auto');
+    const alertsContainer = document.createElement('div');
+    alertsContainer.className = 'validation-alerts';
+    
+    if (data.summary.total_failed > 0) {
+        // Summary alert
+        const summaryAlert = document.createElement('div');
+        summaryAlert.className = 'alert alert-info validation-alert';
+        summaryAlert.innerHTML = `
+            <strong>תוצאות עיבוד:</strong><br>
+            סך הכל: ${data.summary.total_processed} מגובשים<br>
+            נוספו בהצלחה: ${data.summary.total_successful}<br>
+            נכשלו: ${data.summary.total_failed}
+        `;
+        alertsContainer.appendChild(summaryAlert);
+        
+        // Show specific errors
+        if (data.results.duplicate_in_batch.length > 0) {
+            const duplicateAlert = document.createElement('div');
+            duplicateAlert.className = 'alert alert-danger validation-alert';
+            duplicateAlert.innerHTML = `
+                <strong>מספרים כפולים בטופס:</strong><br>
+                ${data.results.duplicate_in_batch.map(item => `שורה ${item.row}: ${item.id} - ${item.name}`).join('<br>')}
+            `;
+            alertsContainer.appendChild(duplicateAlert);
+        }
+        
+        if (data.results.existing_candidates.length > 0) {
+            const existingAlert = document.createElement('div');
+            existingAlert.className = 'alert alert-warning validation-alert';
+            existingAlert.innerHTML = `
+                <strong>מגובשים קיימים במערכת:</strong><br>
+                ${data.results.existing_candidates.map(item => `שורה ${item.row}: ${item.id} - ${item.name}`).join('<br>')}
+            `;
+            alertsContainer.appendChild(existingAlert);
+        }
+        
+        if (data.results.invalid_data.length > 0) {
+            const invalidAlert = document.createElement('div');
+            invalidAlert.className = 'alert alert-danger validation-alert';
+            invalidAlert.innerHTML = `
+                <strong>נתונים שגויים:</strong><br>
+                ${data.results.invalid_data.map(item => `שורה ${item.row}: ${item.error}`).join('<br>')}
+            `;
+            alertsContainer.appendChild(invalidAlert);
+        }
+        
+        if (data.results.errors.length > 0) {
+            const errorAlert = document.createElement('div');
+            errorAlert.className = 'alert alert-danger validation-alert';
+            errorAlert.innerHTML = `
+                <strong>שגיאות מערכת:</strong><br>
+                ${data.results.errors.map(item => `שורה ${item.row}: ${item.error}`).join('<br>')}
+            `;
+            alertsContainer.appendChild(errorAlert);
+        }
+    } else {
+        // All successful
+        const successAlert = document.createElement('div');
+        successAlert.className = 'alert alert-success validation-alert';
+        successAlert.innerHTML = `
+            <strong>הצלחה!</strong> כל ${data.summary.total_successful} המגובשים נוספו בהצלחה.
+        `;
+        alertsContainer.appendChild(successAlert);
+    }
+    
+    container.insertBefore(alertsContainer, container.querySelector('form'));
+}
+
 document.getElementById('add-row').addEventListener('click', function() {
     const tbody = document.getElementById('candidates-tbody');
     const template = tbody.querySelector('.candidate-row').cloneNode(true);
@@ -110,6 +225,8 @@ document.getElementById('add-row').addEventListener('click', function() {
     // Clear the values in the cloned row
     template.querySelectorAll('input, select').forEach(input => {
         input.value = '';
+        input.classList.remove('is-invalid');
+        input.style.backgroundColor = '';
     });
     
     tbody.appendChild(template);
@@ -120,13 +237,36 @@ document.addEventListener('click', function(e) {
         const tbody = document.getElementById('candidates-tbody');
         if (tbody.children.length > 1) {
             e.target.closest('tr').remove();
+            // Check for duplicates after removal
+            checkDuplicateIds();
         }
+    }
+});
+
+// Add real-time validation on input
+document.addEventListener('input', function(e) {
+    if (e.target.name === 'id') {
+        setTimeout(() => checkDuplicateIds(), 100);
     }
 });
 
 // Add form submission handler
 document.getElementById('batch-form').addEventListener('submit', function(e) {
     e.preventDefault();
+    
+    // Check for client-side duplicates first
+    if (!checkDuplicateIds()) {
+        const duplicateAlert = document.createElement('div');
+        duplicateAlert.className = 'alert alert-danger validation-alert';
+        duplicateAlert.innerHTML = '<strong>שגיאה:</strong> יש מספרים כפולים בטופס. אנא תקן את הכפילויות לפני השליחה.';
+        
+        const container = document.querySelector('.col-lg-8.col-md-10.mx-auto');
+        const existingAlerts = document.querySelectorAll('.validation-alert');
+        existingAlerts.forEach(alert => alert.remove());
+        
+        container.insertBefore(duplicateAlert, container.querySelector('form'));
+        return;
+    }
     
     const rows = document.querySelectorAll('.candidate-row');
     const candidates = [];
@@ -136,11 +276,19 @@ document.getElementById('batch-form').addEventListener('submit', function(e) {
         const candidate = {};
         
         inputs.forEach(input => {
-            candidate[input.name] = input.value;
+            candidate[input.name] = input.value.trim();
         });
         
-        candidates.push(candidate);
+        // Only add if both ID and name are present
+        if (candidate.id && candidate.name) {
+            candidates.push(candidate);
+        }
     });
+    
+    if (candidates.length === 0) {
+        alert('אנא הוסף לפחות מגובש אחד עם מספר ושם.');
+        return;
+    }
     
     fetch('/add-candidate-batch', {
         method: 'POST',
@@ -151,43 +299,69 @@ document.getElementById('batch-form').addEventListener('submit', function(e) {
     })
     .then(response => response.json())
     .then(data => {
-        const tbody = document.getElementById('candidates-tbody');
-        
         if (data.success) {
-            if (data.duplicates && data.duplicates.length > 0) {
-                // Filter out successful entries while keeping duplicates
+            showValidationResults(data);
+            
+            // If all successful, redirect after a delay
+            if (data.summary.total_failed === 0) {
+                setTimeout(() => {
+                    window.location.href = '/add-candidate-batch';
+                }, 2000);
+            } else {
+                // Remove successful entries from the form
+                const tbody = document.getElementById('candidates-tbody');
                 const remainingRows = [];
-                document.querySelectorAll('.candidate-row').forEach(row => {
+                
+                document.querySelectorAll('.candidate-row').forEach((row, index) => {
                     const idInput = row.querySelector('input[name="id"]');
                     const nameInput = row.querySelector('input[name="name"]');
-                    if (data.duplicates.includes(idInput.value)) {
+                    const id = idInput.value.trim();
+                    
+                    // Check if this candidate was successful
+                    const wasSuccessful = data.results.successful_adds.some(success => 
+                        success.id === id
+                    );
+                    
+                    if (!wasSuccessful && id && nameInput.value.trim()) {
                         remainingRows.push({
-                            id: idInput.value,
-                            name: nameInput.value
+                            id: id,
+                            name: nameInput.value.trim()
                         });
                     }
                 });
                 
                 // Clear and rebuild table with remaining rows
                 tbody.innerHTML = '';
-                remainingRows.forEach(candidate => {
+                if (remainingRows.length > 0) {
+                    remainingRows.forEach(candidate => {
+                        const newRow = document.createElement('tr');
+                        newRow.className = 'candidate-row';
+                        newRow.innerHTML = `
+                            <td><input type="text" name="id" class="form-control" value="${candidate.id}" /></td>
+                            <td><input type="text" name="name" class="form-control" value="${candidate.name}" /></td>
+                            <td><span class="remove-row">❌</span></td>
+                        `;
+                        tbody.appendChild(newRow);
+                    });
+                } else {
+                    // Add empty row if no remaining candidates
                     const newRow = document.createElement('tr');
                     newRow.className = 'candidate-row';
                     newRow.innerHTML = `
-                        <td><input type="text" name="id" class="form-control" value="${candidate.id}" /></td>
-                        <td><input type="text" name="name" class="form-control" value="${candidate.name}" /></td>
+                        <td><input type="text" name="id" class="form-control" /></td>
+                        <td><input type="text" name="name" class="form-control" /></td>
                         <td><span class="remove-row">❌</span></td>
                     `;
                     tbody.appendChild(newRow);
-                });
-            } else {
-                // All candidates were added successfully
-                window.location.href = '/add-candidate-batch';
+                }
             }
+        } else {
+            alert('שגיאה: ' + data.error);
         }
     })
     .catch(error => {
         console.error('Error:', error);
+        alert('שגיאה בתקשורת עם השרת');
     });
 });
 </script>
