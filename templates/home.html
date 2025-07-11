@@ -13,7 +13,11 @@
           <div class="page-heading">
             <h1> שלום {{ current_user.name }}</h1>
             <span class="subheading" style="direction: rtl">מגבש קבוצה מס'  {{ current_user.id }} </span>
-
+            <div class="candidate-count" style="direction: rtl; margin-top: 10px;">
+              <span style="background-color: rgba(0,0,0,0.3); padding: 8px 15px; border-radius: 20px; color: white; font-size: 14px;">
+                <strong>{{ active_candidates_count }}</strong> מגובשים פעילים
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -51,13 +55,7 @@ th{
 
 </style>
       <div class="col-lg-8 col-md-10 mx-auto content" style="direction: rtl; float: right">
-      {% with messages = get_flashed_messages() %}
-        {% if messages %}
-          {% for message in messages %}
-           <p>{{ message }}</p>
-          {% endfor %}
-        {% endif %}
-      {% endwith %}
+        {% include "flash-messages.html" %}
       </div>
 <table class = "table table-bordered" style="width:100%; direction: rtl;">
     <thead>

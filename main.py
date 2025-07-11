@@ -211,6 +211,8 @@ def home():
     if current_user.id == 0:
         return redirect(url_for("admin_home"))
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
+    # Calculate count of active candidates (not "פרש")
+    active_candidates_count = len([c for c in candidates if c.status != "פרש"])
     tiz_avgs = []
     total_avgs = []
     physical_stations = getPhysicalStations()
@@ -255,8 +257,8 @@ def home():
         candidates = [x for _, x in sorted(zip(total_avgs, candidates), key=lambda pair: pair[0], reverse=True)]
         tiz_avgs = [x for _, x in sorted(zip(total_avgs, tiz_avgs), key=lambda pair: pair[0], reverse=True)]
         total_avgs.sort(reverse=True)
-        return render_template("home.html", current_user=current_user, candidates=enumerate(candidates), tiz_avg =tiz_avgs, total_avg =total_avgs)
-    return render_template("home.html", current_user=current_user, candidates = candidates)
+        return render_template("home.html", current_user=current_user, candidates=enumerate(candidates), tiz_avg =tiz_avgs, total_avg =total_avgs, active_candidates_count=active_candidates_count)
+    return render_template("home.html", current_user=current_user, candidates = candidates, active_candidates_count=active_candidates_count)
 
 
 @app.route('/register', methods=["GET", "POST"])
@@ -285,9 +287,7 @@ def register():
         )
         db.session.add(new_user)
         db.session.commit()
-        # if current_user.id == 1:
-        #     return redirect(url_for('manage'))
-        # else:
+        flash(f'קבוצה {form.name.data} (מס\' {form.id.data}) נוספה בהצלחה!', 'success')
         return redirect(url_for('register'))
     return render_template("register.html", form=form, current_user=current_user)
 
@@ -295,13 +295,19 @@ def register():
 @app.route('/add-candidate', methods=["GET", "POST"])
 def addCandidate():
     form = NewCandidateForm()
+    
+    # Get existing candidate numbers for the current user's group
+    existing_candidates = Candidate.query.filter_by(group_id=current_user.id).all()
+    existing_numbers = [candidate.id.split("/")[1] for candidate in existing_candidates]
+    existing_numbers.sort(key=lambda x: int(x) if x.isdigit() else float('inf'))
+    
     if form.validate_on_submit():
         new_id = str(form.id.data).strip()
         if Candidate.query.filter_by(id=str(current_user.id) + "/" + new_id, group_id=current_user.id).first():
             # print(User.query.filter_by(id=form.id.data).first())
             #User already exists
             flash("מגובש כבר קיים!")
-            return render_template("add-candidate.html", current_user=current_user, form=form)
+            return render_template("add-candidate.html", current_user=current_user, form=form, existing_numbers=existing_numbers)
 
         # hash_and_salted_password = generate_password_hash(
         #     form.password.data,
@@ -316,11 +322,9 @@ def addCandidate():
         )
         db.session.add(new_candidate)
         db.session.commit()
-        # if current_user.id == 1:
-        #     return redirect(url_for('manage'))
-        # else:
+        flash(f'מגובש {form.name.data} נוסף בהצלחה!', 'success')
         return redirect(url_for('addCandidate'))
-    return render_template("add-candidate.html", form=form, current_user=current_user)
+    return render_template("add-candidate.html", form=form, current_user=current_user, existing_numbers=existing_numbers)
 
 # ... existing imports ...
 
@@ -352,45 +356,115 @@ def addCandidateBatch():
                 "error": "Expected JSON array of candidates"
             }), 400
 
-        successful_adds = []
-
-        for candidate in data:
+        # Track all results for detailed feedback
+        results = {
+            "successful_adds": [],
+            "existing_candidates": [],
+            "invalid_data": [],
+            "duplicate_in_batch": [],
+            "errors": []
+        }
+        
+        # Track candidate IDs in this batch to detect duplicates
+        batch_ids = []
+        
+        for i, candidate in enumerate(data):
             # Validate required fields
             if not all(k in candidate for k in ['id', 'name']):
+                results["invalid_data"].append({
+                    "row": i + 1,
+                    "id": candidate.get('id', ''),
+                    "name": candidate.get('name', ''),
+                    "error": "חסרים שדות חובה (מספר או שם)"
+                })
                 continue
-
-            # Check if candidate already exists
+                
+            # Clean and validate candidate ID
             new_id = str(candidate['id']).strip()
+            if not new_id:
+                results["invalid_data"].append({
+                    "row": i + 1,
+                    "id": new_id,
+                    "name": candidate['name'],
+                    "error": "מספר מגובש לא יכול להיות ריק"
+                })
+                continue
+                
+            # Check for duplicate within the batch
+            if new_id in batch_ids:
+                results["duplicate_in_batch"].append({
+                    "row": i + 1,
+                    "id": new_id,
+                    "name": candidate['name'],
+                    "error": "מספר מגובש כפול בטופס"
+                })
+                continue
+                
+            batch_ids.append(new_id)
+
+            # Check if candidate already exists in database
+            full_id = f"{current_user.id}/{new_id}"
             if Candidate.query.filter_by(
-                id=f"{current_user.id}/{new_id}",
+                id=full_id,
                 group_id=current_user.id
             ).first():
+                results["existing_candidates"].append({
+                    "row": i + 1,
+                    "id": new_id,
+                    "name": candidate['name'],
+                    "error": "מספר מגובש כבר קיים במערכת"
+                })
                 continue
 
             try:
                 new_candidate = Candidate(
-                    id=f"{current_user.id}/{new_id}",
-                    name=candidate['name'],
+                    id=full_id,
+                    name=candidate['name'].strip(),
                     group_id=current_user.id,
                     group=current_user
                 )
                 db.session.add(new_candidate)
                 db.session.commit()
-                successful_adds.append(candidate['id'])
+                results["successful_adds"].append({
+                    "row": i + 1,
+                    "id": new_id,
+                    "name": candidate['name']
+                })
 
             except Exception as e:
                 db.session.rollback()
-                # Handle error if needed
+                results["errors"].append({
+                    "row": i + 1,
+                    "id": new_id,
+                    "name": candidate['name'],
+                    "error": f"שגיאה בשמירה: {str(e)}"
+                })
 
+        # Calculate summary
+        total_processed = len(data)
+        total_successful = len(results["successful_adds"])
+        total_failed = total_processed - total_successful
+        
         return jsonify({
             "success": True,
-            "added": successful_adds
+            "summary": {
+                "total_processed": total_processed,
+                "total_successful": total_successful,
+                "total_failed": total_failed
+            },
+            "results": results
         })
 
+    # Get existing candidate numbers for the current user's group
+    existing_candidates = Candidate.query.filter_by(group_id=current_user.id).all()
+    existing_numbers = [candidate.id.split("/")[1] for candidate in existing_candidates]
+    existing_numbers.sort(key=lambda x: int(x) if x.isdigit() else float('inf'))
+    
     return render_template(
         "add-candidate-batch.html",
         form=form,
-        current_user=current_user
+        current_user=current_user,
+        existing_numbers=existing_numbers
     )
 
 @app.route('/login', methods=["GET", "POST"])
@@ -593,6 +667,8 @@ def add_new_review():
         db.session.add(new_review)
         db.session.commit()
         update_avgs(form)
+        candidate_name = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(form.subject.data)).first().name
+        flash(f'הערכת תחנה {form.station.data} עבור {candidate_name} נשמרה בהצלחה!', 'success')
         form.note.data = ""
         form.odt.data = ""
         return render_template("make-post.html", form=form, current_user=current_user, selected_subject=form.station.data)
@@ -711,7 +787,7 @@ def update_counter_reviews():
             db.session.add(review)
 
     db.session.commit()
-    return jsonify({'success': True})
+    return jsonify({'success': True, 'message': f'הערכות התחנה {station} נשמרו בהצלחה!'})
 
 @app.route('/add-review-candidate', methods=['POST'])
 def addOneReview():
@@ -766,6 +842,7 @@ def update_all():
             db.session.commit()
         counter += 1
     update_avgs_nf()
+    flash(f'הערכות התחנה {station} נשמרו בהצלחה!', 'success')
     return redirect(url_for('add_new_group_review'))
 
 @app.route('/group-manage', methods=["GET", "POST"])
@@ -1075,6 +1152,7 @@ def AddStatus():
         candidate.final_status = form.final_status.data
         candidate.final_note = form.final_note.data
         db.session.commit()
+        flash(f'נתוני סיכום עבור {candidate.name} נשמרו בהצלחה!', 'success')
         return redirect(url_for('AddStatus', candidate_id=form.id.data))
 
     return render_template('add-status.html', form=form)
@@ -1099,6 +1177,7 @@ def Interview():
         candidate.tash_prob = form.tash.data
         candidate.medical_prob = form.medical.data
         db.session.commit()
+        flash(f'הראיון עבור {candidate.name} נשמר בהצלחה!', 'success')
         return redirect(url_for('Interview'))
     return render_template('interview.html', form=form)
 
@@ -1583,7 +1662,7 @@ def circles_finished():
     physical_stations = getPhysicalStations()
     circles = [{'id': i, 'clicked': False, 'finished': False} for i in full_candidates]
     update_avgs_nf()
-    return redirect(url_for('reset_circles', other_flag=other_flag, new_station=station))
+    return jsonify({'success': True, 'message': f'הערכות התחנה {station} נשמרו בהצלחה!'})
 
 
 @app.route('/circles/finished-act', methods=['POST'])
@@ -1636,7 +1715,7 @@ def circles_finished_act():
     updateActAvgs()
     circles = [{'id': i, 'clicked': False, 'finished': False} for i in full_candidates]
     updateActAvgs()
-    return redirect(url_for('reset_circles'))
+    return jsonify({'success': True, 'message': f'הערכות התחנה {station} נשמרו בהצלחה!'})
 
 
 
@@ -1676,6 +1755,8 @@ def add_new_note():
         )
         db.session.add(new_note)
         db.session.commit()
+        candidate_name = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(form.subject.data)).first().name
+        flash(f'פתק {form.type.data} עבור {candidate_name} נשמר בהצלחה!', 'success')
         form.text.data = ""
         return render_template("make-note.html", form=form, current_user=current_user)
     return render_template("make-note.html", form=form, current_user=current_user)
