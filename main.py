@@ -639,9 +639,34 @@ def getStations(group):
 
     return jsonify({'stations': stationsArray})
 
+def getAllStations():
+    """
+    Helper function to get all stations including custom ones created via 'אחר' mode.
+    Returns a list combining predefined stations with custom stations from the database.
+    Excludes circle mode stations (containing "אקט") which are handled separately.
+    """
+    # Get all unique station names from the database
+    unique_stations = db.session.query(distinct(Review.station)).all()
+    unique_station_values = [station[0] for station in unique_stations]
+    
+    # Predefined stations list
+    predefined_stations = ["משימת מחשבה", "דיון מילוט", "פירוק והרכבת נשק", "מסע", "שקים", "מעגל זנבות", "ODT", "הרצאות", "בניית שוח", "חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול", "נאסא"]
+    
+    # Filter out circle mode stations (containing "אקט") and summary stations (containing "סיכום")
+    # Circle mode stations are stored with " - אקט X" suffix and handled separately
+    unique_station_values = [station for station in unique_station_values if "אקט" not in station and "סיכום" not in station]
+    
+    # Get custom stations that are not in predefined list
+    custom_stations = [station for station in unique_station_values if station not in predefined_stations]
+    
+    # Combine predefined stations with custom stations and add "אחר" at the end
+    all_stations = predefined_stations + custom_stations + ["אחר"]
+    
+    return all_stations
+
 @app.route("/new-review", methods=["GET", "POST"])
 def add_new_review():
-    stations = ["משימת מחשבה", "דיון מילוט", "פירוק והרכבת נשק", "מסע", "שקים", "מעגל זנבות", "ODT", "הרצאות", "בניית שוח", "חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול" , "נאסא", "אחר"]
+    stations = getAllStations()
     form = CreateReviewForm()
     form.station.choices = stations
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
@@ -677,7 +702,7 @@ def add_new_review():
 @app.route("/new-group-review", methods=["GET", "POST"])
 def add_new_group_review():
     form = GroupReviewForm()
-    stations = ["משימת מחשבה", "דיון מילוט", "פירוק והרכבת נשק", "מסע", "שקים", "מעגל זנבות","ODT", "הרצאות", "בניית שוח", "חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול" , "נאסא", "אחר"]
+    stations = getAllStations()
     form.station.choices = stations
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     candidates = [int(candidate.id.split("/")[1]) for candidate in candidates if candidate.status != "פרש"]
@@ -1365,7 +1390,11 @@ def edit_review(review_id):
 
 @app.route("/edit-physical-review/<int:review_id>", methods=["GET", "POST"])
 def edit_physical_review(review_id):
-    stations = ["ספרינטים", "זחילות", "ODT", "משימת מחשבה", "דיון מילוט", "פירוק והרכבת נשק", "מסע", "שקים", "מעגל זנבות", "אלונקה סוציומטרית", "מתלה שזיפים", "הרצאות", "בניית שוח", "חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול", "נאסא", "אחר"]
+    # Get all stations including custom ones plus physical stations for editing
+    base_stations = getAllStations()
+    physical_stations = ["ספרינטים", "זחילות", "אלונקה סוציומטרית", "מתלה שזיפים"]
+    # Combine physical stations with all stations, avoiding duplicates
+    stations = physical_stations + [s for s in base_stations if s not in physical_stations]
     review = Review.query.get(review_id)
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     candidate_nums = []
@@ -1388,7 +1417,11 @@ def edit_physical_review(review_id):
 
 @app.route("/edit-odt-review/<int:review_id>", methods=["GET", "POST"])
 def edit_odt_review(review_id):
-    stations = ["ספרינטים", "זחילות", "ODT", "משימת מחשבה", "דיון מילוט", "פירוק והרכבת נשק", "מסע", "שקים", "מעגל זנבות", "אלונקה סוציומטרית", "מתלה שזיפים", "הרצאות", "בניית שוח", "חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול", "נאסא", "אחר"]
+    # Get all stations including custom ones plus physical stations for editing
+    base_stations = getAllStations()
+    physical_stations = ["ספרינטים", "זחילות", "אלונקה סוציומטרית", "מתלה שזיפים"]
+    # Combine physical stations with all stations, avoiding duplicates
+    stations = physical_stations + [s for s in base_stations if s not in physical_stations]
     review = Review.query.get(review_id)
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     candidate_nums = []

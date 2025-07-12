@@ -130,6 +130,32 @@
   // finishButton.addEventListener('click', sendCircleNumbers);
   finishActButton.addEventListener('click', sendCircleNumbersAct);
 
+  function addNewStationToDropdown(stationName) {
+    // Check if station already exists in dropdown
+    const existingOptions = Array.from(movementTypeSelect.options);
+    const stationExists = existingOptions.some(option => option.value === stationName);
+    
+    if (!stationExists && stationName && stationName.trim() !== '') {
+      // Find the "אחר" option
+      const otherOption = Array.from(movementTypeSelect.options).find(option => option.value === 'אחר');
+      
+      if (otherOption) {
+        // Create new option element
+        const newOption = document.createElement('option');
+        newOption.value = stationName;
+        newOption.textContent = stationName;
+        
+        // Insert before the "אחר" option
+        movementTypeSelect.insertBefore(newOption, otherOption);
+        
+        // Select the newly added station and hide the additional field
+        movementTypeSelect.value = stationName;
+        additionalField.style.display = 'none';
+        additionalFieldText.value = '';
+      }
+    }
+  }
+
   function sendCircleNumbers() {
     const movementType = movementTypeSelect.value;
     const other = additionalFieldText.value;
@@ -154,6 +180,11 @@
     .then(response => response.json())
     .then(data => {
       if (data.success) {
+        // If this was a new custom station, add it to the dropdown
+        if (movementType === 'אחר' && other) {
+          addNewStationToDropdown(other);
+        }
+        
         // Show success message
         const flashContainer = document.querySelector('.flash-messages-container') || document.createElement('div');
         flashContainer.className = 'flash-messages-container';
@@ -210,6 +241,11 @@
     .then(response => response.json())
     .then(data => {
       if (data.success) {
+        // If this was a new custom station, add it to the dropdown
+        if (movementType === 'אחר' && other) {
+          addNewStationToDropdown(other);
+        }
+        
         // Show success message
         const flashContainer = document.querySelector('.flash-messages-container') || document.createElement('div');
         flashContainer.className = 'flash-messages-container';
