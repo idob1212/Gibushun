@@ -390,6 +390,28 @@ def addCandidateBatch():
                 })
                 continue
                 
+            # Validate that candidate ID is an integer (including 0)
+            try:
+                candidate_number = int(new_id)
+                if candidate_number < 0:
+                    results["invalid_data"].append({
+                        "row": i + 1,
+                        "id": new_id,
+                        "name": candidate['name'],
+                        "error": "מספר מגובש חייב להיות מספר שלם חיובי או אפס"
+                    })
+                    continue
+                # Convert back to string for consistency with existing logic
+                new_id = str(candidate_number)
+            except ValueError:
+                results["invalid_data"].append({
+                    "row": i + 1,
+                    "id": new_id,
+                    "name": candidate['name'],
+                    "error": "מספר מגובש חייב להיות מספר שלם (כולל 0)"
+                })
+                continue
+                
             # Check for duplicate within the batch
             if new_id in batch_ids:
                 results["duplicate_in_batch"].append({
