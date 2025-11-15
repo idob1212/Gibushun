@@ -1811,7 +1811,7 @@ def add_new_note():
         db.session.add(new_note)
         db.session.commit()
         candidate_name = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(form.subject.data)).first().name
-        flash(f'פתק {form.type.data} עבור {candidate_name} נשמר בהצלחה!', 'success')
+        flash(f'הערה {form.type.data} עבור {candidate_name} נשמרה בהצלחה!', 'success')
         form.text.data = ""
         return render_template("make-note.html", form=form, current_user=current_user)
     return render_template("make-note.html", form=form, current_user=current_user)
