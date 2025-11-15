@@ -100,8 +100,12 @@
 
   function updateCircleColors() {
     const greenCircles = document.querySelectorAll('.circle.finished');
+    const reverseMode = document.getElementById('reverseMode').checked;
+
     greenCircles.forEach((circle, index) => {
-      const shade = 255 - (index * 25);
+      // If reverse mode is on, invert the index to reverse the color gradient
+      const effectiveIndex = reverseMode ? (greenCircles.length - 1 - index) : index;
+      const shade = 255 - (effectiveIndex * 25);
       const color = `rgb(0, ${shade}, 0)`;
       circle.style.backgroundColor = color;
     });
@@ -126,6 +130,9 @@
       additionalField.style.display = 'none';
     }
   });
+
+  // Update colors when reverse mode is toggled
+  document.getElementById('reverseMode').addEventListener('change', updateCircleColors);
 
   // finishButton.addEventListener('click', sendCircleNumbers);
   finishActButton.addEventListener('click', sendCircleNumbersAct);
