@@ -834,7 +834,7 @@ def update_counter_reviews():
             db.session.add(review)
 
     db.session.commit()
-    return jsonify({'success': True, 'message': f'הערכות התחנה {station} נשמרו בהצלחה!'})
+    return jsonify({'success': True, 'message': f'ציוני התחנה {station} נשמרו בהצלחה!'})
 
 @app.route('/add-review-candidate', methods=['POST'])
 def addOneReview():
@@ -889,7 +889,7 @@ def update_all():
             db.session.commit()
         counter += 1
     update_avgs_nf()
-    flash(f'הערכות התחנה {station} נשמרו בהצלחה!', 'success')
+    flash(f'ציוני התחנה {station} נשמרו בהצלחה!', 'success')
     return redirect(url_for('add_new_group_review'))
 
 @app.route('/group-manage', methods=["GET", "POST"])
@@ -1717,7 +1717,7 @@ def circles_finished():
     physical_stations = getPhysicalStations()
     circles = [{'id': i, 'clicked': False, 'finished': False} for i in full_candidates]
     update_avgs_nf()
-    return jsonify({'success': True, 'message': f'הערכות התחנה {station} נשמרו בהצלחה!'})
+    return jsonify({'success': True, 'message': f'ציוני התחנה {station} נשמרו בהצלחה!'})
 
 
 @app.route('/circles/finished-act', methods=['POST'])
@@ -1770,7 +1770,7 @@ def circles_finished_act():
     updateActAvgs()
     circles = [{'id': i, 'clicked': False, 'finished': False} for i in full_candidates]
     updateActAvgs()
-    return jsonify({'success': True, 'message': f'הערכות התחנה {station} נשמרו בהצלחה!'})
+    return jsonify({'success': True, 'message': f'ציוני התחנה {station} נשמרו בהצלחה!'})
 
 
 
