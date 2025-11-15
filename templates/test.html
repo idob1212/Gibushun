@@ -1,5 +1,7 @@
 {% block content %}
 {% include "header.html" %}
+<link href="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" rel="stylesheet">
+<script src="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js"> </script>
 <!-- Page Header -->
 <header class="masthead" style="background-image: url('{{ url_for('static', filename='img/review.jpg')}}')">
   <div class="overlay"></div>
@@ -20,8 +22,8 @@
 
 <div class="container">
   <a href = "{{ url_for('counter_review') }}"><button class="btn btn-primary btn-lg btn-block" style="margin-bottom: 10px;"> עבור למצב מסע</button></a>
-  <a href="{{ url_for('add_new_group_review') }}" class="btn btn-primary btn-lg btn-block">עבור למצב קבוצתי</a>
-  <a href="{{ url_for('add_new_review') }}" class="btn btn-primary btn-lg btn-block mt-3">עבור למצב יחיד</a>
+  <a href = "{{ url_for('add_new_group_review') }}"><button class="btn btn-primary btn-lg btn-block" style="margin-bottom: 10px;"> עבור למצב קבוצתי</button></a>
+  <a href = "{{ url_for('add_new_review') }}"><button class="btn btn-primary btn-lg btn-block" style="margin-bottom: 10px;"> עבור למצב יחיד</button></a>
   <div class="row">
     <div class="col-lg-8 col-md-10 mx-auto" style="direction: rtl; float: right">
       {% include "flash-messages.html" %}
@@ -100,8 +102,12 @@
 
   function updateCircleColors() {
     const greenCircles = document.querySelectorAll('.circle.finished');
+    const reverseMode = document.getElementById('reverseMode').checked;
+
     greenCircles.forEach((circle, index) => {
-      const shade = 255 - (index * 25);
+      // If reverse mode is on, invert the index to reverse the color gradient
+      const effectiveIndex = reverseMode ? (greenCircles.length - 1 - index) : index;
+      const shade = 255 - (effectiveIndex * 25);
       const color = `rgb(0, ${shade}, 0)`;
       circle.style.backgroundColor = color;
     });
@@ -126,6 +132,9 @@
       additionalField.style.display = 'none';
     }
   });
+
+  // Update colors when reverse mode is toggled
+  document.getElementById('reverseMode').addEventListener('change', updateCircleColors);
 
   // finishButton.addEventListener('click', sendCircleNumbers);
   finishActButton.addEventListener('click', sendCircleNumbersAct);

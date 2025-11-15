@@ -1,5 +1,7 @@
 {% block content %}
 {% include "header.html" %}
+<link href="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" rel="stylesheet">
+<script src="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js"> </script>
 <!-- Page Header -->
 <header class="masthead" style="background-image: url('{{ url_for('static', filename='img/review.jpg')}}')">
   <div class="overlay"></div>
@@ -15,9 +17,9 @@
 </header>
 
 <div class="container">
-  <a href="{{ url_for('circles') }}"><button class="btn btn-primary btn-lg btn-block" style="margin-bottom: 10px;">עבור למצב סדרי הגעה</button></a>
-  <a href="{{ url_for('add_new_group_review') }}" class="btn btn-primary btn-lg btn-block">עבור למצב קבוצתי</a>
-  <a href="{{ url_for('add_new_review') }}" class="btn btn-primary btn-lg btn-block mt-3 mb-5">עבור למצב יחיד</a>
+  <a href = "{{ url_for('circles') }}"><button class="btn btn-primary btn-lg btn-block" style="margin-bottom: 10px;"> עבור למצב סדרי הגעה</button></a>
+  <a href = "{{ url_for('add_new_group_review') }}"><button class="btn btn-primary btn-lg btn-block" style="margin-bottom: 10px;"> עבור למצב קבוצתי</button></a>
+  <a href = "{{ url_for('add_new_review') }}"><button class="btn btn-primary btn-lg btn-block" style="margin-bottom: 10px;"> עבור למצב יחיד</button></a>
   <div class="row">
     <div class="col-lg-12 mx-auto" style="direction: rtl;">
       <!-- Flash Messages Container -->
@@ -60,7 +62,7 @@
         </tbody>
       </table>
 
-      <button id="submitAll" class="btn btn-primary btn-lg btn-block mt-4">שמור</button>
+      <button id="submitAll" class="btn btn-primary btn-lg btn-block mt-4">סיים מסע</button>
     </div>
   </div>
 </div>
@@ -69,7 +71,7 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    function updateAllReviews() {
+    function updateAllReviews(showMessage = false) {
         const data = {
             station: document.getElementById('station').value,
             reviews: []
@@ -98,8 +100,8 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(response => response.json())
         .then(data => {
-            if (data.success) {
-                // Show success message
+            if (data.success && showMessage) {
+                // Show success message only when explicitly requested
                 const flashContainer = document.getElementById('flash-messages-container');
                 flashContainer.innerHTML = `
                     <div class="alert alert-success alert-dismissible fade show" role="alert" style="direction: rtl; text-align: right;">
@@ -108,7 +110,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                     </div>
                 `;
-                
+
                 // Auto-hide success message after 3 seconds
                 setTimeout(() => {
                     const alert = flashContainer.querySelector('.alert');
@@ -142,8 +144,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Handle submit all button
-    document.getElementById('submitAll').addEventListener('click', updateAllReviews);
+    // Handle submit all button (finish march)
+    document.getElementById('submitAll').addEventListener('click', function() {
+        updateAllReviews(true);  // Show success message when explicitly finishing march
+    });
 
     // Function to load station reviews
     function loadStationReviews(station) {
