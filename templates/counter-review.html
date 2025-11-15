@@ -60,7 +60,7 @@
         </tbody>
       </table>
 
-      <button id="submitAll" class="btn btn-primary btn-lg btn-block mt-4">שמור</button>
+      <button id="submitAll" class="btn btn-primary btn-lg btn-block mt-4">סיים מסע</button>
     </div>
   </div>
 </div>
@@ -69,7 +69,7 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    function updateAllReviews() {
+    function updateAllReviews(showMessage = false) {
         const data = {
             station: document.getElementById('station').value,
             reviews: []
@@ -98,8 +98,8 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(response => response.json())
         .then(data => {
-            if (data.success) {
-                // Show success message
+            if (data.success && showMessage) {
+                // Show success message only when explicitly requested
                 const flashContainer = document.getElementById('flash-messages-container');
                 flashContainer.innerHTML = `
                     <div class="alert alert-success alert-dismissible fade show" role="alert" style="direction: rtl; text-align: right;">
@@ -108,7 +108,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                     </div>
                 `;
-                
+
                 // Auto-hide success message after 3 seconds
                 setTimeout(() => {
                     const alert = flashContainer.querySelector('.alert');
@@ -142,8 +142,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Handle submit all button
-    document.getElementById('submitAll').addEventListener('click', updateAllReviews);
+    // Handle submit all button (finish march)
+    document.getElementById('submitAll').addEventListener('click', function() {
+        updateAllReviews(true);  // Show success message when explicitly finishing march
+    });
 
     // Function to load station reviews
     function loadStationReviews(station) {
