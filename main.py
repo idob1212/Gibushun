@@ -2256,6 +2256,11 @@ def sync_operation(operation_type):
 
     elif operation_type == 'group-review':
         station = payload.get('station', '')
+        odt_value = payload.get('odt', '')
+        if station == "ODT" and odt_value:
+            station = station + " " + odt_value
+        if station == "אחר" and odt_value:
+            station = odt_value
         reviews_list = payload.get('reviews', [])
         candidates = Candidate.query.filter_by(group_id=group_id).all()
         active_candidates = sorted(

@@ -48,6 +48,11 @@
           continue;
         }
 
+        // Skip items that are in backoff period
+        if (item.retryAfter && Date.now() < item.retryAfter) {
+          continue;
+        }
+
         // Mark as syncing
         await db.syncQueue.update(item.id, { status: 'syncing', attempts: item.attempts + 1 });
 
@@ -83,7 +88,8 @@
           var backoffMs = Math.min(1000 * Math.pow(2, item.attempts), 30000);
           await db.syncQueue.update(item.id, {
             status: 'pending',
-            lastError: err.message
+            lastError: err.message,
+            retryAfter: Date.now() + backoffMs
           });
           failCount++;
 
