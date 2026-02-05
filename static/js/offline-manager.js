@@ -206,81 +206,6 @@
     });
   }
 
-  // ─── Intercept AJAX GET endpoints when offline ────────────────────────────
-  var originalFetch = window.fetch;
-  window.fetch = function(url, options) {
-    if (!navigator.onLine && typeof url === 'string') {
-      var subjectMatch = url.match(/\/subjects\/(\d+)/);
-      if (subjectMatch) {
-        var gId = parseInt(subjectMatch[1]);
-        return db.candidates.where('groupId').equals(gId).toArray().then(function(candidates) {
-          var subjects = candidates
-            .filter(function(c) { return c.status !== "פרש"; })
-            .map(function(c) { return { id: parseInt(c.id.split('/')[1]) }; })
-            .sort(function(a, b) { return a.id - b.id; });
-          return new Response(JSON.stringify({ subjects: subjects }), {
-            headers: { 'Content-Type': 'application/json' }
-          });
-        });
-      }
-
-      var physMatch = url.match(/\/physicals\/(\d+)/);
-      if (physMatch) {
-        return db.stations.where('type').equals('physical').toArray().then(function(stations) {
-          return new Response(JSON.stringify({
-            stations: stations.map(function(s) { return { id: s.name }; })
-          }), { headers: { 'Content-Type': 'application/json' } });
-        });
-      }
-
-      var stationsMatch = url.match(/\/stations\/(\d+)/);
-      if (stationsMatch) {
-        return db.stations.toArray().then(function(stations) {
-          return new Response(JSON.stringify({
-            stations: stations.map(function(s) { return { id: s.name }; })
-          }), { headers: { 'Content-Type': 'application/json' } });
-        });
-      }
-
-      var reviewsMatch = url.match(/\/get-station-reviews\/(.+)/);
-      if (reviewsMatch) {
-        var stationName = decodeURIComponent(reviewsMatch[1]);
-        return db.authState.get('current').then(function(auth) {
-          if (!auth) return new Response(JSON.stringify({ reviews: [] }));
-          return db.candidates.where('groupId').equals(auth.userId).toArray().then(function(candidates) {
-            var activeCandidates = candidates
-              .filter(function(c) { return c.status !== "פרש"; })
-              .map(function(c) { return parseInt(c.id.split('/')[1]); })
-              .sort(function(a, b) { return a - b; });
-
-            return db.reviews.where('station').equals(stationName).toArray().then(function(reviews) {
-              var reviewMap = {};
-              reviews.forEach(function(r) {
-                var num = r.subjectId.split('/')[1];
-                reviewMap[num] = r;
-              });
-
-              var result = activeCandidates.map(function(candidateId) {
-                var r = reviewMap[String(candidateId)];
-                return {
-                  subject: candidateId,
-                  counter_value: r ? (r.counterValue || 0) : 0,
-                  note: r ? (r.note || '') : ''
-                };
-              });
-
-              return new Response(JSON.stringify({ reviews: result }), {
-                headers: { 'Content-Type': 'application/json' }
-              });
-            });
-          });
-        });
-      }
-    }
-
-    return originalFetch.apply(this, arguments);
-  };
-
   // ─── Form Interception ────────────────────────────────────────────────────
 
   // URL to operation type mapping
@@ -420,119 +345,184 @@
     }
   });
 
-  // ─── Intercept AJAX POST endpoints when offline ───────────────────────────
+  // ─── Unified Fetch Interception (GET + POST when offline) ────────────────
 
-  // Counter review debounce
-  var counterDebounceTimer = null;
-
-  var originalXHROpen = XMLHttpRequest.prototype.open;
-  var originalXHRSend = XMLHttpRequest.prototype.send;
-
-  // Also intercept fetch POST for offline
-  var baseFetch = window.fetch;
+  var originalFetch = window.fetch;
   window.fetch = function(url, options) {
     options = options || {};
-    if (!navigator.onLine && options.method && options.method.toUpperCase() === 'POST') {
-      var urlStr = typeof url === 'string' ? url : url.toString();
+    var urlStr = typeof url === 'string' ? url : url.toString();
 
-      // Counter reviews
-      if (urlStr.includes('/update-counter-reviews')) {
-        var body = typeof options.body === 'string' ? JSON.parse(options.body) : options.body;
-        return db.authState.get('current').then(function(auth) {
-          if (!auth) return;
-          return db.syncQueue.add({
-            clientId: uuid(),
-            type: 'counter-review',
-            payload: body,
-            groupId: auth.userId,
-            status: 'pending',
-            createdAt: Date.now(),
-            attempts: 0,
-            lastError: null
-          });
-        }).then(function() {
-          showToast('נשמר מקומית');
-          updateOnlineStatus();
-          return new Response(JSON.stringify({ success: true, message: 'נשמר מקומית' }), {
+    if (!navigator.onLine) {
+      // ── GET interception ──
+      var subjectMatch = urlStr.match(/\/subjects\/(\d+)/);
+      if (subjectMatch) {
+        var gId = parseInt(subjectMatch[1]);
+        return db.candidates.where('groupId').equals(gId).toArray().then(function(candidates) {
+          var subjects = candidates
+            .filter(function(c) { return c.status !== "פרש"; })
+            .map(function(c) { return { id: parseInt(c.id.split('/')[1]) }; })
+            .sort(function(a, b) { return a.id - b.id; });
+          return new Response(JSON.stringify({ subjects: subjects }), {
             headers: { 'Content-Type': 'application/json' }
           });
         });
       }
 
-      // Circles finished
-      if (urlStr.includes('/circles/finished')) {
-        var body = typeof options.body === 'string' ? JSON.parse(options.body) : options.body;
+      var physMatch = urlStr.match(/\/physicals\/(\d+)/);
+      if (physMatch) {
+        return db.stations.where('type').equals('physical').toArray().then(function(stations) {
+          return new Response(JSON.stringify({
+            stations: stations.map(function(s) { return { id: s.name }; })
+          }), { headers: { 'Content-Type': 'application/json' } });
+        });
+      }
+
+      var stationsMatch = urlStr.match(/\/stations\/(\d+)/);
+      if (stationsMatch) {
+        return db.stations.toArray().then(function(stations) {
+          return new Response(JSON.stringify({
+            stations: stations.map(function(s) { return { id: s.name }; })
+          }), { headers: { 'Content-Type': 'application/json' } });
+        });
+      }
+
+      var reviewsMatch = urlStr.match(/\/get-station-reviews\/(.+)/);
+      if (reviewsMatch) {
+        var stationName = decodeURIComponent(reviewsMatch[1]);
         return db.authState.get('current').then(function(auth) {
-          if (!auth) return;
-          return db.syncQueue.add({
-            clientId: uuid(),
-            type: 'circles-finished',
-            payload: body,
-            groupId: auth.userId,
-            status: 'pending',
-            createdAt: Date.now(),
-            attempts: 0,
-            lastError: null
-          });
-        }).then(function() {
-          showToast('נשמר מקומית');
-          updateOnlineStatus();
-          return new Response(JSON.stringify({ success: true, message: 'נשמר מקומית' }), {
-            headers: { 'Content-Type': 'application/json' }
+          if (!auth) return new Response(JSON.stringify({ reviews: [] }));
+          return db.candidates.where('groupId').equals(auth.userId).toArray().then(function(candidates) {
+            var activeCandidates = candidates
+              .filter(function(c) { return c.status !== "פרש"; })
+              .map(function(c) { return parseInt(c.id.split('/')[1]); })
+              .sort(function(a, b) { return a - b; });
+
+            return db.reviews.where('station').equals(stationName).toArray().then(function(reviews) {
+              var reviewMap = {};
+              reviews.forEach(function(r) {
+                var num = r.subjectId.split('/')[1];
+                reviewMap[num] = r;
+              });
+
+              var result = activeCandidates.map(function(candidateId) {
+                var r = reviewMap[String(candidateId)];
+                return {
+                  subject: candidateId,
+                  counter_value: r ? (r.counterValue || 0) : 0,
+                  note: r ? (r.note || '') : ''
+                };
+              });
+
+              return new Response(JSON.stringify({ reviews: result }), {
+                headers: { 'Content-Type': 'application/json' }
+              });
+            });
           });
         });
       }
 
-      // Add review candidate (AJAX single review)
-      if (urlStr.includes('/add-review-candidate')) {
-        var formBody = options.body;
-        var payload = {};
-        if (formBody instanceof FormData) {
-          formBody.forEach(function(val, key) { if (key !== 'csrf_token') payload[key] = val; });
+      // ── POST interception ──
+      if (options.method && options.method.toUpperCase() === 'POST') {
+
+        // Counter reviews
+        if (urlStr.includes('/update-counter-reviews')) {
+          var body = typeof options.body === 'string' ? JSON.parse(options.body) : options.body;
+          return db.authState.get('current').then(function(auth) {
+            if (!auth) return;
+            return db.syncQueue.add({
+              clientId: uuid(),
+              type: 'counter-review',
+              payload: body,
+              groupId: auth.userId,
+              status: 'pending',
+              createdAt: Date.now(),
+              attempts: 0,
+              lastError: null
+            });
+          }).then(function() {
+            showToast('נשמר מקומית');
+            updateOnlineStatus();
+            return new Response(JSON.stringify({ success: true, message: 'נשמר מקומית' }), {
+              headers: { 'Content-Type': 'application/json' }
+            });
+          });
         }
-        return db.authState.get('current').then(function(auth) {
-          if (!auth) return;
-          return db.syncQueue.add({
-            clientId: uuid(),
-            type: 'add-review-candidate',
-            payload: payload,
-            groupId: auth.userId,
-            status: 'pending',
-            createdAt: Date.now(),
-            attempts: 0,
-            lastError: null
-          });
-        }).then(function() {
-          showToast('נשמר מקומית');
-          return new Response('User updated', { headers: { 'Content-Type': 'text/plain' } });
-        });
-      }
 
-      // Batch add candidates
-      if (urlStr.includes('/add-candidate-batch')) {
-        var body = typeof options.body === 'string' ? JSON.parse(options.body) : options.body;
-        return db.authState.get('current').then(function(auth) {
-          if (!auth) return;
-          return db.syncQueue.add({
-            clientId: uuid(),
-            type: 'add-candidate-batch',
-            payload: body,
-            groupId: auth.userId,
-            status: 'pending',
-            createdAt: Date.now(),
-            attempts: 0,
-            lastError: null
+        // Circles finished
+        if (urlStr.includes('/circles/finished')) {
+          var body = typeof options.body === 'string' ? JSON.parse(options.body) : options.body;
+          return db.authState.get('current').then(function(auth) {
+            if (!auth) return;
+            return db.syncQueue.add({
+              clientId: uuid(),
+              type: 'circles-finished',
+              payload: body,
+              groupId: auth.userId,
+              status: 'pending',
+              createdAt: Date.now(),
+              attempts: 0,
+              lastError: null
+            });
+          }).then(function() {
+            showToast('נשמר מקומית');
+            updateOnlineStatus();
+            return new Response(JSON.stringify({ success: true, message: 'נשמר מקומית' }), {
+              headers: { 'Content-Type': 'application/json' }
+            });
           });
-        }).then(function() {
-          showToast('נשמר מקומית');
-          return new Response(JSON.stringify({ success: true }), {
-            headers: { 'Content-Type': 'application/json' }
+        }
+
+        // Add review candidate (AJAX single review)
+        if (urlStr.includes('/add-review-candidate')) {
+          var formBody = options.body;
+          var payload = {};
+          if (formBody instanceof FormData) {
+            formBody.forEach(function(val, key) { if (key !== 'csrf_token') payload[key] = val; });
+          }
+          return db.authState.get('current').then(function(auth) {
+            if (!auth) return;
+            return db.syncQueue.add({
+              clientId: uuid(),
+              type: 'add-review-candidate',
+              payload: payload,
+              groupId: auth.userId,
+              status: 'pending',
+              createdAt: Date.now(),
+              attempts: 0,
+              lastError: null
+            });
+          }).then(function() {
+            showToast('נשמר מקומית');
+            return new Response('User updated', { headers: { 'Content-Type': 'text/plain' } });
           });
-        });
+        }
+
+        // Batch add candidates
+        if (urlStr.includes('/add-candidate-batch')) {
+          var body = typeof options.body === 'string' ? JSON.parse(options.body) : options.body;
+          return db.authState.get('current').then(function(auth) {
+            if (!auth) return;
+            return db.syncQueue.add({
+              clientId: uuid(),
+              type: 'add-candidate-batch',
+              payload: body,
+              groupId: auth.userId,
+              status: 'pending',
+              createdAt: Date.now(),
+              attempts: 0,
+              lastError: null
+            });
+          }).then(function() {
+            showToast('נשמר מקומית');
+            return new Response(JSON.stringify({ success: true }), {
+              headers: { 'Content-Type': 'application/json' }
+            });
+          });
+        }
       }
     }
 
-    return baseFetch.apply(this, arguments);
+    return originalFetch.apply(this, arguments);
   };
 
   // ─── Initialize on page load ──────────────────────────────────────────────

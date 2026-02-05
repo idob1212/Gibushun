@@ -2199,6 +2199,9 @@ db.create_all()
 @app.route('/api/sync/<operation_type>', methods=['POST'])
 @login_required
 def sync_operation(operation_type):
+    if current_user.id == 0:
+        return jsonify({"status": "error", "message": "Admin cannot use sync API"}), 403
+
     data = request.get_json()
     client_id = data.get('clientId')
 
@@ -2335,6 +2338,10 @@ def sync_operation(operation_type):
         if station == "אחר":
             station = other_value
 
+        # C5: Truncate at sentinel zero (matches original route behavior)
+        if 0 in circle_numbers:
+            circle_numbers = circle_numbers[:circle_numbers.index(0)]
+
         if reverse_mode:
             circle_numbers = circle_numbers[::-1]
 
@@ -2342,8 +2349,21 @@ def sync_operation(operation_type):
         full_candidates = [int(c.id.split("/")[1]) for c in candidates if c.status != "פרש"]
         non_circle = [c for c in full_candidates if c not in circle_numbers]
 
-        reviews = Review.query.filter_by(author_id=group_id).filter(Review.station.like(f'%{station}%')).all()
+        # C1: Escape LIKE wildcards to prevent injection
+        escaped_station = station.replace('%', r'\%').replace('_', r'\_')
+        reviews = Review.query.filter_by(author_id=group_id).filter(
+            Review.station.like(f'%{escaped_station}%', escape='\\')
+        ).all()
         reviews = [r for r in reviews if "סיכום" in r.station.split() and "אקט" in r.station.split()]
+        # C6: Filter by exact station name (matches original getStationName logic)
+        def extract_station_name(review):
+            s = review.station.split(" - ")[0]
+            s = s.split("סיכום")[1]
+            if s and s[0] == " ":
+                s = s[1:]
+            return s
+        reviews = [r for r in reviews if extract_station_name(r) == station]
+
         if reviews:
             acts = [int(r.station.split("אקט")[1]) for r in reviews]
             act_num = max(acts, default=0) + 1
@@ -2388,6 +2408,11 @@ def sync_operation(operation_type):
     sync_log = SyncLog(client_id=client_id, operation_type=operation_type, group_id=group_id)
     db.session.add(sync_log)
     db.session.commit()
+
+    # C3: Recalculate averages after review writes (matches original route behavior)
+    review_operations = {'new-review', 'group-review', 'circles-finished', 'add-review-candidate'}
+    if operation_type in review_operations:
+        update_avgs_nf()
 
     return jsonify({"status": "ok", "message": "Synced successfully"})
 

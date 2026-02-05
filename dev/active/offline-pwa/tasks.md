@@ -38,3 +38,11 @@
 - [x] Install prompt (install-prompt.js - iOS/Android/Desktop)
 - [x] Logout guard (pending items warning)
 - [x] Logout link changed to data-href for JS interception
+
+## Code Review Fixes
+- [x] C1: Escape SQL LIKE wildcards in circles-finished sync handler
+- [x] C2: Add admin guard (reject id=0) on sync API
+- [x] C3: Add update_avgs_nf() calls after review sync writes
+- [x] C4: Consolidate double fetch wrapping into single wrapper
+- [x] C5: Add sentinel-zero truncation in circles-finished sync handler
+- [x] C6: Add getStationName filter in circles-finished sync handler
