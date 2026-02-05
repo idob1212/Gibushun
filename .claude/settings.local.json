@@ -1,6 +1,15 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(grep:*)",
+      "Bash(wc:*)",
+      "mcp__plugin_episodic-memory_episodic-memory__search",
+      "Bash(python3:*)",
+      "Bash(curl:*)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "fetch"
-  ],
-  "enableAllProjectMcpServers": true
+  ]
 }
