@@ -1,0 +1,26 @@
+{
+  "name": "מימדיון",
+  "short_name": "מימדיון",
+  "description": "מערכת ניהול גיבושים",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "dir": "rtl",
+  "lang": "he",
+  "theme_color": "#0085A1",
+  "background_color": "#ffffff",
+  "icons": [
+    {
+      "src": "/static/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

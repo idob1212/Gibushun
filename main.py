@@ -2042,5 +2042,355 @@ def get_station_reviews(station):
 
     return jsonify({'reviews': reviews})
 
+
+# ─── PWA Routes ────────────────────────────────────────────────────────────────
+
+@app.route('/sw.js')
+def service_worker():
+    return send_from_directory(app.static_folder, 'js/sw.js', mimetype='application/javascript')
+
+
+@app.route('/manifest.json')
+def manifest():
+    return send_from_directory(app.static_folder, 'manifest.json', mimetype='application/json')
+
+
+@app.route('/api/offline/page-list')
+@login_required
+def offline_page_list():
+    if current_user.id == 0:
+        pages = [
+            "/admin-home",
+            "/register",
+            "/reviews-finder",
+            "/admin-panel",
+            "/update-date",
+        ]
+        groups = get_groups()
+        for g in groups:
+            pages.append(f"/{g}/")
+    else:
+        pages = [
+            "/",
+            "/add-candidate",
+            "/add-candidate-batch",
+            "/new-review",
+            "/new-group-review",
+            "/counter-review",
+            "/interview/",
+            "/new-note",
+            "/circles",
+            "/candidates/",
+            "/station-reviews/",
+            "/physical-reviews/",
+            "/odt-reviews/",
+            "/show-interview/",
+            "/show-notes",
+            "/final-status/",
+            "/reviews-finder",
+            "/group-manage",
+            "/add-name",
+        ]
+    return jsonify(pages)
+
+
+# ─── Offline Bundle API ───────────────────────────────────────────────────────
+
+@app.route('/api/offline-bundle')
+@login_required
+def offline_bundle():
+    group_id = current_user.id
+
+    if group_id == 0:
+        return jsonify({
+            "auth": {"userId": 0, "userName": current_user.name, "isAdmin": True},
+            "candidates": [],
+            "stations": {"cognitive": [], "physical": [], "counter": []},
+            "reviews": [],
+            "notes": [],
+            "interviews": [],
+            "staticOptions": {
+                "grades": [1, 2, 3, 4],
+                "noteTypes": ["טובה", "ניטרלית", "רעה"]
+            }
+        })
+
+    candidates = Candidate.query.filter_by(group_id=group_id).all()
+    candidate_data = [
+        {"id": c.id, "name": c.name, "groupId": c.group_id, "status": c.status}
+        for c in candidates
+    ]
+
+    cognitive_stations = getAllStations()
+    physical_stations = ["ספרינטים", "זחילות", "אלונקה סוציומטרית", "מתלה שזיפים"] + getPhysicalStationsGroup(group_id)
+    counter_stations = ["מסע 1", "מסע 2", "מסע 3", "שקי חול", "שקי חול 2"]
+
+    reviews = Review.query.filter_by(author_id=group_id).all()
+    review_data = [
+        {
+            "id": r.id,
+            "subjectId": r.subject_id,
+            "station": r.station,
+            "grade": r.grade,
+            "note": r.note,
+            "counterValue": r.counter_value
+        }
+        for r in reviews
+    ]
+
+    notes = Note.query.filter_by(author_id=group_id).all()
+    note_data = [
+        {
+            "id": n.id,
+            "subjectId": n.subject_id,
+            "type": n.type,
+            "text": n.text,
+            "location": n.location,
+            "date": n.date
+        }
+        for n in notes
+    ]
+
+    interview_data = [
+        {
+            "subjectId": c.id,
+            "interviewer": c.interviewer,
+            "interviewGrade": c.interview_grade,
+            "interviewNote": c.interview_note,
+            "tashProb": c.tash_prob,
+            "medicalProb": c.medical_prob
+        }
+        for c in candidates
+        if c.interviewer is not None
+    ]
+
+    return jsonify({
+        "auth": {"userId": group_id, "userName": current_user.name, "isAdmin": False},
+        "candidates": candidate_data,
+        "stations": {
+            "cognitive": cognitive_stations,
+            "physical": physical_stations,
+            "counter": counter_stations
+        },
+        "reviews": review_data,
+        "notes": note_data,
+        "interviews": interview_data,
+        "staticOptions": {
+            "grades": [1, 2, 3, 4],
+            "noteTypes": ["טובה", "ניטרלית", "רעה"]
+        }
+    })
+
+
+# ─── Sync API ─────────────────────────────────────────────────────────────────
+
+class SyncLog(db.Model):
+    __tablename__ = "sync_log"
+    id = db.Column(db.Integer, primary_key=True)
+    client_id = db.Column(db.String(36), unique=True, index=True, nullable=False)
+    operation_type = db.Column(db.String(50), nullable=False)
+    group_id = db.Column(db.Integer, nullable=False)
+    processed_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+db.create_all()
+
+
+@app.route('/api/sync/<operation_type>', methods=['POST'])
+@login_required
+def sync_operation(operation_type):
+    data = request.get_json()
+    client_id = data.get('clientId')
+
+    if not client_id:
+        return jsonify({"status": "error", "message": "Missing clientId"}), 400
+
+    existing = SyncLog.query.filter_by(client_id=client_id).first()
+    if existing:
+        return jsonify({"status": "duplicate", "message": "Already processed"})
+
+    group_id = current_user.id
+    payload = data.get('payload', {})
+
+    if operation_type == 'add-candidate':
+        new_id = str(payload.get('number', '')).strip()
+        candidate_id = f"{group_id}/{new_id}"
+        if not Candidate.query.filter_by(id=candidate_id).first():
+            new_candidate = Candidate(
+                id=candidate_id,
+                name=payload.get('name', ''),
+                group_id=group_id,
+            )
+            db.session.add(new_candidate)
+
+    elif operation_type == 'add-candidate-batch':
+        candidates_list = payload.get('candidates', [])
+        for c in candidates_list:
+            new_id = str(c.get('number', '')).strip()
+            candidate_id = f"{group_id}/{new_id}"
+            if not Candidate.query.filter_by(id=candidate_id).first():
+                new_candidate = Candidate(
+                    id=candidate_id,
+                    name=c.get('name', ''),
+                    group_id=group_id,
+                )
+                db.session.add(new_candidate)
+
+    elif operation_type == 'new-review':
+        station = payload.get('station', '')
+        subject_num = payload.get('subject', '')
+        subject_id = f"{group_id}/{subject_num}"
+        candidate = Candidate.query.filter_by(id=subject_id).first()
+        if candidate:
+            new_review = Review(
+                station=station,
+                subject_id=subject_id,
+                grade=float(payload.get('grade', 0)),
+                note=payload.get('note', ''),
+                author_id=group_id,
+            )
+            db.session.add(new_review)
+
+    elif operation_type == 'group-review':
+        station = payload.get('station', '')
+        reviews_list = payload.get('reviews', [])
+        candidates = Candidate.query.filter_by(group_id=group_id).all()
+        active_candidates = sorted(
+            [int(c.id.split("/")[1]) for c in candidates if c.status != "פרש"]
+        )
+        for i, review_item in enumerate(reviews_list):
+            grade = int(review_item.get('grade', 0))
+            if grade != 0 and i < len(active_candidates):
+                subject_id = f"{group_id}/{active_candidates[i]}"
+                new_review = Review(
+                    station=station,
+                    subject_id=subject_id,
+                    grade=grade,
+                    note=review_item.get('note', ''),
+                    author_id=group_id,
+                )
+                db.session.add(new_review)
+
+    elif operation_type == 'counter-review':
+        station = payload.get('station', '')
+        reviews_list = payload.get('reviews', [])
+        max_counter = max((r.get('counter', 0) for r in reviews_list), default=0)
+        for review_data in reviews_list:
+            candidate_id = f"{group_id}/{review_data['subject']}"
+            normalized_grade = 1.0
+            if max_counter > 0:
+                normalized_grade = 1.0 + (3.0 * review_data.get('counter', 0) / max_counter)
+            review = Review.query.filter_by(
+                station=station, subject_id=candidate_id, author_id=group_id
+            ).first()
+            if review:
+                review.grade = round(normalized_grade, 2)
+                review.counter_value = review_data.get('counter', 0)
+                review.note = review_data.get('note', '')
+            else:
+                candidate = Candidate.query.get(candidate_id)
+                if candidate:
+                    review = Review(
+                        station=station, subject_id=candidate_id, author_id=group_id,
+                        grade=round(normalized_grade, 2),
+                        counter_value=review_data.get('counter', 0),
+                        note=review_data.get('note', ''),
+                    )
+                    db.session.add(review)
+
+    elif operation_type == 'interview':
+        subject_num = payload.get('id', '')
+        subject_id = f"{group_id}/{subject_num}"
+        candidate = Candidate.query.filter_by(id=subject_id).first()
+        if candidate:
+            candidate.interviewer = payload.get('interviewer', '')
+            candidate.interview_grade = payload.get('grade', '')
+            candidate.interview_note = payload.get('note', '')
+            candidate.tash_prob = payload.get('tash', '')
+            candidate.medical_prob = payload.get('medical', '')
+
+    elif operation_type == 'new-note':
+        subject_num = payload.get('subject', '')
+        subject_id = f"{group_id}/{subject_num}"
+        candidate = Candidate.query.filter_by(id=subject_id).first()
+        if candidate:
+            israel_tz = pytz.timezone('Israel')
+            current_time_israel = datetime.now(israel_tz)
+            formatted_time = current_time_israel.strftime('%d-%m-%Y %H:%M')
+            new_note = Note(
+                subject_id=subject_id,
+                type=payload.get('type', ''),
+                text=payload.get('text', ''),
+                author_id=group_id,
+                date=formatted_time,
+                location=payload.get('location', '')
+            )
+            db.session.add(new_note)
+
+    elif operation_type == 'circles-finished':
+        circle_numbers = payload.get('circle_numbers', [])
+        station = payload.get('movement_type', '')
+        reverse_mode = payload.get('reverse_mode', False)
+        other_value = payload.get('other', '')
+        if station == "אחר":
+            station = other_value
+
+        if reverse_mode:
+            circle_numbers = circle_numbers[::-1]
+
+        candidates = Candidate.query.filter_by(group_id=group_id).all()
+        full_candidates = [int(c.id.split("/")[1]) for c in candidates if c.status != "פרש"]
+        non_circle = [c for c in full_candidates if c not in circle_numbers]
+
+        reviews = Review.query.filter_by(author_id=group_id).filter(Review.station.like(f'%{station}%')).all()
+        reviews = [r for r in reviews if "סיכום" in r.station.split() and "אקט" in r.station.split()]
+        if reviews:
+            acts = [int(r.station.split("אקט")[1]) for r in reviews]
+            act_num = max(acts, default=0) + 1
+        else:
+            act_num = 1
+        station_name = f"{station} - אקט {act_num}"
+
+        num_of_circles = max(len(circle_numbers) - 1, 1)
+        penalty = 4 / num_of_circles
+        for counter, cn in enumerate(circle_numbers):
+            new_review = Review(
+                station=station_name, author_id=group_id,
+                subject_id=f"{group_id}/{cn}",
+                grade=max(1, 4 - counter * penalty),
+            )
+            db.session.add(new_review)
+        for cn in non_circle:
+            new_review = Review(
+                station=station_name, author_id=group_id,
+                subject_id=f"{group_id}/{cn}", grade=1,
+            )
+            db.session.add(new_review)
+
+    elif operation_type == 'add-review-candidate':
+        station = payload.get('station', '')
+        subject_num = payload.get('subject', '')
+        subject_id = f"{group_id}/{subject_num}"
+        candidate = Candidate.query.filter_by(id=subject_id).first()
+        if candidate:
+            new_review = Review(
+                station=station,
+                subject_id=subject_id,
+                grade=float(payload.get('grade', 0)),
+                note=payload.get('note', ''),
+                author_id=group_id,
+            )
+            db.session.add(new_review)
+
+    else:
+        return jsonify({"status": "error", "message": f"Unknown operation: {operation_type}"}), 400
+
+    sync_log = SyncLog(client_id=client_id, operation_type=operation_type, group_id=group_id)
+    db.session.add(sync_log)
+    db.session.commit()
+
+    return jsonify({"status": "ok", "message": "Synced successfully"})
+
+
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=3000)

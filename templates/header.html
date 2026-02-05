@@ -1,31 +1,43 @@
 
 <!DOCTYPE html>
-<html lang="he">
+<html lang="he" dir="rtl">
 
 <head>
 
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-  <meta name="description" content="">
+  <meta name="description" content="מערכת ניהול גיבושים">
   <meta name="author" content="">
 
+  <!-- PWA Meta Tags -->
+  <meta name="theme-color" content="#0085A1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="מימדיון">
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+
   <title>מימדיון</title>
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/logo-meymadion.png') }}">
 
-  <!-- Bootstrap 4.5.0 CSS -->
-  <link href="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap 4.5.0 CSS (local) -->
+  <link href="{{ url_for('static', filename='vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
 
   <!-- Custom fonts for this template -->
   <link href="{{ url_for('static', filename='vendor/fontawesome-free/css/all.min.css')}}" rel="stylesheet" type="text/css">
-  <link href='https://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic' rel='stylesheet' type='text/css'>
-  <link href='https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800' rel='stylesheet' type='text/css'>
 
   <!-- Custom styles for this template -->
   <link href="{{ url_for('static', filename='css/clean-blog.min.css')}}" rel="stylesheet">
 
   <style>
+    /* System font stack fallback for Google Fonts (Lora, Open Sans) */
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
     ul{
         text-align: right;
         direction: rtl;
@@ -44,11 +56,69 @@
     .navbar {
         background-color: white;
     }
+
+    /* Sync status bar */
+    #sync-status-bar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        z-index: 9999;
+        transition: background-color 0.3s, opacity 0.3s;
+    }
+    #sync-status-bar.online { background-color: #28a745; }
+    #sync-status-bar.syncing { background-color: #007bff; animation: pulse 1.5s infinite; }
+    #sync-status-bar.pending { background-color: #fd7e14; }
+    #sync-status-bar.offline { background-color: #dc3545; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+    /* Toast container */
+    #toast-container {
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 9998;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+    }
+    .offline-toast {
+        background: rgba(0,0,0,0.85);
+        color: white;
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-size: 14px;
+        direction: rtl;
+        animation: fadeIn 0.3s;
+        max-width: 90vw;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Pending badge */
+    .sync-badge {
+        background: #fd7e14;
+        color: white;
+        border-radius: 50%;
+        padding: 2px 6px;
+        font-size: 10px;
+        position: relative;
+        top: -8px;
+        margin-right: -6px;
+    }
   </style>
 
 </head>
 
 <body>
+  <!-- Sync status bar -->
+  <div id="sync-status-bar" class="online"></div>
+
+  <!-- Toast container -->
+  <div id="toast-container"></div>
+
   <!-- Navigation -->
   <nav class="navbar navbar-expand-md navbar-light fixed-top" id="mainNav">
     <div class="container-fluid">
@@ -87,7 +157,7 @@
                     <a class="nav-link active" href="{{ url_for('showInterviewAdmin') }}">ראיונות</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link active" href="{{ url_for('logout') }}">התנתק</a>
+                <a class="nav-link active" href="#" id="logout-link" data-href="{{ url_for('logout') }}">התנתק</a>
             </li>
 
 
@@ -137,7 +207,7 @@
             </li>
 
             <li class="nav-item">
-                <a class="nav-link active" href="{{ url_for('logout') }}">התנתק</a>
+                <a class="nav-link active" href="#" id="logout-link" data-href="{{ url_for('logout') }}">התנתק</a>
             </li>
 
             {% else %}
@@ -156,9 +226,17 @@
     </div>
   </nav>
 
-  <!-- jQuery (required for Bootstrap 4) -->
-  <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-  <!-- Bootstrap 4.5.0 JS -->
-  <script src="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js"></script>
+  <!-- Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js', { scope: '/' })
+        .then(function(reg) {
+          console.log('SW registered, scope:', reg.scope);
+        })
+        .catch(function(err) {
+          console.log('SW registration failed:', err);
+        });
+    }
+  </script>
 </body>
 </html>
