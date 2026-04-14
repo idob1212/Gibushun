@@ -67,6 +67,17 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = _engine_options
 db = SQLAlchemy(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+PUBLIC_ENDPOINTS = {'login', 'register', 'static'}
+
+
+@app.before_request
+def _require_login():
+    if request.endpoint is None or request.endpoint in PUBLIC_ENDPOINTS:
+        return None
+    if not current_user.is_authenticated:
+        return redirect(url_for('login'))
 
 
 app.logger.addHandler(logging.StreamHandler(sys.stdout))
@@ -1720,17 +1731,18 @@ def circles_finished():
     else:
         act_num = 1
         station = f"{station} - אקט {act_num}"
+    all_ids = [str(current_user.id) + "/" + str(n) for n in circle_numbers + candidates]
+    candidate_map = {c.id: c for c in Candidate.query.filter(Candidate.id.in_(all_ids)).all()}
     for circle_number in circle_numbers:
         counter += 1
-        candidate = Candidate.query.get(str(current_user.id) + "/" + str(circle_number))
-        review = Review(station=station, author=current_user, subject_id=str(current_user.id) + "/" + str(circle_number), grade=max(1,4 - counter * penalty), subject=Candidate.query.filter_by(id=str(current_user.id) + "/" + str(circle_number)).first())
+        subject_id = str(current_user.id) + "/" + str(circle_number)
+        review = Review(station=station, author=current_user, subject_id=subject_id, grade=max(1, 4 - counter * penalty), subject=candidate_map.get(subject_id))
         db.session.add(review)
-        db.session.commit()
     for circle_number in candidates:
-        candidate = Candidate.query.get(str(current_user.id) + "/" + str(circle_number))
-        review = Review(station=station, author=current_user, subject_id=str(current_user.id) + "/" + str(circle_number), grade= 1, subject=Candidate.query.filter_by(id=str(current_user.id) + "/" + str(circle_number)).first())
+        subject_id = str(current_user.id) + "/" + str(circle_number)
+        review = Review(station=station, author=current_user, subject_id=subject_id, grade=1, subject=candidate_map.get(subject_id))
         db.session.add(review)
-        db.session.commit()
+    db.session.commit()
     # Process the finished circle numbers as desired
     physical_stations = getPhysicalStations()
     circles = [{'id': i, 'clicked': False, 'finished': False} for i in full_candidates]
