@@ -1774,20 +1774,20 @@ def circles_finished_act():
     else:
         act_num = 1
         station = f"{station} - אקט {act_num}"
+    all_ids = [str(current_user.id) + "/" + str(n) for n in circle_numbers + candidates]
+    candidate_map = {c.id: c for c in Candidate.query.filter(Candidate.id.in_(all_ids)).all()}
     for circle_number in circle_numbers:
         counter += 1
-        candidate = Candidate.query.get(str(current_user.id) + "/" + str(circle_number))
-        review = Review(station=station, author=current_user, subject_id=str(current_user.id) + "/" + str(circle_number), grade=max(1,4 - counter * penalty), subject=Candidate.query.filter_by(id=str(current_user.id) + "/" + str(circle_number)).first())
+        subject_id = str(current_user.id) + "/" + str(circle_number)
+        review = Review(station=station, author=current_user, subject_id=subject_id, grade=max(1, 4 - counter * penalty), subject=candidate_map.get(subject_id))
         db.session.add(review)
-        db.session.commit()
     for circle_number in candidates:
-        candidate = Candidate.query.get(str(current_user.id) + "/" + str(circle_number))
-        review = Review(station=station, author=current_user, subject_id=str(current_user.id) + "/" + str(circle_number), grade= 1, subject=Candidate.query.filter_by(id=str(current_user.id) + "/" + str(circle_number)).first())
+        subject_id = str(current_user.id) + "/" + str(circle_number)
+        review = Review(station=station, author=current_user, subject_id=subject_id, grade=1, subject=candidate_map.get(subject_id))
         db.session.add(review)
-        db.session.commit()
+    db.session.commit()
     updateActAvgs()
     circles = [{'id': i, 'clicked': False, 'finished': False} for i in full_candidates]
-    updateActAvgs()
     return jsonify({'success': True, 'message': f'ציוני התחנה {station} נשמרו בהצלחה!'})
 
 
