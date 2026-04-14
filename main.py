@@ -44,14 +44,26 @@ app.logger.setLevel(logging.ERROR)
 
 
 ##CONNECT TO DB
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("DATABASE_URL", "sqlite:///data.db")
+_database_url = os.environ.get("DATABASE_URL", "sqlite:///data.db")
+if _database_url.startswith("postgres://"):
+    _database_url = _database_url.replace("postgres://", "postgresql://", 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = _database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+_engine_options = {
     'pool_pre_ping': True,
     'pool_recycle': 280,
     'pool_size': 5,
     'max_overflow': 10,
 }
+if _database_url.startswith("postgresql"):
+    _engine_options['connect_args'] = {
+        'keepalives': 1,
+        'keepalives_idle': 30,
+        'keepalives_interval': 10,
+        'keepalives_count': 5,
+        'sslmode': 'require',
+    }
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = _engine_options
 db = SQLAlchemy(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
