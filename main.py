@@ -46,6 +46,12 @@ app.logger.setLevel(logging.ERROR)
 ##CONNECT TO DB
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("DATABASE_URL", "sqlite:///data.db")
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_pre_ping': True,
+    'pool_recycle': 280,
+    'pool_size': 5,
+    'max_overflow': 10,
+}
 db = SQLAlchemy(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
