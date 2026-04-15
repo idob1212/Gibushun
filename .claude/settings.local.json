@@ -1,6 +1,19 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(python3:*)",
+      "Bash(PYTHONWARNINGS=ignore ENV=LOCAL python -m pytest test_fixes.py -x -v)",
+      "Bash(python -m py_compile /Users/idob/code/Gibushun/main.py)",
+      "Read(//opt/homebrew/bin/**)",
+      "Bash(python3.9 --version)",
+      "Read(//opt/anaconda3/envs/**)",
+      "Read(//opt/homebrew/opt/**)",
+      "Bash(compgen -c python3)",
+      "Bash(pip install:*)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "fetch"
-  ],
-  "enableAllProjectMcpServers": true
+  ]
 }
