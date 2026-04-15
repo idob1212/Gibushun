@@ -111,11 +111,11 @@ class Candidate(db.Model):
     group = relationship("User", back_populates="candidates")
     name = db.Column(db.String(1000), nullable=False)
     final_status = db.Column(db.String(1000))
-    final_note = db.Column(db.String(1000))
+    final_note = db.Column(db.Text)
     status = db.Column(db.String(1000))
     interviewer = db.Column(db.String(1000))
     interview_grade = db.Column(db.String(1000))
-    interview_note = db.Column(db.String(1000))
+    interview_note = db.Column(db.Text)
     tash_prob = db.Column(db.String(1000))
     medical_prob = db.Column(db.String(1000))
     reviews = relationship("Review", back_populates="subject")
@@ -130,7 +130,7 @@ class Review(db.Model):
     subject_id = db.Column(db.String(250), db.ForeignKey("candidates.id"))
     subject = relationship("Candidate", back_populates="reviews")
     grade = db.Column(db.Float, nullable=False)
-    note = db.Column(db.String(1000))
+    note = db.Column(db.Text)
     counter_value = db.Column(db.Integer, nullable=True)
 
 class Note(db.Model):
@@ -141,12 +141,33 @@ class Note(db.Model):
     subject_id = db.Column(db.String(250), db.ForeignKey("candidates.id"))
     subject = relationship("Candidate", back_populates="notes")
     type = db.Column(db.String(1000), nullable=False)
-    text = db.Column(db.String(1000))
+    text = db.Column(db.Text)
     location = db.Column(db.String(1000))
     date = db.Column(db.String(1000))
 
 
 db.create_all()
+
+
+def _migrate_text_columns():
+    if not _database_url.startswith("postgresql"):
+        return
+    alterations = [
+        ("candidates", "interview_note"),
+        ("candidates", "final_note"),
+        ("reviews", "note"),
+        ("notes", "text"),
+    ]
+    with db.engine.connect() as conn:
+        for table, column in alterations:
+            conn.execute(
+                sqlalchemy.text(
+                    f'ALTER TABLE {table} ALTER COLUMN {column} TYPE TEXT'
+                )
+            )
+
+
+_migrate_text_columns()
 
 
 def admin_only(f):
