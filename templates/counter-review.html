@@ -1,73 +1,67 @@
 {% block content %}
 {% include "header.html" %}
-<link href="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" rel="stylesheet">
-<script src="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js"> </script>
-<!-- Page Header -->
-<header class="masthead" style="background-image: url('{{ url_for('static', filename='img/review.jpg')}}')">
-  <div class="overlay"></div>
-  <div class="container">
-    <div class="row">
-      <div class="col-lg-8 col-md-10 mx-auto">
-        <div class="page-heading">
-          <h1 style="color: white">הזן ציונים</h1>
-        </div>
-      </div>
-    </div>
-  </div>
-</header>
 
-<div class="container">
-  <a href = "{{ url_for('circles') }}"><button class="btn btn-primary btn-lg btn-block" style="margin-bottom: 10px;"> עבור למצב סדרי הגעה</button></a>
-  <a href = "{{ url_for('add_new_group_review') }}"><button class="btn btn-primary btn-lg btn-block" style="margin-bottom: 10px;"> עבור למצב קבוצתי</button></a>
-  <a href = "{{ url_for('add_new_review') }}"><button class="btn btn-primary btn-lg btn-block" style="margin-bottom: 10px;"> עבור למצב יחיד</button></a>
-  <div class="row">
-    <div class="col-lg-12 mx-auto" style="direction: rtl;">
-      <!-- Flash Messages Container -->
-      <div id="flash-messages-container"></div>
-      
-      <!-- Station Selection -->
-      <div class="form-group text-center mb-4">
-        <label for="station" style="font-size: 18px">בחר תחנה:</label>
-        <select class="form-control d-inline-block" id="station" name="station" style="width: 200px; margin-right: 10px;">
+<section class="app-hero px-5 pt-6 pb-6" style="background-image:url('{{ url_for('static', filename='img/physical.jpg') }}')">
+  <h1 class="text-2xl font-extrabold leading-tight">הזן ציונים</h1>
+  <p class="text-white/75 text-sm mt-1">מצב מסע — תחנה פיזית</p>
+</section>
+
+<section class="px-4 mt-4 grid gap-2">
+  <a href="{{ url_for('circles') }}" class="btn btn-outline w-full">עבור למצב סדרי הגעה</a>
+  <a href="{{ url_for('add_new_group_review') }}" class="btn btn-outline w-full">עבור למצב קבוצתי</a>
+  <a href="{{ url_for('add_new_review') }}" class="btn btn-outline w-full">עבור למצב יחיד</a>
+</section>
+
+<div class="px-4 mt-4">
+  <div id="flash-messages-container"></div>
+</div>
+
+<section class="px-4 mt-2">
+  <div class="card bg-base-100 shadow-sm">
+    <div class="card-body p-4 gap-4">
+      <div>
+        <label for="station" class="label"><span class="label-text font-semibold">בחר תחנה</span></label>
+        <select class="select select-bordered w-full" id="station" name="station">
           {% for station in form.station.choices %}
           <option value="{{ station }}">{{ station }}</option>
           {% endfor %}
         </select>
       </div>
 
-      <!-- Candidates Table -->
-      <table class="table table-bordered">
-        <thead>
-          <tr>
-            <th>מספר מועמד</th>
-            <th>ציון</th>
-            <th>הערות</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for candidate in form.subject.choices %}
-          {% set review = get_existing_review(candidate, form.station.choices[0]) %}
-          <tr>
-            <td>{{ candidate }}</td>
-            <td class="d-flex justify-content-center align-items-center">
-              <button type="button" class="btn btn-danger minus-btn" data-candidate="{{ candidate }}">-</button>
-              <span class="grade-value mx-3" id="grade-{{ candidate }}">{{ review.counter_value if review else 0 }}</span>
-              <button type="button" class="btn btn-success plus-btn" data-candidate="{{ candidate }}">+</button>
-            </td>
-            <td>
-              <input type="text" class="form-control note-input" id="note-{{ candidate }}" name="note-{{ candidate }}" value="{{ review.note if review else '' }}">
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+      <div class="overflow-x-auto rounded-box border border-base-300">
+        <table class="table table-zebra">
+          <thead>
+            <tr>
+              <th>מספר מועמד</th>
+              <th class="text-center">ציון</th>
+              <th>הערות</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for candidate in form.subject.choices %}
+            {% set review = get_existing_review(candidate, form.station.choices[0]) %}
+            <tr>
+              <td class="font-semibold">{{ candidate }}</td>
+              <td>
+                <div class="flex items-center justify-center gap-3">
+                  <button type="button" class="btn btn-error btn-circle btn-sm minus-btn" data-candidate="{{ candidate }}">-</button>
+                  <span class="grade-value font-display text-xl font-bold min-w-8 text-center" id="grade-{{ candidate }}">{{ review.counter_value if review else 0 }}</span>
+                  <button type="button" class="btn btn-success btn-circle btn-sm plus-btn" data-candidate="{{ candidate }}">+</button>
+                </div>
+              </td>
+              <td>
+                <input type="text" class="input input-bordered input-sm w-full note-input" id="note-{{ candidate }}" name="note-{{ candidate }}" value="{{ review.note if review else '' }}">
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
 
-      <button id="submitAll" class="btn btn-primary btn-lg btn-block mt-4">סיים מסע</button>
+      <button id="submitAll" class="btn btn-primary btn-lg w-full">סיים מסע</button>
     </div>
   </div>
-</div>
-
-{% include "footer.html" %}
+</section>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -130,15 +124,15 @@ document.addEventListener('DOMContentLoaded', function() {
             const candidateId = this.dataset.candidate;
             const gradeSpan = document.getElementById(`grade-${candidateId}`);
             let currentCounter = parseInt(gradeSpan.textContent);
-            
+
             if (this.classList.contains('plus-btn')) {
                 currentCounter = Math.min(currentCounter + 1, 100);
             } else {
                 currentCounter = Math.max(currentCounter - 1, 0);
             }
-            
+
             gradeSpan.textContent = currentCounter;
-            
+
             // Update all reviews whenever a counter changes
             updateAllReviews();
         });
@@ -157,7 +151,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 data.reviews.forEach(review => {
                     const gradeSpan = document.getElementById(`grade-${review.subject}`);
                     const noteInput = document.getElementById(`note-${review.subject}`);
-                    
+
                     if (gradeSpan) gradeSpan.textContent = review.counter_value || 0;
                     if (noteInput) noteInput.value = review.note || '';
                 });
@@ -175,26 +169,5 @@ document.addEventListener('DOMContentLoaded', function() {
     loadStationReviews(stationSelect.value);
 });
 </script>
-
-<style>
-.grade-value {
-    min-width: 30px;
-    text-align: center;
-    font-size: 18px;
-    font-weight: bold;
-}
-
-.plus-btn, .minus-btn {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    font-size: 20px;
-    line-height: 1;
-    padding: 0;
-}
-
-.table td {
-    vertical-align: middle;
-}
-</style>
+{% include "footer.html" %}
 {% endblock %}

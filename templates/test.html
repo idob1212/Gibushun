@@ -1,36 +1,32 @@
 {% block content %}
 {% include "header.html" %}
-<link href="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" rel="stylesheet">
-<script src="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js"> </script>
-<!-- Page Header -->
-<header class="masthead" style="background-image: url('{{ url_for('static', filename='img/review.jpg')}}')">
-  <div class="overlay"></div>
-  <div class="container">
-    <div class="row">
-      <div class="col-lg-8 col-md-10 mx-auto">
-        <div class="page-heading">
-          {% if is_edit %}
-          <h1>ערוך חוות דעת</h1>
-          {% else: %}
-          <h1 style="color: white">הזן ציון</h1>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-  </div>
-</header>
 
-<div class="container">
-  <a href = "{{ url_for('counter_review') }}"><button class="btn btn-primary btn-lg btn-block" style="margin-bottom: 10px;"> עבור למצב מסע</button></a>
-  <a href = "{{ url_for('add_new_group_review') }}"><button class="btn btn-primary btn-lg btn-block" style="margin-bottom: 10px;"> עבור למצב קבוצתי</button></a>
-  <a href = "{{ url_for('add_new_review') }}"><button class="btn btn-primary btn-lg btn-block" style="margin-bottom: 10px;"> עבור למצב יחיד</button></a>
-  <div class="row">
-    <div class="col-lg-8 col-md-10 mx-auto" style="direction: rtl; float: right">
-      {% include "flash-messages.html" %}
-      <div id="flash-messages-target"></div>
-      <div class="text-center mb-3 mt-3">
-        <label for="movementType" style="margin-right: 10px; font-size: 16px">סוג תחנה:</label>
-        <select class="form-control d-inline-block" id="movementType">
+<section class="app-hero px-5 pt-6 pb-6" style="background-image:url('{{ url_for('static', filename='img/physical.jpg') }}')">
+  {% if is_edit %}
+  <h1 class="text-2xl font-extrabold leading-tight">ערוך חוות דעת</h1>
+  {% else %}
+  <h1 class="text-2xl font-extrabold leading-tight">הזן ציון</h1>
+  {% endif %}
+  <p class="text-white/75 text-sm mt-1">סדרי הגעה — תחנה פיזית</p>
+</section>
+
+<section class="px-4 mt-4 grid gap-2">
+  <a href="{{ url_for('counter_review') }}" class="btn btn-outline w-full">עבור למצב מסע</a>
+  <a href="{{ url_for('add_new_group_review') }}" class="btn btn-outline w-full">עבור למצב קבוצתי</a>
+  <a href="{{ url_for('add_new_review') }}" class="btn btn-outline w-full">עבור למצב יחיד</a>
+</section>
+
+<div class="px-4 mt-4">
+  {% include "flash-messages.html" %}
+  <div id="flash-messages-target"></div>
+</div>
+
+<section class="px-4 mt-4">
+  <div class="card bg-base-100 shadow-sm">
+    <div class="card-body p-4 gap-4">
+      <div>
+        <label for="movementType" class="label"><span class="label-text font-semibold">סוג תחנה</span></label>
+        <select class="select select-bordered w-full" id="movementType">
           <option value="ספרינטים">ספרינט</option>
           <option value="זחילות">זחילות</option>
           <option value="אלונקה סוציומטרית">אלונקה סוציומטרית</option>
@@ -39,28 +35,25 @@
           {% endfor %}
           <option value="אחר">אחר</option>
         </select>
-        <div id="additionalField" style="display: none">
-          <label for="additionalFieldText" style="margin-right: 10px; font-size: 16px">הזן שם תחנה:</label>
-          <input class="form-control d-inline-block" type="text" id="additionalFieldText">
+        <div id="additionalField" style="display: none" class="mt-3">
+          <label for="additionalFieldText" class="label"><span class="label-text font-semibold">הזן שם תחנה</span></label>
+          <input class="input input-bordered w-full" type="text" id="additionalFieldText">
         </div>
       </div>
-      <div id="row1" style="margin-top: 20px; text-align: right; direction: rtl;"></div>
-      <h2 id="redHeader" style="margin-top: 40px; display: none; text-align: right;">סיימו</h2>
-      <div id="row2" class="row"></div>
-      <button id="finishActButton" class="btn btn-primary btn-lg" style="margin-top: 20px; display: none;">סיום אקט</button>
-      <!-- <button id="finishButton" class="btn btn-primary btn-lg" style="margin-top: 20px; display: none;">סיום סיבוב</button> -->
-      <!-- Updated checkbox positioning and styling -->
-      <div class="form-check" style="clear: both; margin-top: 20px; text-align: right;">
-        <input class="form-check-input" type="checkbox" id="reverseMode" style="margin-left: 8px;">
-        <label class="form-check-label" for="reverseMode" style="margin-right: 25px;">
-          מצב הפוך
-        </label>
-      </div>
+
+      <div id="row1" class="text-right"></div>
+      <h2 id="redHeader" class="font-display text-lg font-bold" style="margin-top: 40px; display: none; text-align: right;">סיימו</h2>
+      <div id="row2" class="text-right"></div>
+
+      <button id="finishActButton" class="btn btn-accent btn-lg w-full" style="display: none;">סיום אקט</button>
+
+      <label class="label cursor-pointer justify-start gap-3">
+        <input class="checkbox" type="checkbox" id="reverseMode">
+        <span class="label-text">מצב הפוך</span>
+      </label>
     </div>
   </div>
-</div>
-
-{% include "footer.html" %}
+</section>
 
 <script>
   const movementTypeSelect = document.getElementById('movementType');
@@ -143,20 +136,20 @@
     // Check if station already exists in dropdown
     const existingOptions = Array.from(movementTypeSelect.options);
     const stationExists = existingOptions.some(option => option.value === stationName);
-    
+
     if (!stationExists && stationName && stationName.trim() !== '') {
       // Find the "אחר" option
       const otherOption = Array.from(movementTypeSelect.options).find(option => option.value === 'אחר');
-      
+
       if (otherOption) {
         // Create new option element
         const newOption = document.createElement('option');
         newOption.value = stationName;
         newOption.textContent = stationName;
-        
+
         // Insert before the "אחר" option
         movementTypeSelect.insertBefore(newOption, otherOption);
-        
+
         // Select the newly added station and hide the additional field
         movementTypeSelect.value = stationName;
         additionalField.style.display = 'none';
@@ -193,7 +186,7 @@
         if (movementType === 'אחר' && other) {
           addNewStationToDropdown(other);
         }
-        
+
         // Show success message
         const flashContainer = document.querySelector('.flash-messages-container') || document.createElement('div');
         flashContainer.className = 'flash-messages-container';
@@ -204,14 +197,14 @@
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
           </div>
         `;
-        
+
         // Insert flash message at the correct location (same as regular flash messages)
         const targetElement = document.querySelector('#flash-messages-target');
         if (targetElement) {
           targetElement.innerHTML = '';
           targetElement.appendChild(flashContainer);
         }
-        
+
         // Auto-hide success message after 5 seconds
         setTimeout(() => {
           const alert = flashContainer.querySelector('.alert');
@@ -254,7 +247,7 @@
         if (movementType === 'אחר' && other) {
           addNewStationToDropdown(other);
         }
-        
+
         // Show success message
         const flashContainer = document.querySelector('.flash-messages-container') || document.createElement('div');
         flashContainer.className = 'flash-messages-container';
@@ -265,14 +258,14 @@
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
           </div>
         `;
-        
+
         // Insert flash message at the correct location (same as regular flash messages)
         const targetElement = document.querySelector('#flash-messages-target');
         if (targetElement) {
           targetElement.innerHTML = '';
           targetElement.appendChild(flashContainer);
         }
-        
+
         // Auto-hide success message after 5 seconds
         setTimeout(() => {
           const alert = flashContainer.querySelector('.alert');
@@ -326,7 +319,7 @@
     const movementType = document.getElementById('movementType').value;
     const otherInput = document.getElementById('otherInput');
     const reverseMode = document.getElementById('reverseMode').checked;
-    
+
     const data = {
       circle_numbers: finishedCircles,
       movement_type: movementType,
@@ -349,7 +342,7 @@
     const movementType = document.getElementById('movementType').value;
     const otherInput = document.getElementById('otherInput');
     const reverseMode = document.getElementById('reverseMode').checked;
-    
+
     const data = {
       circle_numbers: finishedCircles,
       movement_type: movementType,
@@ -370,14 +363,15 @@
 </script>
 <style>
   .circle {
-    display: inline-block;
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 9999px;
     background-color: blue;
-    text-align: center;
-    line-height: 40px;
     color: white;
+    font-weight: 700;
     margin: 5px;
     cursor: pointer;
     transition: all 0.3s ease;
@@ -387,28 +381,6 @@
   .circle.finished {
     background-color: green;
   }
-
-  .form-control {
-    width: auto;
-    display: inline-block;
-    margin-bottom: 0;
-    vertical-align: middle;
-    padding: 0.5rem 1rem;
-    font-size: 16px;
-  }
-
-  #movementType {
-    width: 200px;
-    font-size: 16px;
-  }
-  /* #finishButton{
-    padding: 12px 24px;
-    font-size: 18px;
-  } */
-
-  #finishActButton {
-    padding: 12px 24px;
-    font-size: 18px;
-  }
 </style>
+{% include "footer.html" %}
 {% endblock %}
