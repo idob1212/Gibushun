@@ -52,10 +52,11 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 _engine_options = {
     'pool_pre_ping': True,
     'pool_recycle': 280,
-    'pool_size': 5,
-    'max_overflow': 10,
 }
 if _database_url.startswith("postgresql"):
+    # QueuePool sizing only applies to the pooled Postgres backend; SQLite uses NullPool.
+    _engine_options['pool_size'] = 5
+    _engine_options['max_overflow'] = 10
     _engine_options['connect_args'] = {
         'keepalives': 1,
         'keepalives_idle': 30,
