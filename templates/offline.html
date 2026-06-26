@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="he" data-theme="meymadion">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>אופליין — מימדיון</title>
+  <link href="{{ url_for('static', filename='vendor/fontawesome-free/css/all.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/app.css') }}" rel="stylesheet">
+</head>
+<body class="bg-base-200 text-base-content min-h-screen flex items-center justify-center p-6">
+  <div class="card bg-base-100 shadow-lg max-w-sm w-full">
+    <div class="card-body items-center text-center gap-3">
+      <div class="text-5xl text-warning"><i class="fas fa-wifi"></i></div>
+      <h1 class="text-xl font-extrabold">אין חיבור לרשת</h1>
+      <p class="text-base-content/70">הדף הזה עדיין לא נשמר במכשיר. עמודים שכבר ביקרת בהם זמינים גם ללא רשת, וכל ציון שתזין יישמר ויסונכרן אוטומטית.</p>
+      <button onclick="location.reload()" class="btn btn-primary w-full mt-2">נסה שוב</button>
+      <a href="/" class="btn btn-ghost btn-sm">חזרה לדף הבית</a>
+    </div>
+  </div>
+</body>
+</html>
