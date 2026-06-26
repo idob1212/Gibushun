@@ -1,12 +1,91 @@
 @import "tailwindcss";
 @source "../../templates";
 
-@plugin "daisyui" {
-  themes: light --default, dark --prefersdark;
+@plugin "daisyui";
+
+@plugin "daisyui/theme" {
+  name: "meymadion";
+  default: true;
+  prefersdark: false;
+  color-scheme: light;
+
+  --color-primary: #6d28d9;
+  --color-primary-content: #ffffff;
+  --color-secondary: #2563eb;
+  --color-secondary-content: #ffffff;
+  --color-accent: #f59e0b;
+  --color-accent-content: #2a1a00;
+  --color-neutral: #15132a;
+  --color-neutral-content: #ecdafb;
+
+  --color-base-100: #ffffff;
+  --color-base-200: #f4f2fb;
+  --color-base-300: #e6e1f7;
+  --color-base-content: #1b1830;
+
+  --color-info: #2563eb;
+  --color-info-content: #ffffff;
+  --color-success: #15a34a;
+  --color-success-content: #ffffff;
+  --color-warning: #f59e0b;
+  --color-warning-content: #2a1a00;
+  --color-error: #e11d48;
+  --color-error-content: #ffffff;
+
+  --radius-selector: 1rem;
+  --radius-field: 0.6rem;
+  --radius-box: 1.1rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+@plugin "daisyui/theme" {
+  name: "meymadion-dark";
+  default: false;
+  prefersdark: true;
+  color-scheme: dark;
+
+  --color-primary: #8b5cf6;
+  --color-primary-content: #ffffff;
+  --color-secondary: #3b82f6;
+  --color-secondary-content: #ffffff;
+  --color-accent: #fbbf24;
+  --color-accent-content: #2a1a00;
+  --color-neutral: #221d33;
+  --color-neutral-content: #ece9f7;
+
+  --color-base-100: #1b1827;
+  --color-base-200: #131120;
+  --color-base-300: #2a2540;
+  --color-base-content: #e9e7f5;
+
+  --color-info: #3b82f6;
+  --color-info-content: #ffffff;
+  --color-success: #22c55e;
+  --color-success-content: #06210f;
+  --color-warning: #fbbf24;
+  --color-warning-content: #2a1a00;
+  --color-error: #fb5571;
+  --color-error-content: #2a0610;
+
+  --radius-selector: 1rem;
+  --radius-field: 0.6rem;
+  --radius-box: 1.1rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
 }
 
 @theme {
+  --font-display: "Rubik", ui-sans-serif, system-ui, sans-serif;
   --font-sans: "Heebo", ui-sans-serif, system-ui, sans-serif;
+  --color-brand-violet: #6d28d9;
+  --color-brand-blue: #2563eb;
 }
 
 @layer base {
@@ -16,4 +95,93 @@
   body {
     font-family: var(--font-sans);
   }
+  h1, h2, h3, .font-display {
+    font-family: var(--font-display);
+  }
+}
+
+@layer components {
+  /* Jersey-style candidate / group number — the app's signature mark */
+  .bib {
+    display: inline-grid;
+    place-items: center;
+    min-width: 3rem;
+    min-height: 3rem;
+    padding: 0.25rem;
+    border-radius: 0.85rem;
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 1.35rem;
+    line-height: 1;
+    color: #fff;
+    background: linear-gradient(135deg, var(--color-brand-violet), var(--color-brand-blue));
+    box-shadow: 0 6px 16px -6px color-mix(in oklab, var(--color-brand-violet) 70%, transparent);
+  }
+  .bib-ghost {
+    color: var(--color-primary);
+    background: color-mix(in oklab, var(--color-primary) 16%, var(--color-base-100));
+    box-shadow: none;
+  }
+  .bib-lg {
+    min-width: 4.5rem;
+    min-height: 4.5rem;
+    font-size: 2.25rem;
+    border-radius: 1.1rem;
+  }
+
+  /* Brand gradient text */
+  .text-brand-gradient {
+    background: linear-gradient(120deg, var(--color-brand-violet), var(--color-brand-blue));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Immersive hero: field photo under a brand gradient wash */
+  .app-hero {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    border-radius: 0 0 1.75rem 1.75rem;
+    color: #fff;
+    background-size: cover;
+    background-position: center;
+  }
+  .app-hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(150deg,
+      color-mix(in oklab, var(--color-brand-violet) 92%, transparent) 0%,
+      color-mix(in oklab, var(--color-brand-blue) 80%, transparent) 60%,
+      color-mix(in oklab, #0b1030 88%, transparent) 100%);
+    mix-blend-mode: multiply;
+  }
+  .app-hero::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: radial-gradient(120% 80% at 80% 0%, rgba(255,255,255,.18), transparent 55%);
+  }
+
+  /* Score band chip, colored by performance */
+  .score-chip {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.25rem;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  .score-chip b {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 0.95rem;
+  }
+  .score-good { background: color-mix(in oklab, var(--color-success) 18%, var(--color-base-100)); color: color-mix(in oklab, var(--color-success) 75%, var(--color-base-content)); }
+  .score-mid  { background: color-mix(in oklab, var(--color-warning) 22%, var(--color-base-100)); color: color-mix(in oklab, var(--color-warning) 60%, var(--color-base-content)); }
+  .score-low  { background: color-mix(in oklab, var(--color-error) 16%, var(--color-base-100)); color: color-mix(in oklab, var(--color-error) 78%, var(--color-base-content)); }
 }
