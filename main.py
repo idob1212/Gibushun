@@ -70,7 +70,7 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
-PUBLIC_ENDPOINTS = {'login', 'register', 'static'}
+PUBLIC_ENDPOINTS = {'login', 'register', 'static', 'service_worker', 'offline'}
 
 
 @app.before_request
@@ -148,6 +148,11 @@ class Note(db.Model):
     date = db.Column(db.String(1000))
 
 
+class ProcessedRequest(db.Model):
+    __tablename__ = "processed_requests"
+    request_id = db.Column(db.String(64), primary_key=True)
+
+
 db.create_all()
 
 
@@ -186,6 +191,23 @@ def _add_withdraw_reason_column():
 
 
 _add_withdraw_reason_column()
+
+app.config['WTF_CSRF_TIME_LIMIT'] = None
+# Let the service worker own asset caching; without this Flask's 12h HTTP cache
+# would serve stale CSS/JS to both the browser and the SW after a deploy.
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+
+
+def is_duplicate_request():
+    request_id = request.headers.get("X-Request-Id")
+    if not request_id and request.is_json:
+        request_id = (request.json or {}).get("request_id")
+    if not request_id:
+        return False
+    if db.session.query(ProcessedRequest.request_id).filter_by(request_id=request_id).first():
+        return True
+    db.session.add(ProcessedRequest(request_id=request_id))
+    return False
 
 
 def admin_only(f):
@@ -1719,6 +1741,20 @@ def updateActAvgs():
 
 
 
+@app.route('/sw.js')
+def service_worker():
+    response = send_from_directory('static', 'sw.js')
+    response.headers['Service-Worker-Allowed'] = '/'
+    response.headers['Cache-Control'] = 'no-cache'
+    response.headers['Content-Type'] = 'application/javascript'
+    return response
+
+
+@app.route('/offline')
+def offline():
+    return render_template('offline.html')
+
+
 @app.route('/circles', methods=['GET', 'POST'])
 def circles():
     physical_stations = []
@@ -1739,7 +1775,8 @@ def circles():
 
 @app.route('/circles/finished', methods=['POST'])
 def circles_finished():
-    print(f"request: {request.json}")
+    if is_duplicate_request():
+        return jsonify({'success': True, 'message': 'הציונים כבר נשמרו'})
     circle_numbers = request.json['circle_numbers']
     circle_numbers = circle_numbers[:circle_numbers.index(0)]
     reverse_mode = request.json.get('reverse_mode', False)
@@ -1793,7 +1830,8 @@ def circles_finished():
 
 @app.route('/circles/finished-act', methods=['POST'])
 def circles_finished_act():
-    print(f"request: {request.json}")
+    if is_duplicate_request():
+        return jsonify({'success': True, 'message': 'הציונים כבר נשמרו'})
     circle_numbers = request.json['circle_numbers']
     circle_numbers = circle_numbers[:circle_numbers.index(0)]
     reverse_mode = request.json.get('reverse_mode', False)
@@ -1868,6 +1906,9 @@ def add_new_note():
     form.subject.choices = candidate_nums
     israel_tz = pytz.timezone('Israel')
     if form.validate_on_submit():
+        if is_duplicate_request():
+            flash('ההערה כבר נשמרה', 'success')
+            return redirect(url_for('add_new_note'))
         current_time_israel = datetime.now(israel_tz)
         formatted_time = current_time_israel.strftime('%d-%m-%Y %H:%M')
         new_note = Note(
@@ -1883,8 +1924,7 @@ def add_new_note():
         db.session.commit()
         candidate_name = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(form.subject.data)).first().name
         flash(f'הערה {form.type.data} עבור {candidate_name} נשמרה בהצלחה!', 'success')
-        form.text.data = ""
-        return render_template("make-note.html", form=form, current_user=current_user)
+        return redirect(url_for('add_new_note'))
     return render_template("make-note.html", form=form, current_user=current_user)
 
 @app.route("/edit-note/<int:note_id>", methods=["GET", "POST"])
