@@ -20,6 +20,14 @@
 
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/logo-meymadion.png') }}">
 
+  <!-- PWA: installable app shell + offline support -->
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/apple-touch-icon.png') }}">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="מימדיון">
+  <meta name="mobile-web-app-capable" content="yes">
+
   <!-- Icons (kept from the previous design) -->
   <link href="{{ url_for('static', filename='vendor/fontawesome-free/css/all.min.css') }}" rel="stylesheet" type="text/css">
   <!-- Modern Hebrew font -->
