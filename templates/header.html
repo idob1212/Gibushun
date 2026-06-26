@@ -8,6 +8,16 @@
   <meta name="theme-color" content="#1f2937">
   <title>מימדיון</title>
 
+  <script>
+    // Apply the saved theme before paint to avoid a flash. No saved value = follow the device.
+    (function () {
+      try {
+        var t = localStorage.getItem('theme');
+        if (t) document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    })();
+  </script>
+
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/logo-meymadion.png') }}">
 
   <!-- Icons (kept from the previous design) -->
@@ -43,7 +53,12 @@
           <img src="{{ url_for('static', filename='img/logo-meymadion.png') }}" class="h-8 w-auto" alt="מימדיון" />
         </a>
       </div>
-      <div class="flex-none">
+      <div class="flex-none flex items-center gap-0.5">
+        <label class="swap swap-rotate btn btn-ghost btn-circle btn-sm" aria-label="החלף בין מצב כהה לבהיר" title="מצב תצוגה">
+          <input id="theme-toggle" type="checkbox" />
+          <i class="fas fa-sun swap-off text-lg text-warning"></i>
+          <i class="fas fa-moon swap-on text-lg text-primary"></i>
+        </label>
         {% if current_user.is_authenticated %}
           <a href="{{ url_for('logout') }}" class="btn btn-ghost btn-sm" aria-label="התנתק" title="התנתק">
             <i class="fas fa-sign-out-alt text-lg"></i>

@@ -55,6 +55,25 @@
 
 </div><!-- /drawer -->
 
+<script>
+  (function () {
+    var html = document.documentElement;
+    var box = document.getElementById('theme-toggle');
+    if (!box) return;
+    function isDark() {
+      var t = html.getAttribute('data-theme');
+      if (t) return t === 'meymadion-dark';
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    box.checked = isDark();
+    box.addEventListener('change', function () {
+      var theme = box.checked ? 'meymadion-dark' : 'meymadion';
+      html.setAttribute('data-theme', theme);
+      try { localStorage.setItem('theme', theme); } catch (e) {}
+    });
+  })();
+</script>
+
 </body>
 
 </html>
