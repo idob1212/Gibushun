@@ -1,138 +1,75 @@
-{#{% extends 'bootstrap/base.html' %}#}
-{% import "bootstrap/wtf.html" as wtf %}
-
 {% block content %}
 {% include "header.html" %}
-  <!-- Page Header -->
-  <header class="masthead" style="background-image: url('{{ url_for('static', filename='img/review.jpg')}}')">
-    <div class="overlay"></div>
 
-    <div class="container">
-      <div class="row">
-        <div class="col-lg-8 col-md-10 mx-auto">
-          <div class="page-heading">
-            {% if is_edit %}
-            <h1>ערוך חוות דעת</h1>
-            {% else: %}
-            <h1 style="color: white">הזן ציון</h1>
-            {% endif %}
-{#            <span class="subheading" style="direction: rtl; color: white">נשמח לשמוע את דעתך!</span>#}
-          </div>
+<section class="app-hero px-5 pt-6 pb-6" style="background-image:url('{{ url_for('static', filename='img/review.jpg') }}')">
+  <h1 class="text-2xl font-extrabold leading-tight">הזן ציון</h1>
+  <p class="text-white/75 text-sm mt-1">מצב קבוצתי — כל המגובשים יחד</p>
+</section>
+
+<section class="px-4 mt-4 grid gap-2">
+  <a href="{{ url_for('circles') }}" class="btn btn-outline w-full">עבור למצב סדרי הגעה</a>
+  <a href="{{ url_for('counter_review') }}" class="btn btn-outline w-full">עבור למצב מסע</a>
+  <a href="{{ url_for('add_new_review') }}" class="btn btn-outline w-full">עבור למצב יחיד</a>
+</section>
+
+<div class="px-4 mt-4">
+  {% include "flash-messages.html" %}
+</div>
+
+<section class="px-4 mt-2">
+  <div class="card bg-base-100 shadow-sm">
+    <div class="card-body p-4 gap-4">
+      <form method="POST" action="{{ url_for('update_all') }}" class="flex flex-col gap-4">
+        {{ user_form.csrf_token }}
+
+        <div class="form-control w-full">
+          <label class="label pb-1" for="station"><span class="label-text font-semibold">בחר תחנה</span></label>
+          {{ user_form.station(class="select select-bordered w-full") }}
         </div>
-      </div>
+
+        <div class="form-control w-full" id="additionalField" style="display:none">
+          <label class="label pb-1" for="odt"><span class="label-text font-medium">שם תחנה</span></label>
+          {{ user_form.odt(class="input input-bordered w-full") }}
+        </div>
+
+        <div class="overflow-x-auto rounded-box border border-base-300">
+          <table class="table table-zebra">
+            <thead>
+              <tr>
+                <th>מספר מגובש</th>
+                <th class="text-center">ציון</th>
+                <th>הערה</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for candidate in candidates %}
+              <tr>
+                <td class="font-semibold">{{ candidate }}</td>
+                <td>{{ user_form.grade(class="select select-bordered select-sm w-full") }}</td>
+                <td>{{ user_form.note(class="input input-bordered input-sm w-full") }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-lg w-full">הזן ציונים</button>
+      </form>
     </div>
-      <link href="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" rel="stylesheet">
-    <script src="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js"> </script>
-  </header>
-    <style>
-    label{
-  direction: rtl;
-  float: right;
-}
-    .table{
-        float: right;
-        {#size: auto;#}
-        table-layout: fixed;
-    }
-    td {
-    border: 1px solid #000;
-    text-align: right;
-}
+  </div>
+</section>
 
-tr td {
-    {#width: 1%;#}
-    {#white-space: nowrap;#}
-    text-align: right;
-}
-
-th{
-    text-align: right;
-}
-th,td{
-    text-align: right;
-=}
-        label{
-        float: right;
-        direction: rtl;
-    }
-
-
-.all{
-    float: right;
-    direction: rtl;
-    padding: 10px;
-    margin: 10px;
-    margin-right: 50%;
-}
-
-
-    </style>
-  <div class="overlay"></div>
-  <div class="container">
-    <a href = "{{ url_for('circles') }}"><button class="btn btn-primary btn-lg btn-block" style="margin-bottom: 10px;"> עבור למצב סדרי הגעה</button></a>
-    <a href = "{{ url_for('counter_review') }}"><button class="btn btn-primary btn-lg btn-block" style="margin-bottom: 10px;"> עבור למצב מסע</button></a>
-    <a href = "{{ url_for('add_new_review') }}"><button class="btn btn-primary btn-lg btn-block" style="margin-bottom: 10px;"> עבור למצב יחיד</button></a>
-    <div class="row">
-    <script>
-  document.addEventListener('DOMContentLoaded', function() {
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
     var stationField = document.getElementById('station');
-
-    stationField.addEventListener('change', function() {
-      var selectedStation = stationField.value;
-      var additionalField = document.getElementById('additionalField');
-
-      if (selectedStation === 'ODT' || selectedStation === 'אחר') {
-        additionalField.style.display = 'block';
-      } else {
-        additionalField.style.display = 'none';
-      }
+    var additionalField = document.getElementById('additionalField');
+    if (!stationField) return;
+    stationField.addEventListener('change', function () {
+      var v = stationField.value;
+      additionalField.style.display = (v === 'ODT' || v === 'אחר') ? 'block' : 'none';
     });
   });
 </script>
-      <div class="col-lg-8 col-md-10 mx-auto", style="direction: rtl; float: right">
-        {% include "flash-messages.html" %}
-        <table class = "table table-bordered" style="width:100%; direction: rtl;">
-        <form method="POST" action="/add-all">
-        <tr>
-
-      <td colspan="3" style="text-align: center; margin-right: 50%; margin-left: 50%" >
-        {{ user_form.station() }}
-        <div class="form-group" id="additionalField" style="display: none">
-        <label for="additionalField">שם תחנה:</label>
-        {{ user_form.odt(class="form-control") }}
-    </div>
-      </td>
-        </tr>
-          <tr>
-            <th>מספר מועמד</th>
-            <th>ציון</th>
-            <th>הערה</th>
-          </tr>
-
-          {% for candidate in candidates %}
-          <tr>
-              {{ user_form.hidden_tag() }}
-              {{ user_form.csrf_token}}
-              <td>{{ candidate }}</td>
-                <td>{{ user_form.grade() }} </td>
-              <td class="note">{{ user_form.note(class="note") }}</td>
-          </tr>
-          {% endfor %}
-        <tr>
-      <td colspan="3" style="text-align: center; margin-right: 50%; margin-left: 50%">
-        <button type="submit" class ="btn btn-primary">הזן ציונים</button>
-      </td>
-    </tr>
-  </form>
-        </table>
-
-    </div>
-  </div>
 
 {% include "footer.html" %}
 {% endblock %}
-
-
-
-
-
