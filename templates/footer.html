@@ -23,10 +23,11 @@
   {% if current_user.is_authenticated %}
   <div class="drawer-side z-40">
     <label for="nav-drawer" class="drawer-overlay" aria-label="סגור תפריט"></label>
-    <ul class="menu bg-base-100 min-h-full w-72 p-4 gap-1 text-base">
-      <li class="menu-title flex justify-center pb-3">
-        <img src="{{ url_for('static', filename='img/logo-meymadion.png') }}" class="h-8 w-auto" alt="מימדיון" />
-      </li>
+    <div class="bg-base-100 min-h-full w-72 flex flex-col">
+    <div class="flex justify-center py-5 border-b border-base-200">
+      <img src="{{ url_for('static', filename='img/logo-meymadion.png') }}" style="height:32px;width:auto" alt="מימדיון" />
+    </div>
+    <ul class="menu p-4 gap-1 text-base">
       {% if is_admin %}
         <li><a href="{{ url_for('admin_home') }}"><i class="fas fa-house w-5"></i>בית</a></li>
         <li><a href="{{ url_for('register') }}"><i class="fas fa-user-plus w-5"></i>הוסף מגבש</a></li>
@@ -50,6 +51,7 @@
       {% endif %}
       <li class="mt-2 border-t border-base-200 pt-2"><a href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt w-5"></i>התנתק</a></li>
     </ul>
+    </div>
   </div>
   {% endif %}
 
