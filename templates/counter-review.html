@@ -98,10 +98,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Show success message only when explicitly requested
                 const flashContainer = document.getElementById('flash-messages-container');
                 flashContainer.innerHTML = `
-                    <div class="alert alert-success alert-dismissible fade show" role="alert" style="direction: rtl; text-align: right;">
-                        <i class="fas fa-check-circle" style="margin-left: 8px;"></i>
-                        <strong>${data.message}</strong>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    <div class="alert alert-success shadow-sm" role="alert">
+                        <i class="fas fa-circle-check"></i>
+                        <span class="font-medium">${data.message}</span>
+                        <button type="button" class="btn btn-ghost btn-xs btn-circle" aria-label="סגור" onclick="this.parentElement.remove()">✕</button>
                     </div>
                 `;
 
@@ -109,8 +109,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 setTimeout(() => {
                     const alert = flashContainer.querySelector('.alert');
                     if (alert) {
-                        const bsAlert = new bootstrap.Alert(alert);
-                        bsAlert.close();
+                        alert.style.transition = 'opacity .4s';
+                        alert.style.opacity = '0';
+                        setTimeout(() => alert.remove(), 400);
                     }
                 }, 3000);
             }

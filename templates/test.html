@@ -191,10 +191,10 @@
         const flashContainer = document.querySelector('.flash-messages-container') || document.createElement('div');
         flashContainer.className = 'flash-messages-container';
         flashContainer.innerHTML = `
-          <div class="alert alert-success alert-dismissible fade show" role="alert" style="direction: rtl; text-align: right;">
-            <i class="fas fa-check-circle" style="margin-left: 8px;"></i>
-            <strong>${data.message}</strong>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          <div class="alert alert-success shadow-sm" role="alert">
+            <i class="fas fa-circle-check"></i>
+            <span class="font-medium">${data.message}</span>
+            <button type="button" class="btn btn-ghost btn-xs btn-circle" aria-label="סגור" onclick="this.parentElement.remove()">✕</button>
           </div>
         `;
 
@@ -252,10 +252,10 @@
         const flashContainer = document.querySelector('.flash-messages-container') || document.createElement('div');
         flashContainer.className = 'flash-messages-container';
         flashContainer.innerHTML = `
-          <div class="alert alert-success alert-dismissible fade show" role="alert" style="direction: rtl; text-align: right;">
-            <i class="fas fa-check-circle" style="margin-left: 8px;"></i>
-            <strong>${data.message}</strong>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          <div class="alert alert-success shadow-sm" role="alert">
+            <i class="fas fa-circle-check"></i>
+            <span class="font-medium">${data.message}</span>
+            <button type="button" class="btn btn-ghost btn-xs btn-circle" aria-label="סגור" onclick="this.parentElement.remove()">✕</button>
           </div>
         `;
 

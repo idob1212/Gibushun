@@ -1,0 +1,38 @@
+{% macro render_field(field, label=None) %}
+  {% if field.type in ['CSRFTokenField', 'HiddenField'] %}
+    {{ field() }}
+  {% elif field.type == 'SubmitField' %}
+    <button type="submit" class="btn btn-primary btn-lg w-full mt-2">{{ label or field.label.text }}</button>
+  {% elif field.type == 'BooleanField' %}
+    <label class="label cursor-pointer justify-start gap-3">
+      {{ field(class="checkbox checkbox-primary") }}
+      <span class="label-text font-medium">{{ label or field.label.text }}</span>
+    </label>
+  {% else %}
+    <div class="form-control w-full">
+      <label class="label pb-1" for="{{ field.id }}"><span class="label-text font-medium">{{ label or field.label.text }}</span></label>
+      {% if field.type == 'SelectField' %}
+        {{ field(class="select select-bordered w-full") }}
+      {% elif field.type == 'TextAreaField' %}
+        {{ field(class="textarea textarea-bordered w-full min-h-28") }}
+      {% else %}
+        {{ field(class="input input-bordered w-full") }}
+      {% endif %}
+      {% for err in field.errors %}
+        <span class="text-error text-sm mt-1">{{ err }}</span>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endmacro %}
+
+{% macro render_form(form, submit_label=None, action=None) %}
+  <form method="POST" {% if action %}action="{{ action }}"{% endif %} novalidate class="flex flex-col gap-3">
+    {% for field in form %}
+      {% if field.type == 'SubmitField' %}
+        {{ render_field(field, label=submit_label) }}
+      {% else %}
+        {{ render_field(field) }}
+      {% endif %}
+    {% endfor %}
+  </form>
+{% endmacro %}

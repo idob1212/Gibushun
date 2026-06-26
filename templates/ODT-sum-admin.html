@@ -1,163 +1,76 @@
-{#{% extends 'bootstrap/base.html' %}#}
-{#{% import "bootstrap/wtf.html" as wtf %}#}
-{% import "bootstrap/wtf.html" as wtf %}
-
 {% block content %}
 {% include "header.html" %}
 
-  <!-- Page Header -->
-  <header class="masthead" style="background-image: url('{{ url_for('static', filename='img/ODT.jpg')}}')">
-    <div class="overlay"></div>
-    <div class="container">
-      <div class="row">
-        <div class="col-lg-8 col-md-10 mx-auto">
-          <div class="page-heading">
-            <h1>ODT</h1>
-              {% if candidate_id %}
-          <span class="subheading" style="direction: rtl">ציוני ODT של מועמד מספר {{ candidate_id }} </span>
-              {% else %}
-{#         <span class="subheading" style="direction: rtl">חוות דעת על כולם </span>#}
-              {% endif %}
+<section class="app-hero px-5 pt-6 pb-6" style="background-image:url('{{ url_for('static', filename='img/ODT.jpg') }}')">
+  <h1 class="text-2xl font-extrabold leading-tight">ODT</h1>
+  {% if candidate_id %}
+  <p class="text-white/75 text-sm mt-1">ציוני ODT של מועמד מספר {{ candidate_id }}</p>
+  {% endif %}
+</section>
+
+<section class="px-4 mt-4 max-w-md mx-auto">
+  <div class="card bg-base-100 shadow-sm">
+    <div class="card-body p-4">
+      <form method="POST" class="flex flex-col gap-3">
+        {{ form.csrf_token }}
+        <div class="form-control w-full">
+          <label class="label pb-1" for="group"><span class="label-text font-medium">קבוצה</span></label>
+          {{ form.group(class="select select-bordered w-full") }}
+        </div>
+        <div class="form-control w-full">
+          <label class="label pb-1" for="id"><span class="label-text font-medium">מגובש</span></label>
+          {{ form.id(class="select select-bordered w-full") }}
+        </div>
+        <button type="submit" class="btn btn-primary btn-lg w-full">הצג</button>
+      </form>
+    </div>
+  </div>
+</section>
+
+{% if candidate_id %}
+<section class="px-4 mt-4">
+  <div class="grid gap-2.5">
+    {% for review in reviews %}
+      <div class="card bg-base-100 shadow-sm">
+        <div class="card-body p-3">
+          <div class="flex items-center gap-3">
+            <div class="font-display font-bold flex-1">{{ review.station }}</div>
+            <span class="score-chip bg-base-200 text-base-content">ציון <b>{{ review.grade }}</b></span>
+          </div>
+          {% if review.note %}<p class="text-sm text-base-content/70 mt-2 whitespace-pre-wrap break-words">{{ review.note }}</p>{% endif %}
+          <div class="flex gap-2 mt-2">
+            <a href="{{ url_for('edit_physical_review', review_id=review.id) }}" class="btn btn-xs btn-ghost"><i class="fas fa-pen"></i> עריכה</a>
+            <a href="{{ url_for('delete_physical_review', review_id=review.id) }}" class="btn btn-xs btn-ghost text-error"><i class="fas fa-trash"></i> מחק</a>
           </div>
         </div>
       </div>
-    </div>
-      <link href="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" rel="stylesheet">
-    <script src="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js"> </script>
-  </header>
-
-<head>
-    <meta charset="UTF-8">
-    <title>לוח חוות דעת</title>
-
-</head>
-<body>
-<style>
-    .table{
-        float: right;
-        {#size: auto;#}
-        table-layout: fixed;
-    }
-    td {
-    border: 1px solid #000;
-    text-align: right;
-}
-
-tr td {
-    {#width: 1%;#}
-    {#white-space: nowrap;#}
-    text-align: right;
-}
-
-th{
-    text-align: right;
-}
-        label{
-        float: right;
-        direction: rtl;
-    }
-
-
-select{
-    text-align: right;
-}
-.btn{
-    float: right;
-    direction: rtl;
-    padding: 10px;
-    margin: 10px;
-    margin-right: 50%;
-}
-#station{
-    float: right;
-    direction: rtl;
-}
-#subject{
-    float: right;
-    direction: rtl;
-}
-
-</style>
-
-
-<div class="container">
-    <div class="row">
-        <div class="col-md-12">
-        <form method="POST">
-          {{ form.csrf_token}}
-        <div class="form-group">
-                <label for="group">קבוצה:</label>
-                {{ form.group(class="form-control")}}
-            </div>
-            <div class="form-group">
-                <label for="id">מגובש:</label>
-                {{ form.id(class="form-control")}}
-            </div>
-                <input type="submit" class="btn btn-primary" btn-lg>
-        </form>
-        </div>
-    </div>
-
-<table class = "table table-bordered" style="width:100%; direction: rtl;">
-    <thead>
-    {% if candidate_id %}
-
-    <tr>
-        <th>סוג תחנה</th>
-        <th>ציון</th>
-        <th>הערה</th>
-{#        <th>עריכה</th>#}
-{#        <th>מחק</th>#}
-    </tr>
-    </thead>
-    <tbody>
-        {% for review in reviews %}
-    <tr>
-        <td class="block">{{ review.station }}</td>
-        <td class="block">{{ review.grade }}</td>
-        <td class="block">{{ review.note }}</td>
-        <td class="block"><a href="{{ url_for('edit_physical_review', review_id=review.id) }}">עריכה</a></td>
-        <td class="block"><a href="{{ url_for('delete_physical_review', review_id=review.id) }}">מחק</a></td>
-    </tr>
-        {% endfor %}
-    </tbody>
+    {% endfor %}
+  </div>
+</section>
 {% endif %}
 
-</table>
-    <script>
-        var group_select = document.getElementById("group");
-        var subject_select = document.getElementById("id");
+<script>
+    var group_select = document.getElementById("group");
+    var subject_select = document.getElementById("id");
 
-        group_select.onchange = function() {
+    group_select.onchange = function() {
 
-            group = group_select.value;
+        group = group_select.value;
 
-            fetch('/subjects/' + group).then(function(response) {
+        fetch('/subjects/' + group).then(function(response) {
 
-                response.json().then(function(data) {
-                    var optionHTML = '';
+            response.json().then(function(data) {
+                var optionHTML = '';
 
-                    for (var candidate of data.subjects) {
-                        optionHTML += '<option value="' + candidate.id + '">' + candidate.id + '</option>';
-                    }
-                    subject_select.innerHTML = optionHTML;
-                })
+                for (var candidate of data.subjects) {
+                    optionHTML += '<option value="' + candidate.id + '">' + candidate.id + '</option>';
+                }
+                subject_select.innerHTML = optionHTML;
+            })
 
-            });
-        }
-    </script>
-</body>
+        });
+    }
+</script>
 
-<style>
-footer{
-position: fixed;
-    left:0px;
-   bottom:0px;
-   height:50px;
-   width:100%;
-    padding-top: 20px;
-}
-</style>
-</html>
+{% include "footer.html" %}
 {% endblock %}
-{#{% include "footer.html" %}#}
