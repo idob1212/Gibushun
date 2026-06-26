@@ -113,6 +113,7 @@ class Candidate(db.Model):
     final_status = db.Column(db.String(1000))
     final_note = db.Column(db.Text)
     status = db.Column(db.String(1000))
+    withdraw_reason = db.Column(db.String(50))
     interviewer = db.Column(db.String(1000))
     interview_grade = db.Column(db.String(1000))
     interview_note = db.Column(db.Text)
@@ -168,6 +169,22 @@ def _migrate_text_columns():
 
 
 _migrate_text_columns()
+
+
+def _add_withdraw_reason_column():
+    inspector = sqlalchemy.inspect(db.engine)
+    columns = [col["name"] for col in inspector.get_columns("candidates")]
+    if "withdraw_reason" in columns:
+        return
+    with db.engine.connect() as conn:
+        conn.execute(
+            sqlalchemy.text(
+                "ALTER TABLE candidates ADD COLUMN withdraw_reason VARCHAR(50)"
+            )
+        )
+
+
+_add_withdraw_reason_column()
 
 
 def admin_only(f):
@@ -964,6 +981,7 @@ def manageGroups():
 def delete_candidate(candidate_id):
     candidate_to_delete = Candidate.query.get(str(current_user.id) + "/" + candidate_id)
     candidate_to_delete.status = "פרש"
+    candidate_to_delete.withdraw_reason = "רפואי" if request.args.get("reason") == "medical" else None
     db.session.commit()
     update_avgs_nf()
     return redirect(url_for('manageCandidates'))
@@ -972,6 +990,7 @@ def delete_candidate(candidate_id):
 def return_candidate(candidate_id):
     user_to_return = Candidate.query.get(str(current_user.id) +"/" + candidate_id)
     user_to_return.status = ""
+    user_to_return.withdraw_reason = None
     db.session.commit()
     update_avgs_nf()
     return redirect(url_for('manageCandidates'))

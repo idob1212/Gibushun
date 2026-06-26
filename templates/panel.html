@@ -73,7 +73,11 @@ th{
         {% endif %}
         <td>{{ candidate.name }}</td>
         {%   if candidate.status != "פרש" %}
-        <td><a href="#" onclick="confirmDelete('{{url_for('delete_candidate', candidate_id=candidate.id.split('/')[1]) }}')" class="delete-btn">פרש</a></td>
+        <td>
+            <a href="#" onclick="confirmDelete('{{url_for('delete_candidate', candidate_id=candidate.id.split('/')[1]) }}')" class="delete-btn">פרש</a>
+            &nbsp;|&nbsp;
+            <a href="#" onclick="confirmMedical('{{url_for('delete_candidate', candidate_id=candidate.id.split('/')[1], reason='medical') }}')" class="delete-btn">פרש (רופא)</a>
+        </td>
             {% else %}
         <td><a href="{{url_for('return_candidate', candidate_id= candidate.id.split("**")[0].split("/")[1]) }}">הפוך לפעיל</a></td>
         {% endif %}
@@ -89,7 +93,12 @@ th{
         {% else %}
             <td style="color:red">{{ candidate.id.split("/")[1] }}**</td>
         {% endif %}
-        <td>{{ candidate.name }}</td>
+        <td>
+            {{ candidate.name }}
+            {% if candidate.withdraw_reason == "רפואי" %}
+                <span style="color:#fff; background-color:#c0392b; border-radius:4px; padding:1px 6px; font-size:0.8em; margin-right:4px;">הורד ע"י רופא</span>
+            {% endif %}
+        </td>
         {%   if candidate.status != "פרש" %}
         <td><a href="#" onclick="confirmDelete('{{url_for('delete_candidate', candidate_id=candidate.id.split('/')[1]) }}')" class="delete-btn">פרש</a></td>
             {% else %}
@@ -102,6 +111,11 @@ th{
 <script>
 function confirmDelete(deleteUrl) {
     if (confirm('האם אתה בטוח שברצונך לסמן מועמד זה כפורש?')) {
+        window.location.href = deleteUrl;
+    }
+}
+function confirmMedical(deleteUrl) {
+    if (confirm('האם אתה בטוח שברצונך לסמן מועמד זה כפורש בעקבות החלטת רופא?')) {
         window.location.href = deleteUrl;
     }
 }
