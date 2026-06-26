@@ -1,0 +1,14 @@
+{
+  "name": "gibushun-ui",
+  "private": true,
+  "description": "Tailwind v4 + DaisyUI build for the Gibushun UI. Run `npm run build` after editing templates/CSS and commit the generated static/css/app.css.",
+  "scripts": {
+    "dev": "tailwindcss -i ./static/src/input.css -o ./static/css/app.css --watch",
+    "build": "tailwindcss -i ./static/src/input.css -o ./static/css/app.css --minify"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.1.11",
+    "daisyui": "^5.0.43",
+    "tailwindcss": "^4.1.11"
+  }
+}

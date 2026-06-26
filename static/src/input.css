@@ -1,0 +1,19 @@
+@import "tailwindcss";
+@source "../../templates";
+
+@plugin "daisyui" {
+  themes: light --default, dark --prefersdark;
+}
+
+@theme {
+  --font-sans: "Heebo", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  html {
+    direction: rtl;
+  }
+  body {
+    font-family: var(--font-sans);
+  }
+}
