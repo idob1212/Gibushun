@@ -39,7 +39,9 @@
       </div>
       {% endif %}
       <div class="flex-1 justify-center">
-        <a href="{{ url_for('home') }}" class="btn btn-ghost px-2 font-display text-xl font-extrabold tracking-tight">מימדיון</a>
+        <a href="{{ url_for('home') }}" class="btn btn-ghost px-2">
+          <img src="{{ url_for('static', filename='img/logo-meymadion.png') }}" class="h-8 w-auto" alt="מימדיון" />
+        </a>
       </div>
       <div class="flex-none">
         {% if current_user.is_authenticated %}

@@ -25,7 +25,7 @@
     <label for="nav-drawer" class="drawer-overlay" aria-label="סגור תפריט"></label>
     <ul class="menu bg-base-100 min-h-full w-72 p-4 gap-1 text-base">
       <li class="menu-title flex justify-center pb-3">
-        <span class="font-display text-2xl font-extrabold tracking-tight text-brand-gradient">מימדיון</span>
+        <img src="{{ url_for('static', filename='img/logo-meymadion.png') }}" class="h-10 w-auto" alt="מימדיון" />
       </li>
       {% if is_admin %}
         <li><a href="{{ url_for('admin_home') }}"><i class="fas fa-house w-5"></i>בית</a></li>
