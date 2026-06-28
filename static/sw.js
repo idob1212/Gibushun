@@ -1,4 +1,4 @@
-const VERSION = 'v5';
+const VERSION = 'v6';
 const SHELL_CACHE = 'meymadion-shell-' + VERSION;
 const PAGE_CACHE = 'meymadion-pages-' + VERSION;
 
@@ -18,7 +18,7 @@ const SHELL = [
 const FIELD_PREFIXES = [
   '/circles', '/counter-review', '/new-review', '/new-group-review',
   '/interview', '/show-interview', '/new-note', '/show-notes',
-  '/candidates', '/add-candidate', '/group-manage', '/final-status',
+  '/candidate', '/candidates', '/add-candidate', '/group-manage', '/final-status',
   '/add-name', '/login'
 ];
 

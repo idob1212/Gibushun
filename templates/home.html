@@ -81,7 +81,7 @@
       {% for index, candidate in candidates %}
         {% if candidate.status != "פרש" %}
           {% set rows.count = rows.count + 1 %}
-          <div class="card bg-base-100 shadow-sm hover:shadow-md transition-shadow">
+          <a href="{{ url_for('candidate_profile', candidate_id=candidate.id) }}" class="card bg-base-100 shadow-sm hover:shadow-md transition-shadow active:scale-[.99]">
             <div class="card-body p-3 flex-row items-center gap-3">
               <div class="bib">{{ candidate.id.split('/')[1] }}</div>
               <div class="flex-1 min-w-0">
@@ -92,8 +92,9 @@
                 </div>
               </div>
               {{ status_badge(candidate.final_status) }}
+              <i class="fas fa-chevron-left text-base-content/30 text-sm"></i>
             </div>
-          </div>
+          </a>
         {% endif %}
       {% endfor %}
     {% endif %}

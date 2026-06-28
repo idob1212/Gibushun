@@ -351,6 +351,55 @@ def home():
     return render_template("home.html", current_user=current_user, candidates = candidates, active_candidates_count=active_candidates_count)
 
 
+@app.route("/candidate/<path:candidate_id>")
+def candidate_profile(candidate_id):
+    if not current_user.is_authenticated:
+        return redirect(url_for("login"))
+    candidate = Candidate.query.filter_by(id=candidate_id).first()
+    if not candidate:
+        abort(404)
+    if current_user.id != 0 and candidate.group_id != current_user.id:
+        abort(403)
+    update_avgs_nf()
+
+    physical_stations = getPhysicalStationsGroup(candidate.group_id) + ["ספרינטים", "זחילות", "אלונקה סוציומטרית", "מתלה שזיפים"]
+    counter_stations = ["מסע 1", "מסע 2", "מסע 3", "שקי חול", "שקי חול 2"]
+    all_reviews = Review.query.filter_by(subject_id=candidate.id).all()
+
+    physical_reviews = []
+    for station in physical_stations:
+        summary = Review.query.filter_by(subject_id=candidate.id, station=f"{station} סיכום").first()
+        if summary:
+            physical_reviews.append(summary)
+    for station in counter_stations:
+        summary = Review.query.filter_by(subject_id=candidate.id, station=station).first()
+        if summary:
+            physical_reviews.append(summary)
+    physical_reviews.sort(key=lambda x: x.grade, reverse=True)
+    tiz_avg = round(sum(r.grade for r in physical_reviews) / len(physical_reviews), 2) if physical_reviews else 0
+
+    general_reviews = [r for r in all_reviews if r.station not in physical_stations and ("ODT" not in r.station or r.station == "ODT סיכום")]
+    general_reviews = [r for r in general_reviews if ("אקט" not in r.station) or ("אקט" in r.station and "סיכום" in r.station)]
+    general_reviews = [r for r in general_reviews if r.station not in counter_stations]
+    general_reviews.sort(key=lambda x: x.grade, reverse=True)
+
+    total_pool = [r for r in all_reviews if r.station not in physical_stations and "אקט" not in r.station and ("ODT" not in r.station or r.station == "ODT סיכום")]
+    total_avg = round(sum(r.grade for r in total_pool) / len(total_pool), 2) if total_pool else 0
+
+    notes = sorted(candidate.notes, key=lambda n: n.id, reverse=True)
+
+    return render_template(
+        "candidate-profile.html",
+        candidate=candidate,
+        number=candidate.id.split("/")[1],
+        general_reviews=general_reviews,
+        physical_reviews=physical_reviews,
+        notes=notes,
+        tiz_avg=tiz_avg,
+        total_avg=total_avg,
+    )
+
+
 @app.route('/register', methods=["GET", "POST"])
 def register():
     form = RegisterForm()

@@ -1,0 +1,143 @@
+{% block content %}
+{% include "header.html" %}
+
+{% macro grade_chip(val) %}
+  {% set v = val|float %}
+  {% if v >= 3.3 %}<span class="score-chip score-good"><b>{{ '%.1f'|format(v) }}</b></span>
+  {% elif v >= 2.5 %}<span class="score-chip score-mid"><b>{{ '%.1f'|format(v) }}</b></span>
+  {% else %}<span class="score-chip score-low"><b>{{ '%.1f'|format(v) }}</b></span>{% endif %}
+{% endmacro %}
+
+{% macro review_row(r) %}
+  <div class="flex items-center gap-3 py-2.5">
+    <div class="flex-1 min-w-0">
+      <div class="font-semibold text-sm truncate">{{ r.station }}</div>
+      {% if r.note %}<div class="text-xs text-base-content/60 mt-0.5 whitespace-pre-wrap break-words">{{ r.note }}</div>{% endif %}
+    </div>
+    {{ grade_chip(r.grade) }}
+  </div>
+{% endmacro %}
+
+<section class="app-hero px-5 pt-6 pb-6" style="background-image:url('{{ url_for('static', filename='img/my-group.jpg') }}')">
+  <a href="{{ url_for('home') }}" class="inline-flex items-center gap-1 text-sm text-white/80 mb-3"><i class="fas fa-chevron-right text-xs"></i> חזרה לבית</a>
+  <div class="flex items-center gap-4">
+    <div class="bib bib-lg ring-2 ring-white/30">{{ number }}</div>
+    <div class="min-w-0">
+      <h1 class="text-2xl font-extrabold leading-tight truncate">{{ candidate.name }}</h1>
+      <p class="text-white/75 text-sm">מגובש מספר {{ number }} · קבוצה {{ candidate.group_id }}</p>
+    </div>
+  </div>
+
+  <div class="flex flex-wrap gap-1.5 mt-3">
+    {% if candidate.status == "פרש" %}
+      {% if candidate.withdraw_reason == "רפואי" %}
+        <span class="badge badge-error font-medium"><i class="fas fa-user-md"></i>&nbsp;הורד ע"י רופא</span>
+      {% else %}
+        <span class="badge badge-neutral font-medium">פרש</span>
+      {% endif %}
+    {% endif %}
+    {% if candidate.final_status %}
+      <span class="badge {% if 'אדום' in candidate.final_status %}badge-error{% elif 'ברירה' in candidate.final_status %}badge-warning{% else %}badge-success{% endif %} font-medium">{{ candidate.final_status }}</span>
+    {% endif %}
+  </div>
+
+  <div class="grid grid-cols-2 gap-2 mt-4">
+    <div class="rounded-2xl bg-white/12 backdrop-blur px-3 py-2.5 border border-white/15">
+      <div class="font-display text-2xl font-extrabold leading-none">{{ total_avg if total_avg else '—' }}</div>
+      <div class="text-[11px] text-white/75 mt-1">ממוצע כללי</div>
+    </div>
+    <div class="rounded-2xl bg-white/12 backdrop-blur px-3 py-2.5 border border-white/15">
+      <div class="font-display text-2xl font-extrabold leading-none">{{ tiz_avg if tiz_avg else '—' }}</div>
+      <div class="text-[11px] text-white/75 mt-1">ממוצע פיזי</div>
+    </div>
+  </div>
+</section>
+
+<div class="px-4 mt-4 max-w-2xl mx-auto grid gap-3">
+
+  {% if candidate.interview_grade or candidate.interviewer or candidate.interview_note %}
+  <div class="card bg-base-100 shadow-sm">
+    <div class="card-body p-4">
+      <div class="flex items-center justify-between mb-1">
+        <h2 class="font-display font-bold text-lg"><i class="fas fa-comments text-primary"></i> ראיון</h2>
+        {% if candidate.interview_grade %}<span class="score-chip bg-base-200 text-base-content">ציון <b>{{ candidate.interview_grade }}</b></span>{% endif %}
+      </div>
+      <dl class="divide-y divide-base-200 text-sm">
+        {% if candidate.interviewer %}<div class="flex gap-3 py-2"><dt class="font-semibold w-28 shrink-0 text-base-content/70">שם מראיין</dt><dd class="flex-1 whitespace-pre-wrap break-words">{{ candidate.interviewer }}</dd></div>{% endif %}
+        {% if candidate.interview_note %}<div class="flex gap-3 py-2"><dt class="font-semibold w-28 shrink-0 text-base-content/70">סיכום ראיון</dt><dd class="flex-1 whitespace-pre-wrap break-words">{{ candidate.interview_note }}</dd></div>{% endif %}
+        {% if candidate.tash_prob %}<div class="flex gap-3 py-2"><dt class="font-semibold w-28 shrink-0 text-base-content/70">בעיות תש</dt><dd class="flex-1 whitespace-pre-wrap break-words">{{ candidate.tash_prob }}</dd></div>{% endif %}
+        {% if candidate.medical_prob %}<div class="flex gap-3 py-2"><dt class="font-semibold w-28 shrink-0 text-base-content/70">בעיות רפואיות</dt><dd class="flex-1 whitespace-pre-wrap break-words">{{ candidate.medical_prob }}</dd></div>{% endif %}
+      </dl>
+      <a href="{{ url_for('edit_interview', candidate_id=candidate.id.replace('/', '-')) }}" class="btn btn-sm btn-outline mt-3 self-start"><i class="fas fa-pen"></i> ערוך ראיון</a>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if candidate.final_note %}
+  <div class="card bg-base-100 shadow-sm border-r-4 border-primary">
+    <div class="card-body p-4">
+      <h2 class="font-display font-bold text-base mb-1"><i class="fas fa-flag-checkered text-primary"></i> סיכום סופי</h2>
+      <p class="text-sm whitespace-pre-wrap break-words">{{ candidate.final_note }}</p>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="card bg-base-100 shadow-sm">
+    <div class="card-body p-4">
+      <h2 class="font-display font-bold text-lg mb-1"><i class="fas fa-star text-primary"></i> ציונים כלליים</h2>
+      {% if general_reviews %}
+        <div class="divide-y divide-base-200">
+          {% for r in general_reviews %}{{ review_row(r) }}{% endfor %}
+        </div>
+      {% else %}
+        <p class="text-sm text-base-content/50 py-2">לא הוזנו ציונים עדיין</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card bg-base-100 shadow-sm">
+    <div class="card-body p-4">
+      <h2 class="font-display font-bold text-lg mb-1"><i class="fas fa-running text-primary"></i> תחנות פיזיות ומסעות</h2>
+      {% if physical_reviews %}
+        <div class="divide-y divide-base-200">
+          {% for r in physical_reviews %}{{ review_row(r) }}{% endfor %}
+        </div>
+      {% else %}
+        <p class="text-sm text-base-content/50 py-2">לא הוזנו ציונים פיזיים עדיין</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card bg-base-100 shadow-sm">
+    <div class="card-body p-4">
+      <div class="flex items-center justify-between mb-2">
+        <h2 class="font-display font-bold text-lg"><i class="fas fa-comment-dots text-primary"></i> הערות</h2>
+        <a href="{{ url_for('add_new_note') }}" class="btn btn-xs btn-accent"><i class="fas fa-pen"></i> כתוב הערה</a>
+      </div>
+      {% if notes %}
+        <div class="grid gap-2">
+          {% for note in notes %}
+          <div class="card bg-base-100 shadow-sm border-r-4 {% if note.type == 'טובה' %}border-success{% elif note.type == 'ניטרלית' %}border-warning{% else %}border-error{% endif %}">
+            <div class="card-body p-3">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="badge badge-sm {% if note.type == 'טובה' %}badge-success{% elif note.type == 'ניטרלית' %}badge-warning{% else %}badge-error{% endif %} font-medium">{{ note.type }}</span>
+                {% if note.location %}<span class="badge badge-ghost badge-sm">{{ note.location }}</span>{% endif %}
+                <span class="text-xs text-base-content/50 mr-auto">{{ note.date }}</span>
+              </div>
+              <p class="text-sm mt-1.5 whitespace-pre-wrap break-words">{{ note.text }}</p>
+              <a href="{{ url_for('edit_note', note_id=note.id) }}" class="btn btn-xs btn-ghost mt-2 self-start"><i class="fas fa-pen"></i> ערוך</a>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="text-sm text-base-content/50 py-2">אין עדיין הערות על מגובש זה</p>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+<div class="h-6"></div>
+{% include "footer.html" %}
+{% endblock %}
