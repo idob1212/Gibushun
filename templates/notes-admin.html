@@ -1,212 +1,98 @@
-{#{% extends 'bootstrap/base.html' %}#}
-{#{% import "bootstrap/wtf.html" as wtf %}#}
-{#{% import "bootstrap/wtf.html" as wtf %}#}
-
 {% block content %}
 {% include "header.html" %}
 
-  <!-- Page Header -->
-  <header class="masthead" style="background-image: url('{{ url_for('static', filename='img/my-group.jpg')}}')">
-    <div class="overlay"></div>
-    <div class="container">
-      <div class="row">
-        <div class="col-lg-8 col-md-10 mx-auto">
-          <div class="page-heading">
-            <h1>לוח הערות</h1>
-              {% if candidate_id and not all_notes %}
-          <span class="subheading" style="direction: rtl">הערות למועמד מס' {{ candidate_id }} קבוצה מספר {{ group }}</span>
-              {% elif all_notes %}
-         <span class="subheading" style="direction: rtl">הערות על קבוצה מס' {{ group }} </span>
-              {% endif %}
-          </div>
+<section class="app-hero px-5 pt-6 pb-6" style="background-image:url('{{ url_for('static', filename='img/edit.jpg') }}')">
+  <h1 class="text-2xl font-extrabold leading-tight">לוח הערות</h1>
+  {% if candidate_id and not all_notes %}
+  <p class="text-white/75 text-sm mt-1">הערות למועמד מס' {{ candidate_id }} קבוצה מספר {{ group }}</p>
+  {% elif all_notes %}
+  <p class="text-white/75 text-sm mt-1">הערות על קבוצה מס' {{ group }}</p>
+  {% endif %}
+</section>
+
+<section class="px-4 mt-4 max-w-md mx-auto">
+  <div class="card bg-base-100 shadow-sm">
+    <div class="card-body p-4">
+      <form method="POST" class="flex flex-col gap-3">
+        {{ form.csrf_token }}
+        <div class="form-control w-full">
+          <label class="label pb-1" for="group"><span class="label-text font-medium">קבוצה</span></label>
+          {{ form.group(class="select select-bordered w-full") }}
+        </div>
+        <div class="form-control w-full">
+          <label class="label pb-1" for="id"><span class="label-text font-medium">מגובש</span></label>
+          {{ form.id(class="select select-bordered w-full") }}
+        </div>
+        <button type="submit" class="btn btn-primary btn-lg w-full">הצג</button>
+      </form>
+    </div>
+  </div>
+</section>
+
+<section class="px-4 mt-4">
+{% if all_notes|length > 0 %}
+  {% for list in all_notes %}
+    {% if list|length > 0 %}
+      <div class="mb-5">
+        <div class="flex items-center gap-2 mb-2">
+          <div class="bib">{{ list[0].subject_id.split("/")[1] }}</div>
+          <h3 class="font-display font-bold text-lg">מועמד מספר {{ list[0].subject_id.split("/")[1] }}</h3>
+        </div>
+        <div class="grid gap-2">
+          {% for note in list %}
+            <div class="card bg-base-100 shadow-sm border-r-4 {{ 'border-success' if note.type == 'טובה' else 'border-error' }}">
+              <div class="card-body p-3">
+                <div class="flex items-center gap-2">
+                  <span class="badge badge-sm {{ 'badge-success' if note.type == 'טובה' else 'badge-error' }} font-medium">{{ note.type }}</span>
+                  <span class="text-xs text-base-content/50 mr-auto">{{ note.date }}</span>
+                </div>
+                <p class="text-sm mt-1.5 whitespace-pre-wrap break-words">{{ note.text }}</p>
+              </div>
+            </div>
+          {% endfor %}
         </div>
       </div>
-    </div>
-      <link href="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" rel="stylesheet">
-    <script src="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js"> </script>
-  </header>
-
-<head>
-    <meta charset="UTF-8">
-    <title>לוח הערות</title>
-
-</head>
-<body>
-<style>
-    .table{
-        float: right;
-        {#size: auto;#}
-        table-layout: fixed;
-    }
-    td {
-    border: 1px solid #000;
-    text-align: right;
-}
-
-tr td {
-    {#width: 1%;#}
-    {#white-space: nowrap;#}
-    text-align: right;
-}
-
-th{
-    text-align: right;
-}
-        label{
-        float: right;
-        direction: rtl;
-    }
-
-tr td {
-    width: 1%;
-    white-space: nowrap;
-    text-align: right;
-}
-select{
-    text-align: right;
-}
-.btn{
-    float: right;
-    direction: rtl;
-    padding: 10px;
-    margin: 10px;
-    margin-right: 50%;
-}
-#station{
-    float: right;
-    direction: rtl;
-}
-#subject{
-    float: right;
-    direction: rtl;
-}
-
-</style>
-
-
-<div class="col-lg-8 col-md-10 mx-auto">
-    <div class="row">
-        <div class="col-md-12">
-            <form method="POST">
-                {{ form.csrf_token }}
-                <div class="form-group text-center">
-                    <label for="group">קבוצה:</label>
-                    {{ form.group(class="form-control") }}
-                </div>
-                <div class="form-group text-center">
-                    <label for="id">מגובש:</label>
-                    {{ form.id(class="form-control") }}
-                </div>
-                <div class="text-center">
-                    <input type="submit" class="btn btn-primary btn-lg">
-                </div>
-            </form>
+    {% endif %}
+  {% endfor %}
+{% elif candidate_id %}
+  <div class="grid gap-2">
+    {% for note in notes %}
+      <div class="card bg-base-100 shadow-sm border-r-4 {{ 'border-success' if note.type == 'טובה' else 'border-error' }}">
+        <div class="card-body p-3">
+          <div class="flex items-center gap-2">
+            <span class="badge badge-sm {{ 'badge-success' if note.type == 'טובה' else 'badge-error' }} font-medium">{{ note.type }}</span>
+            <span class="text-xs text-base-content/50 mr-auto">{{ note.date }}</span>
+          </div>
+          <p class="text-sm mt-1.5 whitespace-pre-wrap break-words">{{ note.text }}</p>
         </div>
-    </div>
-</div>
-<div class="col-lg-8 col-md-10 mx-auto" style="direction: rtl; float: right">
-{#  <form method="POST">#}
-{#    {{ form.hidden_tag() }}#}
-{#    <div class="form-group">#}
-{#      <label for="subject">מספר מגובש</label>#}
-{#      {{ form.id(class="form-control", required="required") }}#}
-{#    </div>#}
-
-{% if all_notes|length > 0 %}
-    {% for list in all_notes %}
-        <div class="mx-auto">
-        {% if list|length > 0 %}
-            <h4 style="text-align: right"> מועמד מספר {{ list[0].subject_id.split("/")[1] }} </h4>
-                <table class = "table table-bordered" style="direction: rtl;">
-                    <thead>
-                    <tr>
-                        <th>סוג הערה</th>
-                        <th>הערה</th>
-                        <th>תאריך</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {% for note in list %}
-                    <tr>
-                    {% if note.type == "טובה" %}
-                        <td class="block" style="background-color: forestgreen"></td>
-                        {% else %}
-                        <td class="block" style="background-color: red"></td>
-                    {% endif %}
-                        <td class="block">{{ note.text }}</td>
-                        <td class="block">{{ note.date }}</td>
-                    </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-        {% endif %}
-        </div>
-    {%  endfor %}
-</div>
-
-
-{% else %}
-<table class = "table table-bordered" style="width:100%; direction: rtl;">
-    <thead>
-    {% if candidate_id %}
-
-    <tr>
-            <th>סוג הערה</th>
-            <th>הערה</th>
-            <th>תאריך</th>
-    </tr>
-    </thead>
-    <tbody>
-        {% for note in notes %}
-        <tr>
-        {% if note.type == "טובה" %}
-            <td class="block" style="color: forestgreen; background-color: forestgreen"></td>
-        {% else %}
-            <td class="block" style="background-color: red"></td>
-        {% endif %}
-            <td class="block">{{ note.text }}</td>
-            <td class="block">{{ note.date }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
+      </div>
+    {% endfor %}
+  </div>
 {% endif %}
+</section>
 
-</table>
-{% endif %}
-    <script>
-        var group_select = document.getElementById("group");
-        var subject_select = document.getElementById("id");
+<script>
+    var group_select = document.getElementById("group");
+    var subject_select = document.getElementById("id");
 
-        group_select.onchange = function() {
+    group_select.onchange = function() {
 
-            group = group_select.value;
+        group = group_select.value;
 
-            fetch('/subjects/' + group).then(function(response) {
+        fetch('/subjects/' + group).then(function(response) {
 
-                response.json().then(function(data) {
-                    var optionHTML = '';
+            response.json().then(function(data) {
+                var optionHTML = '';
 
-                    for (var candidate of data.subjects) {
-                        optionHTML += '<option value="' + candidate.id + '">' + candidate.id + '</option>';
-                    }
-                    subject_select.innerHTML = optionHTML;
-                })
+                for (var candidate of data.subjects) {
+                    optionHTML += '<option value="' + candidate.id + '">' + candidate.id + '</option>';
+                }
+                subject_select.innerHTML = optionHTML;
+            })
 
-            });
-        }
-    </script>
-</body>
+        });
+    }
+</script>
 
-<style>
-footer{
-position: fixed;
-    left:0px;
-   bottom:0px;
-   height:50px;
-   width:100%;
-    padding-top: 20px;
-}
-</style>
-
-
+{% include "footer.html" %}
 {% endblock %}

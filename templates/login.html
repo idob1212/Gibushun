@@ -1,45 +1,23 @@
-{#{% extends 'bootstrap/base.html' %}#}
-{% import "bootstrap/wtf.html" as wtf %}
+{% import "_formhelpers.html" as f %}
 
 {% block content %}
 {% include "header.html" %}
 
-  <!-- Page Header -->
-  <header class="masthead" style="background-image: url({{ url_for('static', filename='img/logo.png')}}">
-      <div class="overlay"></div>
-    <div class="container">
-      <div class="row">
-        <div class="col-lg-8 col-md-10 mx-auto">
-          <div class="page-heading">
-            <h1>התחבר</h1>
-{#            <span class="subheading" style="direction: rtl">ברוך הבא!</span>#}
-          </div>
-        </div>
-      </div>
-    </div>
-      <link href="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" rel="stylesheet">
-    <script src="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js"> </script>
-  </header>
+<section class="app-hero px-5 pt-6 pb-6" style="background-image:url('{{ url_for('static', filename='img/my-group.jpg') }}')">
+  <h1 class="text-2xl font-extrabold leading-tight">התחבר</h1>
+</section>
 
-  <div class="container">
-    <div class="row">
-<style>
-    label{
-        float: right;
-        direction: rtl;
-    }
-    .site-heading{
-        color:white;
-    }
+<div class="px-4 mt-4">
+  {% include "flash-messages.html" %}
+</div>
 
-</style>
-      <div class="col-lg-8 col-md-10 mx-auto content" style="direction: rtl; float: right">
-        {% include "flash-messages.html" %}
-        {{ wtf.quick_form(form, novalidate=True, button_map={"submit": "primary"}) }}
-      </div>
+<section class="px-4 mt-4 max-w-md mx-auto">
+  <div class="card bg-base-100 shadow-sm">
+    <div class="card-body p-4">
+      {{ f.render_form(form, submit_label="התחבר") }}
     </div>
   </div>
-
+</section>
 
 {% include "footer.html" %}
 {% endblock %}

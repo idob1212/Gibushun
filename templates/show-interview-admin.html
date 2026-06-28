@@ -1,201 +1,92 @@
-{#{% extends 'bootstrap/base.html' %}#}
-{#{% import "bootstrap/wtf.html" as wtf %}#}
-{% import "bootstrap/wtf.html" as wtf %}
+{% import "_formhelpers.html" as f %}
 
 {% block content %}
 {% include "header.html" %}
 
-  <!-- Page Header -->
-  <header class="masthead" style="background-image: url('{{ url_for('static', filename='img/interviews-tot.jpg')}}')">
-    <div class="overlay"></div>
-    <div class="container">
-      <div class="row">
-        <div class="col-lg-8 col-md-10 mx-auto">
-          <div class="page-heading">
-            <h1>סיכום ראיון</h1>
-              {% if all_candidates|length > 0 %}
-                <span class="subheading" style="direction: rtl">ראיונות כל המועמדים</span>
-              {% elif candidate %}
-                <span class="subheading" style="direction: rtl"> ראיון מועמד מס'  {{ candidate_id }} </span>
-              {% else %}
-              {# <span class="subheading" style="direction: rtl">חוות דעת על כולם </span>#}
-              {% endif %}
+<section class="app-hero px-5 pt-6 pb-6" style="background-image:url('{{ url_for('static', filename='img/interviews-tot.jpg') }}')">
+  <h1 class="text-2xl font-extrabold leading-tight">סיכום ראיון</h1>
+  {% if all_candidates|length > 0 %}
+  <p class="text-white/75 text-sm mt-1">ראיונות כל המועמדים</p>
+  {% elif candidate %}
+  <p class="text-white/75 text-sm mt-1">ראיון מועמד מס' {{ candidate_id }}</p>
+  {% endif %}
+</section>
+
+<section class="px-4 mt-4 max-w-md mx-auto">
+  <div class="card bg-base-100 shadow-sm">
+    <div class="card-body p-4">
+      {{ f.render_form(form, submit_label="הצג") }}
+    </div>
+  </div>
+</section>
+
+<section class="px-4 mt-4">
+{% if all_candidates|length > 0 %}
+  <div class="grid gap-3">
+    {% for candidate in all_candidates %}
+      <div class="card bg-base-100 shadow-sm">
+        <div class="card-body p-4">
+          <div class="flex items-center gap-3 mb-2">
+            <div class="bib">{{ candidate.id.split("/")[1] }}</div>
+            <h3 class="font-display font-bold text-lg flex-1">מועמד מספר {{ candidate.id.split("/")[1] }}</h3>
+            {% if candidate.interview_grade %}<span class="score-chip bg-base-200 text-base-content">ציון <b>{{ candidate.interview_grade }}</b></span>{% endif %}
           </div>
+          <dl class="divide-y divide-base-200 text-sm">
+            <div class="flex gap-3 py-2"><dt class="font-semibold w-28 shrink-0 text-base-content/70">שם מראיין</dt><dd class="flex-1 whitespace-pre-wrap break-words">{{ candidate.interviewer }}</dd></div>
+            <div class="flex gap-3 py-2"><dt class="font-semibold w-28 shrink-0 text-base-content/70">סיכום ראיון</dt><dd class="flex-1 whitespace-pre-wrap break-words">{{ candidate.interview_note }}</dd></div>
+            <div class="flex gap-3 py-2"><dt class="font-semibold w-28 shrink-0 text-base-content/70">בעיות תש</dt><dd class="flex-1 whitespace-pre-wrap break-words">{{ candidate.tash_prob }}</dd></div>
+            <div class="flex gap-3 py-2"><dt class="font-semibold w-28 shrink-0 text-base-content/70">בעיות רפואיות</dt><dd class="flex-1 whitespace-pre-wrap break-words">{{ candidate.medical_prob }}</dd></div>
+          </dl>
         </div>
       </div>
-    </div>
-      <link href="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" rel="stylesheet">
-    <script src="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js"> </script>
-  </header>
-
-<head>
-    <meta charset="UTF-8">
-    <title>ראיון</title>
-</head>
-<body>
-<style>
-    .table {
-        float: right;
-        table-layout: fixed;
-    }
-    td {
-        border: 1px solid #000;
-        text-align: right;
-    }
-    tr td {
-        text-align: right;
-    }
-    th {
-        text-align: right;
-    }
-    label {
-        float: right;
-        direction: rtl;
-    }
-    .btn {
-        float: right;
-        direction: rtl;
-        padding: 10px;
-        margin: 10px;
-        margin-right: 50%;
-    }
-    #station {
-        float: right;
-        direction: rtl;
-    }
-    #subject {
-        float: right;
-        direction: rtl;
-    }
-    .form-control {
-        float: right;
-        direction: rtl;
-    }
-    footer {
-        position: fixed;
-        left: 0px;
-        bottom: 0px;
-        height: 50px;
-        width: 100%;
-        padding-top: 20px;
-    }
-    .candidate-card {
-        direction: rtl;
-        background: #fff;
-        border: 1px solid #ddd;
-        border-radius: 8px;
-        padding: 16px 20px;
-        margin: 16px auto;
-        max-width: 900px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-    }
-    .candidate-card h4 {
-        text-align: right;
-        margin: 0 0 12px 0;
-        padding-bottom: 8px;
-        border-bottom: 2px solid #eee;
-    }
-    .candidate-card .kv {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        padding: 8px 0;
-        border-bottom: 1px solid #f0f0f0;
-    }
-    .candidate-card .kv:last-of-type {
-        border-bottom: none;
-    }
-    .candidate-card .kv dt {
-        flex: 0 0 130px;
-        font-weight: 700;
-        color: #333;
-    }
-    .candidate-card .kv dd {
-        flex: 1 1 200px;
-        margin: 0;
-        white-space: pre-wrap;
-        word-break: break-word;
-        text-align: right;
-    }
-    @media (max-width: 600px) {
-        .candidate-card { padding: 12px 14px; margin: 12px 8px; }
-        .candidate-card .kv dt { flex: 0 0 100%; }
-        .candidate-card .kv dd { flex: 0 0 100%; }
-    }
-</style>
-
-<div>
-{{ wtf.quick_form(form, novalidate=True, button_map={"submit": "primary"}) }}
-</div>
-
-{% if all_candidates|length > 0 %}
-    {% for candidate in all_candidates %}
-        <div class="candidate-card">
-            <h4>מועמד מספר {{ candidate.id.split("/")[1] }}</h4>
-            <dl>
-                <div class="kv"><dt>ציון ראיון</dt><dd>{{ candidate.interview_grade }}</dd></div>
-                <div class="kv"><dt>שם מראיין</dt><dd>{{ candidate.interviewer }}</dd></div>
-                <div class="kv"><dt>סיכום ראיון</dt><dd>{{ candidate.interview_note }}</dd></div>
-                <div class="kv"><dt>בעיות תש</dt><dd>{{ candidate.tash_prob }}</dd></div>
-                <div class="kv"><dt>בעיות רפואיות</dt><dd>{{ candidate.medical_prob }}</dd></div>
-            </dl>
-        </div>
     {% endfor %}
+  </div>
 {% elif candidate %}
-<table class = "table table-bordered" style="width:100%; direction: rtl;">
-    <thead>
-    <tr>
-        <th>ציון ראיון</th>
-        <th>שם מראיין</th>
-        <th>סיכום ראיון</th>
-        <th>בעיות תש</th>
-        <th>בעיות רפואיות</th>
-{#        <th>עריכה</th>#}
-{#        <th>מחק</th>#}
-    </tr>
-    </thead>
-    <tbody>
-    {% if candidate.interview_grade %}
-    <tr>
-        <td class="block">{{ candidate.interview_grade }}</td>
-        <td class="block">{{ candidate.interviewer }}</td>
-        <td class="block">{{ candidate.interview_note }}</td>
-        <td class="block">{{ candidate.tash_prob }}</td>
-        <td class="block">{{ candidate.medical_prob }}</td>
-    </tr>
-    {% endif %}
-    </tbody>
-</table>
+  {% if candidate.interview_grade %}
+    <div class="card bg-base-100 shadow-sm">
+      <div class="card-body p-4">
+        <div class="flex items-center gap-3 mb-2">
+          <div class="bib">{{ candidate.id.split("/")[1] }}</div>
+          <span class="score-chip bg-base-200 text-base-content flex-1 justify-start">ציון <b>{{ candidate.interview_grade }}</b></span>
+        </div>
+        <dl class="divide-y divide-base-200 text-sm">
+          <div class="flex gap-3 py-2"><dt class="font-semibold w-28 shrink-0 text-base-content/70">שם מראיין</dt><dd class="flex-1 whitespace-pre-wrap break-words">{{ candidate.interviewer }}</dd></div>
+          <div class="flex gap-3 py-2"><dt class="font-semibold w-28 shrink-0 text-base-content/70">סיכום ראיון</dt><dd class="flex-1 whitespace-pre-wrap break-words">{{ candidate.interview_note }}</dd></div>
+          <div class="flex gap-3 py-2"><dt class="font-semibold w-28 shrink-0 text-base-content/70">בעיות תש</dt><dd class="flex-1 whitespace-pre-wrap break-words">{{ candidate.tash_prob }}</dd></div>
+          <div class="flex gap-3 py-2"><dt class="font-semibold w-28 shrink-0 text-base-content/70">בעיות רפואיות</dt><dd class="flex-1 whitespace-pre-wrap break-words">{{ candidate.medical_prob }}</dd></div>
+        </dl>
+      </div>
+    </div>
+  {% endif %}
 {% endif %}
-</div>
-    <script>
-        var group_select = document.getElementById("group");
-        var subject_select = document.getElementById("id");
+</section>
 
-        group_select.onchange = function() {
+<script>
+    var group_select = document.getElementById("group");
+    var subject_select = document.getElementById("id");
 
-            group = group_select.value;
+    group_select.onchange = function() {
 
-            fetch('/subjects/' + group).then(function(response) {
+        group = group_select.value;
 
-                response.json().then(function(data) {
-                    var optionHTML = '';
+        fetch('/subjects/' + group).then(function(response) {
 
-                    for (var candidate of data.subjects) {
-                        optionHTML += '<option value="' + candidate.id + '">' + candidate.id + '</option>';
-                    }
-                    
-                    // Add "כולם" option
-                    optionHTML += '<option value="כולם">כולם</option>';
-                    
-                    subject_select.innerHTML = optionHTML;
-                })
+            response.json().then(function(data) {
+                var optionHTML = '';
 
-            });
-        }
-    </script>
-</body>
+                for (var candidate of data.subjects) {
+                    optionHTML += '<option value="' + candidate.id + '">' + candidate.id + '</option>';
+                }
 
-</html>
+                // Add "כולם" option
+                optionHTML += '<option value="כולם">כולם</option>';
+
+                subject_select.innerHTML = optionHTML;
+            })
+
+        });
+    }
+</script>
+
+{% include "footer.html" %}
 {% endblock %}
-{#{% include "footer.html" %}#}

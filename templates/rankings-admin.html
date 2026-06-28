@@ -1,147 +1,68 @@
-{#{% extends 'bootstrap/base.html' %}#}
-{#{% import "bootstrap/wtf.html" as wtf %}#}
-{% import "bootstrap/wtf.html" as wtf %}
+{% import "_formhelpers.html" as f %}
 
 {% block content %}
 {% include "header.html" %}
 
-  <!-- Page Header -->
-  <header class="masthead" style="background-image: url('{{ url_for('static', filename='img/rankings.jpg')}}')">
-    <div class="overlay"></div>
-    <div class="container">
-      <div class="row">
-        <div class="col-lg-8 col-md-10 mx-auto">
-          <div class="page-heading">
-            <h1>לוח חוות דעת</h1>
-              {% if user_id != 0 %}
-          <span class="subheading" style="direction: rtl">דירוג המגובשים לפי תחנות </span>
-              {% else %}
-{#         <span class="subheading" style="direction: rtl">חוות דעת על כולם </span>#}
-              {% endif %}
-          </div>
-        </div>
-      </div>
+<section class="app-hero px-5 pt-6 pb-6" style="background-image:url('{{ url_for('static', filename='img/rankings.jpg') }}')">
+  <h1 class="text-2xl font-extrabold leading-tight">לוח חוות דעת</h1>
+  {% if user_id != 0 %}
+  <p class="text-white/75 text-sm mt-1">דירוג המגובשים לפי תחנות</p>
+  {% endif %}
+</section>
+
+<section class="px-4 mt-4 max-w-md mx-auto">
+  <div class="card bg-base-100 shadow-sm">
+    <div class="card-body p-4">
+      {{ f.render_form(form, submit_label="הצג") }}
     </div>
-      <link href="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" rel="stylesheet">
-    <script src="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js"> </script>
-  </header>
+  </div>
+</section>
 
-<head>
-    <meta charset="UTF-8">
-    <title>דירוגים</title>
-</head>
-<body>
-<style>
-    .table{
-        float: right;
-        {#size: auto;#}
-        {#table-layout: fixed;#}
-    }
-    td {
-    border: 1px solid #000;
-    text-align: right;
-}
-
-tr td {
-    {#width: 1%;#}
-    {#white-space: nowrap;#}
-    text-align: right;
-}
-
-th{
-    text-align: right;
-}
-        label{
-        float: right;
-        direction: rtl;
-    }
-select{
-        float: right;
-        direction: rtl;
-    }
-
-
-.btn{
-    float: right;
-    direction: rtl;
-    padding: 10px;
-    margin: 10px;
-    margin-right: 50%;
-}
-#station{
-    float: right;
-    direction: rtl;
-}
-#subject{
-    float: right;
-    direction: rtl;
-}
-
-</style>
-{{ wtf.quick_form(form, novalidate=True, button_map={"submit": "primary"}) }}
-    <script>
-        var group_select = document.getElementById("group");
-        var station_select = document.getElementById("station");
-        group_select.onchange = function() {
-
-            group = group_select.value;
-
-            fetch('/stations/' + group).then(function(response) {
-
-            response.json().then(function(data) {
-                var optionHTML = '';
-
-                for (var station of data.stations) {
-                    optionHTML += '<option value="' + station.id + '">' + station.id + '</option>';
-                }
-
-                station_select.innerHTML = optionHTML;
-            })
-
-        });
-        }
-    </script>
 {% if reviews %}
-<table class = "table table-bordered" style="width:100%; direction: rtl;">
-    <thead>
-    <tr>
-        <th>מספר מועמד</th>
-        <th>ציון</th>
-        <th>הערה</th>
-{#        <th>עריכה</th>#}
-{#        <th>מחק</th>#}
-    </tr>
-    </thead>
-    <tbody>
-        {% for review in reviews %}
-            {% if review.subject.status != "פרש" %}
-    <tr>
-    {% if review.subject_id %}
-        <td class="block">{{ review.subject_id.split("/")[1] }}</td>
-        <td class="block">{{ review.grade|round(2) }}</td>
-        <td class="block">{{ review.note }}</td>
+<section class="px-4 mt-4">
+  <div class="grid gap-2.5">
+    {% for review in reviews %}
+      {% if review.subject.status != "פרש" %}
+        {% if review.subject_id %}
+          {% set g = review.grade|float %}
+          <div class="card bg-base-100 shadow-sm">
+            <div class="card-body p-3 flex-row items-center gap-3">
+              <div class="bib">{{ review.subject_id.split("/")[1] }}</div>
+              <div class="flex-1 min-w-0">
+                {% if review.note %}<div class="text-sm text-base-content/70 whitespace-pre-wrap break-words">{{ review.note }}</div>{% endif %}
+              </div>
+              <span class="score-chip {% if g >= 3.3 %}score-good{% elif g >= 2.5 %}score-mid{% elif g > 0 %}score-low{% else %}bg-base-200 text-base-content/50{% endif %}">ציון <b>{{ review.grade|round(2) }}</b></span>
+            </div>
+          </div>
         {% endif %}
-    </tr>
-            {% endif %}
-        {% endfor %}
-    </tbody>
-
-</table>
+      {% endif %}
+    {% endfor %}
+  </div>
+</section>
 {% endif %}
 
-</body>
+<script>
+    var group_select = document.getElementById("group");
+    var station_select = document.getElementById("station");
+    group_select.onchange = function() {
 
-<style>
-footer{
-position: fixed;
-    left:0px;
-   bottom:0px;
-   height:50px;
-   width:100%;
-    padding-top: 20px;
-}
-</style>
+        group = group_select.value;
 
+        fetch('/stations/' + group).then(function(response) {
 
-    {% endblock %}
-{#{% include "footer.html" %}#}
+        response.json().then(function(data) {
+            var optionHTML = '';
+
+            for (var station of data.stations) {
+                optionHTML += '<option value="' + station.id + '">' + station.id + '</option>';
+            }
+
+            station_select.innerHTML = optionHTML;
+        })
+
+    });
+    }
+</script>
+
+{% include "footer.html" %}
+{% endblock %}

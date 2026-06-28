@@ -1,197 +1,75 @@
-{#{% extends 'bootstrap/base.html' %}#}
-{#{% import "bootstrap/wtf.html" as wtf %}#}
-{% import "bootstrap/wtf.html" as wtf %}
+{% import "_formhelpers.html" as f %}
 
 {% block content %}
 {% include "header.html" %}
 
-  <!-- Page Header -->
-  <header class="masthead" style="background-image: url('{{ url_for('static', filename='img/my-group.jpg')}}')">
-    <div class="overlay"></div>
-    <div class="container">
-      <div class="row">
-        <div class="col-lg-8 col-md-10 mx-auto">
-          <div class="page-heading">
-            <h1>לוח הערות</h1>
-            {% if everyone%}
-                <span class="subheading" style="direction: rtl">הערות לכל המועמדים </span>
-          {% elif candidate_id %}
-          <span class="subheading" style="direction: rtl">הערות  למועמד מס'  {{ candidate_id }} </span>
-                {% endif %}
+<section class="app-hero px-5 pt-6 pb-6" style="background-image:url('{{ url_for('static', filename='img/edit.jpg') }}')">
+  <h1 class="text-2xl font-extrabold leading-tight">לוח הערות</h1>
+  {% if everyone %}
+  <p class="text-white/75 text-sm mt-1">הערות לכל המועמדים</p>
+  {% elif candidate_id %}
+  <p class="text-white/75 text-sm mt-1">הערות למועמד מס' {{ candidate_id }}</p>
+  {% endif %}
+</section>
 
-          </div>
+<section class="px-4 mt-4 max-w-md mx-auto">
+  <a href="{{ url_for('add_new_note') }}" class="btn btn-accent w-full mb-3"><i class="fas fa-pen"></i> כתוב הערה</a>
+  <div class="card bg-base-100 shadow-sm">
+    <div class="card-body p-4">
+      {{ f.render_form(form, submit_label="הצג") }}
+    </div>
+  </div>
+</section>
+
+<section class="px-4 mt-4">
+{% if everyone %}
+  {% for list in all_notes %}
+    {% if list|length > 0 %}
+      <div class="mb-5">
+        <div class="flex items-center gap-2 mb-2">
+          <div class="bib">{{ list[0].subject_id.split("/")[1] }}</div>
+          <h3 class="font-display font-bold text-lg">מועמד מספר {{ list[0].subject_id.split("/")[1] }}</h3>
+        </div>
+        <div class="grid gap-2">
+          {% for note in list %}
+            <div class="card bg-base-100 shadow-sm border-r-4 {% if note.type == 'טובה' %}border-success{% elif note.type == 'ניטרלית' %}border-warning{% else %}border-error{% endif %}">
+              <div class="card-body p-3">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="badge badge-sm {% if note.type == 'טובה' %}badge-success{% elif note.type == 'ניטרלית' %}badge-warning{% else %}badge-error{% endif %} font-medium">{{ note.type }}</span>
+                  {% if note.location %}<span class="badge badge-ghost badge-sm">{{ note.location }}</span>{% endif %}
+                  <span class="text-xs text-base-content/50 mr-auto">{{ note.date }}</span>
+                </div>
+                <p class="text-sm mt-1.5 whitespace-pre-wrap break-words">{{ note.text }}</p>
+                {% if note.date != "" %}
+                <a href="{{ url_for('edit_note', note_id=note.id) }}" class="btn btn-xs btn-ghost mt-2"><i class="fas fa-pen"></i> ערוך</a>
+                {% endif %}
+              </div>
+            </div>
+          {% endfor %}
         </div>
       </div>
-    </div>
-      <link href="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" rel="stylesheet">
-    <script src="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js"> </script>
-  </header>
-
-<head>
-    <meta charset="UTF-8">
-    <title>לוח הערות</title>
-</head>
-<style>
-    .table{
-        float: right;
-        {#size: auto;#}
-        table-layout: fixed;
-    }
-    td {
-    border: 1px solid #000;
-    text-align: right;
-}
-
-tr td {
-    {#width: 1%;#}
-    {#white-space: nowrap;#}
-    text-align: right;
-}
-
-th{
-    text-align: right;
-}
-        label{
-        float: right;
-        direction: rtl;
-    }
-
-.btn{
-    float: right;
-    direction: rtl;
-    padding: 10px;
-    margin: 10px;
-    margin-right: 50%;
-}
-
-#station{
-    float: right;
-    direction: rtl;
-}
-#subject{
-    float: right;
-    direction: rtl;
-}
-
-.form-control{
-    float: right;
-    direction: rtl;
-    width: 100%;
-}
-</style>
-<body>
-<div class="container">
-
-    <a href = "{{ url_for('add_new_note') }}"><button class=" btn-primary btn-lg btn-block" style="margin-bottom: 10px;"> כתוב הערה</button></a>
-
-<div class="row">
-        <div class="col-lg-8 col-md-10 mx-auto" style="direction: rtl; float: right">
-                {{ wtf.quick_form(form, novalidate=True, button_map={"submit": "primary"}) }}
-            </div>
-    </div>
-<div class="row">
-        <div class="col-lg-8 col-md-10 mx-auto" style="direction: rtl; float: right">
-{#  <form method="POST">#}
-{#    {{ form.hidden_tag() }}#}
-{#    <div class="form-group">#}
-{#      <label for="subject">מספר מגובש</label>#}
-{#      {{ form.id(class="form-control", required="required") }}#}
-{#    </div>#}
-
-{% if everyone %}
-    {% for list in all_notes %}
-        <div class="mx-auto">
-        {% if list|length > 0 %}
-            <h4 style="text-align: right"> מועמד מספר {{ list[0].subject_id.split("/")[1] }} </h4>
-                <table class = "table table-bordered" style="direction: rtl;">
-                    <thead>
-                    <tr>
-                        <th>סוג הערה</th>
-                        <th>הערה</th>
-                        <th>מיקום</th>
-                        <th>תאריך</th>
-                        <th>פעולות</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {% for note in list %}
-                    <tr>
-                    {% if note.type == "טובה" %}
-                        <td class="block" style="background-color: forestgreen"></td>
-                    {% elif note.type == "ניטרלית" %}
-                        <td class="block" style="background-color: blue"></td>
-                    {% else %}
-                        <td class="block" style="background-color: red"></td>
-                    {% endif %}
-                        <td class="block">{{ note.text }}</td>
-                        <td class="block">{{ note.location }}</td>
-                        <td class="block">{{ note.date }}</td>
-                        <td class="block">
-                            {% if note.date != "" %}
-                            <a href="{{ url_for('edit_note', note_id=note.id) }}">ערוך</a>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-        {% endif %}
+    {% endif %}
+  {% endfor %}
+{% elif candidate_id %}
+  <div class="grid gap-2">
+    {% for note in notes %}
+      <div class="card bg-base-100 shadow-sm border-r-4 {% if note.type == 'טובה' %}border-success{% elif note.type == 'ניטרלית' %}border-warning{% else %}border-error{% endif %}">
+        <div class="card-body p-3">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="badge badge-sm {% if note.type == 'טובה' %}badge-success{% elif note.type == 'ניטרלית' %}badge-warning{% else %}badge-error{% endif %} font-medium">{{ note.type }}</span>
+            {% if note.location %}<span class="badge badge-ghost badge-sm">{{ note.location }}</span>{% endif %}
+            <span class="text-xs text-base-content/50 mr-auto">{{ note.date }}</span>
+          </div>
+          <p class="text-sm mt-1.5 whitespace-pre-wrap break-words">{{ note.text }}</p>
+          {% if note.date != "" %}
+          <a href="{{ url_for('edit_note', note_id=note.id) }}" class="btn btn-xs btn-ghost mt-2"><i class="fas fa-pen"></i> ערוך</a>
+          {% endif %}
         </div>
+      </div>
     {% endfor %}
-
-{% else %}
-<table class = "table table-bordered" style="width:100%; direction: rtl;">
-    <thead>
-    {% if candidate_id %}
-
-    <tr>
-            <th>סוג הערה</th>
-            <th>הערה</th>
-            <th>מיקום</th>
-            <th>תאריך</th>
-            <th>פעולות</th>
-    </tr>
-    </thead>
-    <tbody>
-        {% for note in notes %}
-        <tr>
-        {% if note.type == "טובה" %}
-            <td class="block" style="color: forestgreen; background-color: forestgreen"></td>
-        {% elif note.type == "ניטרלית" %}
-            <td class="block" style="color: blue; background-color: blue"></td>
-        {% else %}
-            <td class="block" style="background-color: red"></td>
-        {% endif %}
-            <td class="block">{{ note.text }}</td>
-            <td class="block">{{ note.location }}</td>
-            <td class="block">{{ note.date }}</td>
-            <td class="block">
-                {% if note.date != "" %}
-                <a href="{{ url_for('edit_note', note_id=note.id) }}">ערוך</a>
-                {% endif %}            
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
+  </div>
 {% endif %}
+</section>
 
-</table>
-{% endif %}
-</div>
-</div>
-</div>
-</body>
-
-<style>
-footer{
-position: fixed;
-    left:0px;
-   bottom:0px;
-   height:50px;
-   width:100%;
-    padding-top: 20px;
-}
-</style>
-</html>
+{% include "footer.html" %}
 {% endblock %}
-{#{% include "footer.html" %}#}

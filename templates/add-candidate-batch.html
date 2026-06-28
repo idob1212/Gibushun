@@ -1,111 +1,75 @@
 {% block content %}
 {% include "header.html" %}
 
-  <!-- Page Header -->
-  <header class="masthead" style="background-image: url({{ url_for('static', filename='img/add.jpg')}})">
-    <div class="overlay"></div>
-    <div class="container">
-      <div class="row">
-        <div class="col-lg-8 col-md-10 mx-auto">
-          <div class="page-heading">
-              {% if is_edit %}
-              <h1>ערוך מגובש</h1>
-            {% else %}
-            <h1>הוסף מגובש לקבוצה</h1>
-              {% endif %}
-{#            <span class="subheading">Start Contributing to the Blog!</span>#}
+<section class="app-hero px-5 pt-6 pb-6" style="background-image:url('{{ url_for('static', filename='img/add.jpg') }}')">
+  {% if is_edit %}
+    <h1 class="text-2xl font-extrabold leading-tight">ערוך מגובש</h1>
+  {% else %}
+    <h1 class="text-2xl font-extrabold leading-tight">הוסף מגובש לקבוצה</h1>
+  {% endif %}
+</section>
+
+<section class="px-4 mt-4">
+  <div class="col-lg-8 col-md-10 mx-auto">
+    <a href="{{ url_for('addCandidate') }}" class="btn btn-outline btn-primary w-full mb-4">
+      <i class="fas fa-user"></i> מצב יחיד
+    </a>
+
+    {% if existing_numbers %}
+    <div class="alert alert-info mb-4">
+      <span><strong>מספרי מגובשים קיימים:</strong> {{ existing_numbers|join(', ') }}</span>
+    </div>
+    {% endif %}
+
+    {% include "flash-messages.html" %}
+
+    {% if duplicates %}
+    <div class="alert alert-warning mb-4">
+      <span>המספרים הבאים כבר קיימים במערכת: {{ duplicates|join(', ') }}</span>
+    </div>
+    {% endif %}
+
+    <form method="POST" id="batch-form">
+      <div class="card bg-base-100 shadow-sm mb-4">
+        <div class="card-body p-3">
+          <div class="overflow-x-auto">
+            <table class="table w-full">
+              <thead>
+                <tr>
+                  {% for field in form if field.name != 'csrf_token' and field.name != 'submit' %}
+                    <th>{{ field.label.text }}</th>
+                  {% endfor %}
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="candidates-tbody">
+                {% if duplicates %}
+                  {% for duplicate in duplicates %}
+                  <tr class="candidate-row">
+                    <td><input type="text" name="id" class="form-control input input-bordered input-sm w-full" value="{{ duplicate }}" /></td>
+                    <td><input type="text" name="name" class="form-control input input-bordered input-sm w-full" /></td>
+                    <td><span class="remove-row text-error cursor-pointer text-lg">❌</span></td>
+                  </tr>
+                  {% endfor %}
+                {% else %}
+                  <tr class="candidate-row">
+                    {% for field in form if field.name != 'csrf_token' and field.name != 'submit' %}
+                      <td>{{ field(class="form-control input input-bordered input-sm w-full") }}</td>
+                    {% endfor %}
+                    <td><span class="remove-row text-error cursor-pointer text-lg">❌</span></td>
+                  </tr>
+                {% endif %}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
-    </div>
-      <link href="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" rel="stylesheet">
-    <script src="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js"> </script>
-  </header>
 
-<style>
-    label, th {
-        direction: rtl;
-        text-align: right;
-    }
-    
-    .candidate-table {
-        width: 100%;
-        margin-bottom: 20px;
-        direction: rtl;
-        border-collapse: collapse;
-    }
-    
-    .candidate-table th, .candidate-table td {
-        padding: 8px;
-        text-align: right;
-        vertical-align: middle;
-    }
-    
-    .remove-row {
-        color: red;
-        cursor: pointer;
-    }
-</style>
-
-  <div class="container">
-    <div class="row">
-      <div class="col-lg-8 col-md-10 mx-auto" style="direction: rtl">
-        <!-- Add the single addition button -->
-        <div class="text-center mb-4">
-          <a href="{{ url_for('addCandidate') }}" class="btn btn-primary">מצב יחיד</a>
-        </div>
-
-        <!-- Display existing candidate numbers -->
-        {% if existing_numbers %}
-        <div class="alert alert-info">
-          <strong>מספרי מגובשים קיימים:</strong> {{ existing_numbers|join(', ') }}
-        </div>
-        {% endif %}
-
-        {% include "flash-messages.html" %}
-        
-        {% if duplicates %}
-        <div class="alert alert-warning">
-            המספרים הבאים כבר קיימים במערכת: {{ duplicates|join(', ') }}
-        </div>
-        {% endif %}
-
-        <form method="POST" id="batch-form">
-          <table class="table table-striped" style="width:100%; direction: rtl;">
-            <thead>
-                <tr>
-                    {% for field in form if field.name != 'csrf_token' and field.name != 'submit' %}
-                        <th>{{ field.label.text }}</th>
-                    {% endfor %}
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody id="candidates-tbody">
-                {% if duplicates %}
-                    {% for duplicate in duplicates %}
-                    <tr class="candidate-row">
-                        <td><input type="text" name="id" class="form-control" value="{{ duplicate }}" /></td>
-                        <td><input type="text" name="name" class="form-control" /></td>
-                        <td><span class="remove-row">❌</span></td>
-                    </tr>
-                    {% endfor %}
-                {% else %}
-                    <tr class="candidate-row">
-                        {% for field in form if field.name != 'csrf_token' and field.name != 'submit' %}
-                            <td>{{ field(class="form-control") }}</td>
-                        {% endfor %}
-                        <td><span class="remove-row">❌</span></td>
-                    </tr>
-                {% endif %}
-            </tbody>
-          </table>
-          
-          <button type="button" class="btn btn-secondary" id="add-row">הוסף מגובש נוסף</button>
-          <button type="submit" class="btn btn-primary">שמור מגובשים</button>
-        </form>
-      </div>
-    </div>
+      <button type="button" class="btn btn-outline w-full mb-3" id="add-row">הוסף מגובש נוסף</button>
+      <button type="submit" class="btn btn-primary btn-lg w-full">שמור מגובשים</button>
+    </form>
   </div>
+</section>
 
 <script>
 // Function to check for duplicate IDs in the form
@@ -113,15 +77,15 @@ function checkDuplicateIds() {
     const rows = document.querySelectorAll('.candidate-row');
     const ids = {};
     const duplicates = [];
-    
+
     rows.forEach((row, index) => {
         const idInput = row.querySelector('input[name="id"]');
         const id = idInput.value.trim();
-        
+
         // Reset styling
         idInput.classList.remove('is-invalid');
         idInput.style.backgroundColor = '';
-        
+
         if (id) {
             if (ids[id]) {
                 // Mark both current and previous as duplicates
@@ -132,7 +96,7 @@ function checkDuplicateIds() {
             }
         }
     });
-    
+
     // Highlight duplicates
     duplicates.forEach(index => {
         const row = document.querySelectorAll('.candidate-row')[index];
@@ -140,7 +104,7 @@ function checkDuplicateIds() {
         idInput.classList.add('is-invalid');
         idInput.style.backgroundColor = '#ffe6e6';
     });
-    
+
     return duplicates.length === 0;
 }
 
@@ -148,11 +112,11 @@ function checkDuplicateIds() {
 function showValidationResults(data) {
     const existingAlerts = document.querySelectorAll('.validation-alert');
     existingAlerts.forEach(alert => alert.remove());
-    
+
     const container = document.querySelector('.col-lg-8.col-md-10.mx-auto');
     const alertsContainer = document.createElement('div');
     alertsContainer.className = 'validation-alerts';
-    
+
     if (data.summary.total_failed > 0) {
         // Summary alert
         const summaryAlert = document.createElement('div');
@@ -164,7 +128,7 @@ function showValidationResults(data) {
             נכשלו: ${data.summary.total_failed}
         `;
         alertsContainer.appendChild(summaryAlert);
-        
+
         // Show specific errors
         if (data.results.duplicate_in_batch.length > 0) {
             const duplicateAlert = document.createElement('div');
@@ -175,7 +139,7 @@ function showValidationResults(data) {
             `;
             alertsContainer.appendChild(duplicateAlert);
         }
-        
+
         if (data.results.existing_candidates.length > 0) {
             const existingAlert = document.createElement('div');
             existingAlert.className = 'alert alert-warning validation-alert';
@@ -185,7 +149,7 @@ function showValidationResults(data) {
             `;
             alertsContainer.appendChild(existingAlert);
         }
-        
+
         if (data.results.invalid_data.length > 0) {
             const invalidAlert = document.createElement('div');
             invalidAlert.className = 'alert alert-danger validation-alert';
@@ -195,7 +159,7 @@ function showValidationResults(data) {
             `;
             alertsContainer.appendChild(invalidAlert);
         }
-        
+
         if (data.results.errors.length > 0) {
             const errorAlert = document.createElement('div');
             errorAlert.className = 'alert alert-danger validation-alert';
@@ -214,21 +178,21 @@ function showValidationResults(data) {
         `;
         alertsContainer.appendChild(successAlert);
     }
-    
+
     container.insertBefore(alertsContainer, container.querySelector('form'));
 }
 
 document.getElementById('add-row').addEventListener('click', function() {
     const tbody = document.getElementById('candidates-tbody');
     const template = tbody.querySelector('.candidate-row').cloneNode(true);
-    
+
     // Clear the values in the cloned row
     template.querySelectorAll('input, select').forEach(input => {
         input.value = '';
         input.classList.remove('is-invalid');
         input.style.backgroundColor = '';
     });
-    
+
     tbody.appendChild(template);
 });
 
@@ -253,43 +217,43 @@ document.addEventListener('input', function(e) {
 // Add form submission handler
 document.getElementById('batch-form').addEventListener('submit', function(e) {
     e.preventDefault();
-    
+
     // Check for client-side duplicates first
     if (!checkDuplicateIds()) {
         const duplicateAlert = document.createElement('div');
         duplicateAlert.className = 'alert alert-danger validation-alert';
         duplicateAlert.innerHTML = '<strong>שגיאה:</strong> יש מספרים כפולים בטופס. אנא תקן את הכפילויות לפני השליחה.';
-        
+
         const container = document.querySelector('.col-lg-8.col-md-10.mx-auto');
         const existingAlerts = document.querySelectorAll('.validation-alert');
         existingAlerts.forEach(alert => alert.remove());
-        
+
         container.insertBefore(duplicateAlert, container.querySelector('form'));
         return;
     }
-    
+
     const rows = document.querySelectorAll('.candidate-row');
     const candidates = [];
-    
+
     rows.forEach(row => {
         const inputs = row.querySelectorAll('input, select');
         const candidate = {};
-        
+
         inputs.forEach(input => {
             candidate[input.name] = input.value.trim();
         });
-        
+
         // Only add if both ID and name are present
         if (candidate.id && candidate.name) {
             candidates.push(candidate);
         }
     });
-    
+
     if (candidates.length === 0) {
         alert('אנא הוסף לפחות מגובש אחד עם מספר ושם.');
         return;
     }
-    
+
     fetch('/add-candidate-batch', {
         method: 'POST',
         headers: {
@@ -301,7 +265,7 @@ document.getElementById('batch-form').addEventListener('submit', function(e) {
     .then(data => {
         if (data.success) {
             showValidationResults(data);
-            
+
             // If all successful, redirect after a delay
             if (data.summary.total_failed === 0) {
                 setTimeout(() => {
@@ -311,17 +275,17 @@ document.getElementById('batch-form').addEventListener('submit', function(e) {
                 // Remove successful entries from the form
                 const tbody = document.getElementById('candidates-tbody');
                 const remainingRows = [];
-                
+
                 document.querySelectorAll('.candidate-row').forEach((row, index) => {
                     const idInput = row.querySelector('input[name="id"]');
                     const nameInput = row.querySelector('input[name="name"]');
                     const id = idInput.value.trim();
-                    
+
                     // Check if this candidate was successful
-                    const wasSuccessful = data.results.successful_adds.some(success => 
+                    const wasSuccessful = data.results.successful_adds.some(success =>
                         success.id === id
                     );
-                    
+
                     if (!wasSuccessful && id && nameInput.value.trim()) {
                         remainingRows.push({
                             id: id,
@@ -329,7 +293,7 @@ document.getElementById('batch-form').addEventListener('submit', function(e) {
                         });
                     }
                 });
-                
+
                 // Clear and rebuild table with remaining rows
                 tbody.innerHTML = '';
                 if (remainingRows.length > 0) {

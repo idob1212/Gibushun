@@ -52,10 +52,11 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 _engine_options = {
     'pool_pre_ping': True,
     'pool_recycle': 280,
-    'pool_size': 5,
-    'max_overflow': 10,
 }
 if _database_url.startswith("postgresql"):
+    # QueuePool sizing only applies to the pooled Postgres backend; SQLite uses NullPool.
+    _engine_options['pool_size'] = 5
+    _engine_options['max_overflow'] = 10
     _engine_options['connect_args'] = {
         'keepalives': 1,
         'keepalives_idle': 30,
@@ -69,7 +70,7 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
-PUBLIC_ENDPOINTS = {'login', 'register', 'static'}
+PUBLIC_ENDPOINTS = {'login', 'register', 'static', 'service_worker', 'offline'}
 
 
 @app.before_request
@@ -113,6 +114,7 @@ class Candidate(db.Model):
     final_status = db.Column(db.String(1000))
     final_note = db.Column(db.Text)
     status = db.Column(db.String(1000))
+    withdraw_reason = db.Column(db.String(50))
     interviewer = db.Column(db.String(1000))
     interview_grade = db.Column(db.String(1000))
     interview_note = db.Column(db.Text)
@@ -146,6 +148,11 @@ class Note(db.Model):
     date = db.Column(db.String(1000))
 
 
+class ProcessedRequest(db.Model):
+    __tablename__ = "processed_requests"
+    request_id = db.Column(db.String(64), primary_key=True)
+
+
 db.create_all()
 
 
@@ -168,6 +175,39 @@ def _migrate_text_columns():
 
 
 _migrate_text_columns()
+
+
+def _add_withdraw_reason_column():
+    inspector = sqlalchemy.inspect(db.engine)
+    columns = [col["name"] for col in inspector.get_columns("candidates")]
+    if "withdraw_reason" in columns:
+        return
+    with db.engine.connect() as conn:
+        conn.execute(
+            sqlalchemy.text(
+                "ALTER TABLE candidates ADD COLUMN withdraw_reason VARCHAR(50)"
+            )
+        )
+
+
+_add_withdraw_reason_column()
+
+app.config['WTF_CSRF_TIME_LIMIT'] = None
+# Let the service worker own asset caching; without this Flask's 12h HTTP cache
+# would serve stale CSS/JS to both the browser and the SW after a deploy.
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+
+
+def is_duplicate_request():
+    request_id = request.headers.get("X-Request-Id")
+    if not request_id and request.is_json:
+        request_id = (request.json or {}).get("request_id")
+    if not request_id:
+        return False
+    if db.session.query(ProcessedRequest.request_id).filter_by(request_id=request_id).first():
+        return True
+    db.session.add(ProcessedRequest(request_id=request_id))
+    return False
 
 
 def admin_only(f):
@@ -309,6 +349,55 @@ def home():
         total_avgs.sort(reverse=True)
         return render_template("home.html", current_user=current_user, candidates=enumerate(candidates), tiz_avg =tiz_avgs, total_avg =total_avgs, active_candidates_count=active_candidates_count)
     return render_template("home.html", current_user=current_user, candidates = candidates, active_candidates_count=active_candidates_count)
+
+
+@app.route("/candidate/<path:candidate_id>")
+def candidate_profile(candidate_id):
+    if not current_user.is_authenticated:
+        return redirect(url_for("login"))
+    candidate = Candidate.query.filter_by(id=candidate_id).first()
+    if not candidate:
+        abort(404)
+    if current_user.id != 0 and candidate.group_id != current_user.id:
+        abort(403)
+    update_avgs_nf()
+
+    physical_stations = getPhysicalStationsGroup(candidate.group_id) + ["ספרינטים", "זחילות", "אלונקה סוציומטרית", "מתלה שזיפים"]
+    counter_stations = ["מסע 1", "מסע 2", "מסע 3", "שקי חול", "שקי חול 2"]
+    all_reviews = Review.query.filter_by(subject_id=candidate.id).all()
+
+    physical_reviews = []
+    for station in physical_stations:
+        summary = Review.query.filter_by(subject_id=candidate.id, station=f"{station} סיכום").first()
+        if summary:
+            physical_reviews.append(summary)
+    for station in counter_stations:
+        summary = Review.query.filter_by(subject_id=candidate.id, station=station).first()
+        if summary:
+            physical_reviews.append(summary)
+    physical_reviews.sort(key=lambda x: x.grade, reverse=True)
+    tiz_avg = round(sum(r.grade for r in physical_reviews) / len(physical_reviews), 2) if physical_reviews else 0
+
+    general_reviews = [r for r in all_reviews if r.station not in physical_stations and ("ODT" not in r.station or r.station == "ODT סיכום")]
+    general_reviews = [r for r in general_reviews if ("אקט" not in r.station) or ("אקט" in r.station and "סיכום" in r.station)]
+    general_reviews = [r for r in general_reviews if r.station not in counter_stations]
+    general_reviews.sort(key=lambda x: x.grade, reverse=True)
+
+    total_pool = [r for r in all_reviews if r.station not in physical_stations and "אקט" not in r.station and ("ODT" not in r.station or r.station == "ODT סיכום")]
+    total_avg = round(sum(r.grade for r in total_pool) / len(total_pool), 2) if total_pool else 0
+
+    notes = sorted(candidate.notes, key=lambda n: n.id, reverse=True)
+
+    return render_template(
+        "candidate-profile.html",
+        candidate=candidate,
+        number=candidate.id.split("/")[1],
+        general_reviews=general_reviews,
+        physical_reviews=physical_reviews,
+        notes=notes,
+        tiz_avg=tiz_avg,
+        total_avg=total_avg,
+    )
 
 
 @app.route('/register', methods=["GET", "POST"])
@@ -964,6 +1053,7 @@ def manageGroups():
 def delete_candidate(candidate_id):
     candidate_to_delete = Candidate.query.get(str(current_user.id) + "/" + candidate_id)
     candidate_to_delete.status = "פרש"
+    candidate_to_delete.withdraw_reason = "רפואי" if request.args.get("reason") == "medical" else None
     db.session.commit()
     update_avgs_nf()
     return redirect(url_for('manageCandidates'))
@@ -972,6 +1062,7 @@ def delete_candidate(candidate_id):
 def return_candidate(candidate_id):
     user_to_return = Candidate.query.get(str(current_user.id) +"/" + candidate_id)
     user_to_return.status = ""
+    user_to_return.withdraw_reason = None
     db.session.commit()
     update_avgs_nf()
     return redirect(url_for('manageCandidates'))
@@ -1699,6 +1790,20 @@ def updateActAvgs():
 
 
 
+@app.route('/sw.js')
+def service_worker():
+    response = send_from_directory('static', 'sw.js')
+    response.headers['Service-Worker-Allowed'] = '/'
+    response.headers['Cache-Control'] = 'no-cache'
+    response.headers['Content-Type'] = 'application/javascript'
+    return response
+
+
+@app.route('/offline')
+def offline():
+    return render_template('offline.html')
+
+
 @app.route('/circles', methods=['GET', 'POST'])
 def circles():
     physical_stations = []
@@ -1719,7 +1824,8 @@ def circles():
 
 @app.route('/circles/finished', methods=['POST'])
 def circles_finished():
-    print(f"request: {request.json}")
+    if is_duplicate_request():
+        return jsonify({'success': True, 'message': 'הציונים כבר נשמרו'})
     circle_numbers = request.json['circle_numbers']
     circle_numbers = circle_numbers[:circle_numbers.index(0)]
     reverse_mode = request.json.get('reverse_mode', False)
@@ -1773,7 +1879,8 @@ def circles_finished():
 
 @app.route('/circles/finished-act', methods=['POST'])
 def circles_finished_act():
-    print(f"request: {request.json}")
+    if is_duplicate_request():
+        return jsonify({'success': True, 'message': 'הציונים כבר נשמרו'})
     circle_numbers = request.json['circle_numbers']
     circle_numbers = circle_numbers[:circle_numbers.index(0)]
     reverse_mode = request.json.get('reverse_mode', False)
@@ -1848,6 +1955,9 @@ def add_new_note():
     form.subject.choices = candidate_nums
     israel_tz = pytz.timezone('Israel')
     if form.validate_on_submit():
+        if is_duplicate_request():
+            flash('ההערה כבר נשמרה', 'success')
+            return redirect(url_for('add_new_note'))
         current_time_israel = datetime.now(israel_tz)
         formatted_time = current_time_israel.strftime('%d-%m-%Y %H:%M')
         new_note = Note(
@@ -1863,8 +1973,7 @@ def add_new_note():
         db.session.commit()
         candidate_name = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(form.subject.data)).first().name
         flash(f'הערה {form.type.data} עבור {candidate_name} נשמרה בהצלחה!', 'success')
-        form.text.data = ""
-        return render_template("make-note.html", form=form, current_user=current_user)
+        return redirect(url_for('add_new_note'))
     return render_template("make-note.html", form=form, current_user=current_user)
 
 @app.route("/edit-note/<int:note_id>", methods=["GET", "POST"])

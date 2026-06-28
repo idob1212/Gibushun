@@ -1,170 +1,87 @@
-{#{% extends 'bootstrap/base.html' %}#}
-{#{% import "bootstrap/wtf.html" as wtf %}#}
-{% import "bootstrap/wtf.html" as wtf %}
+{% import "_formhelpers.html" as f %}
 
 {% block content %}
 {% include "header.html" %}
 
-  <!-- Page Header -->
-  <header class="masthead" style="background-image: url('{{ url_for('static', filename='img/my-group.jpg')}}')">
-    <div class="overlay"></div>
-    <div class="container">
-      <div class="row">
-        <div class="col-lg-8 col-md-10 mx-auto">
-          <div class="page-heading">
-            <h1>לוח ציונים</h1>
-            {% if all_reviews|length > 0%}
-                <span class="subheading" style="direction: rtl">ציונים לכל המועמדים </span>
-          {% elif candidate_id %}
-          <span class="subheading" style="direction: rtl">ציונים  למועמד מס'  {{ candidate_id }} </span>
-                {% endif %}
+<section class="app-hero px-5 pt-6 pb-6" style="background-image:url('{{ url_for('static', filename='img/review.jpg') }}')">
+  <h1 class="text-2xl font-extrabold leading-tight">לוח ציונים</h1>
+  {% if all_reviews|length > 0 %}
+    <p class="text-white/75 text-sm mt-1">ציונים לכל המועמדים</p>
+  {% elif candidate_id %}
+    <p class="text-white/75 text-sm mt-1">ציונים למועמד מס' {{ candidate_id }}</p>
+  {% endif %}
+</section>
 
-          </div>
-        </div>
-      </div>
+<section class="px-4 mt-4 max-w-md mx-auto">
+  <div class="card bg-base-100 shadow-sm">
+    <div class="card-body p-4">
+      {{ f.render_form(form) }}
     </div>
-      <link href="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" rel="stylesheet">
-    <script src="//maxcdn.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js"> </script>
-  </header>
-
-<head>
-    <meta charset="UTF-8">
-    <title>לוח חוות דעת</title>
-</head>
-<body>
-<style>
-    .table{
-        float: right;
-        {#size: auto;#}
-        table-layout: fixed;
-    }
-    td {
-    border: 1px solid #000;
-    text-align: right;
-}
-
-tr td {
-    {#width: 1%;#}
-    {#white-space: nowrap;#}
-    text-align: right;
-}
-
-th{
-    text-align: right;
-}
-        label{
-        float: right;
-        direction: rtl;
-    }
-
-.btn{
-    float: right;
-    direction: rtl;
-    padding: 10px;
-    margin: 10px;
-    margin-right: 50%;
-}
-#station{
-    float: right;
-    direction: rtl;
-}
-#subject{
-    float: right;
-    direction: rtl;
-}
-
-.form-control{
-    float: right;
-    direction: rtl;
-    width: 100%;
-}
-</style>
-<body>
-{{ wtf.quick_form(form, novalidate=True, button_map={"submit": "primary"}) }}
-<div class="col-lg-8 col-md-10 mx-auto" style="direction: rtl; float: right">
-{#  <form method="POST">#}
-{#    {{ form.hidden_tag() }}#}
-{#    <div class="form-group">#}
-{#      <label for="subject">מספר מגובש</label>#}
-{#      {{ form.id(class="form-control", required="required") }}#}
-{#    </div>#}
+  </div>
+</section>
 
 {% if all_reviews|length > 0 %}
-    {% for list in all_reviews %}
-        <div class="mx-auto">
-        {% if list|length > 0 %}
-            <h4 style="text-align: right"> מועמד מספר {{ list[0].subject_id.split("/")[1] }} </h4>
-
-                <table class = "table table-bordered" style="direction: rtl;">
-                    <thead>
-                    <tr>
-                        <th>סוג תחנה</th>
-                        <th>ציון</th>
-                        <th>ספירה</th>
-                        <th>הערה</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {% for review in list %}
-                    <tr>
-                        <td class="block">{{ review.station }}</td>
-                        <td class="block">{{ review.grade|round(2) }}</td>
-                        <td class="block">{{ review.counter_value if review.counter_value is not none else '' }}</td>
-                        <td class="block">{{ review.note if review.note is not none else '' }}</td>
-                    </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-        {% endif %}
+  {% for list in all_reviews %}
+    {% if list|length > 0 %}
+      <section class="px-4 mt-4">
+        <h2 class="font-display text-lg font-bold mb-2">מועמד מספר {{ list[0].subject_id.split("/")[1] }}</h2>
+        <div class="overflow-x-auto rounded-box border border-base-300">
+          <table class="table table-zebra">
+            <thead>
+              <tr>
+                <th>סוג תחנה</th>
+                <th>ציון</th>
+                <th>ספירה</th>
+                <th>הערה</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for review in list %}
+              <tr>
+                <td>{{ review.station }}</td>
+                <td>{{ review.grade|round(2) }}</td>
+                <td>{{ review.counter_value if review.counter_value is not none else '' }}</td>
+                <td>{{ review.note if review.note is not none else '' }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
         </div>
-    {%  endfor %}
-</div>
-
+      </section>
+    {% endif %}
+  {% endfor %}
 {% else %}
-<table class = "table table-bordered" style="width:100%; direction: rtl;">
-    <thead>
-    {% if candidate_id %}
-
-    <tr>
-        <th>סוג תחנה</th>
-        <th>ציון</th>
-        <th>ספירה</th>
-        <th>הערה</th>
-{#        <th>עריכה</th>#}
-{#        <th>מחק</th>#}
-    </tr>
-    </thead>
-    <tbody>
-        {% for review in reviews %}
-    <tr>
-        <td class="block">{{ review.station }}</td>
-        <td class="block">{{ review.grade|round(2) }}</td>
-        <td class="block">{{ review.counter_value if review.counter_value is not none else '' }}</td>
-        <td class="block">{{ review.note if review.note is not none else '' }}</td>
-        {% if "אקט" not in review.station and "סיכום" not in review.station and "מסע" not in review.station and "שקי חול" not in review.station %}
-        <td class="block"><a href="{{ url_for('edit_review', review_id=review.id) }}">עריכה</a></td>
-        <td class="block"><a href="{{ url_for('delete_review', review_id=review.id) }}">מחק</a></td>
-        {% endif %}
-    </tr>
-        {% endfor %}
-    </tbody>
+  {% if candidate_id %}
+    <section class="px-4 mt-4">
+      <div class="overflow-x-auto rounded-box border border-base-300">
+        <table class="table table-zebra">
+          <thead>
+            <tr>
+              <th>סוג תחנה</th>
+              <th>ציון</th>
+              <th>ספירה</th>
+              <th>הערה</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for review in reviews %}
+            <tr>
+              <td>{{ review.station }}</td>
+              <td>{{ review.grade|round(2) }}</td>
+              <td>{{ review.counter_value if review.counter_value is not none else '' }}</td>
+              <td>{{ review.note if review.note is not none else '' }}</td>
+              {% if "אקט" not in review.station and "סיכום" not in review.station and "מסע" not in review.station and "שקי חול" not in review.station %}
+              <td><a href="{{ url_for('edit_review', review_id=review.id) }}" class="btn btn-ghost btn-xs">עריכה</a></td>
+              <td><a href="{{ url_for('delete_review', review_id=review.id) }}" class="btn btn-ghost btn-xs text-error">מחק</a></td>
+              {% endif %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  {% endif %}
 {% endif %}
 
-</table>
-{% endif %}
-
-</body>
-
-<style>
-footer{
-position: fixed;
-    left:0px;
-   bottom:0px;
-   height:50px;
-   width:100%;
-    padding-top: 20px;
-}
-</style>
-</html>
+{% include "footer.html" %}
 {% endblock %}
-{#{% include "footer.html" %}#}
