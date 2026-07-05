@@ -184,4 +184,35 @@
   .score-good { background: color-mix(in oklab, var(--color-success) 18%, var(--color-base-100)); color: color-mix(in oklab, var(--color-success) 75%, var(--color-base-content)); }
   .score-mid  { background: color-mix(in oklab, var(--color-warning) 22%, var(--color-base-100)); color: color-mix(in oklab, var(--color-warning) 60%, var(--color-base-content)); }
   .score-low  { background: color-mix(in oklab, var(--color-error) 16%, var(--color-base-100)); color: color-mix(in oklab, var(--color-error) 78%, var(--color-base-content)); }
+
+  /* Keep the fixed top bar clear of the iOS status bar / in-call banner, and
+     the mobile dock clear of the home indicator (viewport-fit=cover). */
+  .app-topbar {
+    padding-top: env(safe-area-inset-top);
+    min-height: calc(3.5rem + env(safe-area-inset-top));
+  }
+  .app-dock {
+    padding-bottom: max(0.25rem, env(safe-area-inset-bottom));
+  }
+
+  /* Scoring tables: kill the dead space so the note field is actually usable
+     in portrait. The number/score columns shrink to content; notes take the
+     rest. Tighter cell padding buys the note field more room on narrow phones. */
+  .score-table :where(th, td) {
+    padding-inline: 0.5rem;
+    padding-block: 0.5rem;
+    vertical-align: middle;
+  }
+  .score-table .note-input {
+    min-width: 6rem;
+  }
+
+  /* A grade select that actually holds a score (grade != 0) is tinted green so
+     it's obvious at a glance who has been graded and who hasn't. */
+  .is-scored {
+    border-color: var(--color-success) !important;
+    background-color: color-mix(in oklab, var(--color-success) 14%, var(--color-base-100));
+    color: color-mix(in oklab, var(--color-success) 82%, var(--color-base-content));
+    font-weight: 700;
+  }
 }

@@ -48,7 +48,7 @@
   <div class="drawer-content flex flex-col min-h-screen">
 
     <!-- Top bar -->
-    <div class="navbar bg-base-100 shadow-sm sticky top-0 z-30 px-1 min-h-14">
+    <div class="navbar bg-base-100 shadow-sm sticky top-0 z-30 px-1 min-h-14 app-topbar">
       {% if current_user.is_authenticated %}
       <div class="flex-none">
         <label for="nav-drawer" class="btn btn-square btn-ghost" aria-label="תפריט">
@@ -78,4 +78,4 @@
     </div>
 
     <!-- Page content (closed in footer.html) -->
-    <main class="flex-1 w-full max-w-3xl mx-auto px-3 py-4 pb-28 md:pb-6">
+    <main class="flex-1 w-full max-w-3xl mx-auto px-3 py-4 pb-36 md:pb-6">

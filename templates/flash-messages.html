@@ -3,7 +3,7 @@
     <div class="flex flex-col gap-2 mb-4">
       {% for category, message in messages %}
         {% set cat = category if category in ['success','error','warning','info'] else 'info' %}
-        {% set icon = {'success':'fa-circle-check','error':'fa-triangle-exclamation','warning':'fa-circle-exclamation','info':'fa-circle-info'}[cat] %}
+        {% set icon = {'success':'fa-check-circle','error':'fa-exclamation-triangle','warning':'fa-exclamation-circle','info':'fa-info-circle'}[cat] %}
         <div role="alert" class="app-flash alert alert-{{ cat }} shadow-sm" data-cat="{{ cat }}">
           <i class="fas {{ icon }}"></i>
           <span class="font-medium">{{ message }}</span>

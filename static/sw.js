@@ -1,4 +1,4 @@
-const VERSION = 'v6';
+const VERSION = 'v7';
 const SHELL_CACHE = 'meymadion-shell-' + VERSION;
 const PAGE_CACHE = 'meymadion-pages-' + VERSION;
 
