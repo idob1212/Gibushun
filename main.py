@@ -277,7 +277,7 @@ def homeAdmin(group_id):
             total_count = 0
             total_sum = 0
             for review in reviews:
-                if review.station not in physical_stations and "אקט" not in review.station and ("ODT" not in review.station or review.station == "ODT סיכום"):
+                if review.grade is not None and review.station and review.station not in physical_stations and "אקט" not in review.station and ("ODT" not in review.station or review.station == "ODT סיכום"):
                     total_sum += review.grade
                     total_count += 1
 
@@ -312,18 +312,18 @@ def home():
     counter_reviews = []
     if candidates:
         update_avgs_nf()
+        # Physical (tiz) score comes from the per-station summary reviews.
+        tiz_station_names = {f"{station} סיכום" for station in physical_stations}
+        tiz_station_names |= {station for station in counter_stations}
         for candidate in candidates:
-            station_reviews = []
-            counter_reviews = []
+            # One fetch per candidate instead of ~16 per-station .first() queries.
+            reviews = Review.query.filter_by(subject_id=candidate.id).all()
+            seen_tiz = set()
             curr_avg = 0
             elements_num = 0
-            for station in physical_stations:
-                station_reviews.append(Review.query.filter_by(subject_id=candidate.id, station=f"{station} סיכום").first())
-            for station in counter_stations:
-                counter_reviews.append(Review.query.filter_by(subject_id=candidate.id, station=f"{station}").first())
-
-            for review in station_reviews + counter_reviews:
-                if review:
+            for review in reviews:
+                if review.station in tiz_station_names and review.station not in seen_tiz and review.grade is not None:
+                    seen_tiz.add(review.station)  # mirror .first(): one review per station
                     curr_avg += review.grade
                     elements_num += 1
             if elements_num == 0:
@@ -331,11 +331,10 @@ def home():
             else:
                 tiz_avg = round(curr_avg / elements_num, 2)
                 tiz_avgs.append(tiz_avg)
-            reviews = Review.query.filter_by(subject_id=candidate.id).all()
             total_count = 0
             total_sum = 0
             for review in reviews:
-                if review.station not in physical_stations and "אקט" not in review.station and ("ODT" not in review.station or review.station == "ODT סיכום"):
+                if review.grade is not None and review.station and review.station not in physical_stations and "אקט" not in review.station and ("ODT" not in review.station or review.station == "ODT סיכום"):
                     total_sum += review.grade
                     total_count += 1
             if total_count == 0:
@@ -669,51 +668,53 @@ def update_avgs_nf():
     physical_stations = physical_stations + ["ספרינטים", "זחילות", "אלונקה סוציומטרית", "מתלה שזיפים"]
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     for candidate in candidates:
+        # Fetch this candidate's reviews once, instead of re-querying the whole
+        # set for every station (the old loop did O(stations) full fetches +
+        # a commit per mutation, which is what made /home and /candidate slow).
+        cand_reviews = Review.query.filter_by(subject_id=candidate.id).all()
+        summary_by_station = {}
+        for r in cand_reviews:
+            summary_by_station.setdefault(r.station, r)
+
         for station in physical_stations:
-            count = 0
-            avg = 0
-            reviews = Review.query.filter_by(subject_id=candidate.id).all()
-            reviews = [review for review in reviews if
-                       "סיכום" in review.station and f" {station} " in f" {review.station} " and "אקט" in review.station.split()]
-            count = len(reviews)
-            avg = sum([review.grade for review in reviews]) / count if count != 0 else 0
-            review = Review.query.filter_by(station=station + " סיכום", subject_id=candidate.id).first()
+            act_reviews = [review for review in cand_reviews if
+                           review.station and "סיכום" in review.station
+                           and f" {station} " in f" {review.station} " and "אקט" in review.station.split()]
+            count = len(act_reviews)
+            avg = sum([r.grade for r in act_reviews if r.grade is not None]) / count if count != 0 else 0
+            review = summary_by_station.get(station + " סיכום")
             if review and count == 0:
                 db.session.delete(review)
-                db.session.commit()
             if count != 0 and not review:
                 new_review = Review(station=station + " סיכום",
                                     subject_id=candidate.id,
                                     grade=avg, note="", author=current_user,
                                     subject=candidate)
                 db.session.add(new_review)
-                db.session.commit()
             if count != 0 and review:
                 review.grade = avg
-                db.session.commit()
 
-        count = 0
-        avg = 0
+        # Re-read (autoflush surfaces the summaries just added) and normalise.
         reviews = Review.query.filter_by(subject_id=candidate.id).all()
         for review in reviews:
-            review.grade = review.grade.__round__(2)
-        reviews = [review for review in reviews if "ODT" in review.station and review.station != "ODT סיכום"]
-        count = len(reviews)
-        avg = sum([review.grade for review in reviews if "ODT" in review.station and review.station != "ODT סיכום"])
+            if review.grade is not None:
+                review.grade = round(review.grade, 2)
+        odt_reviews = [review for review in reviews if review.station and "ODT" in review.station and review.station != "ODT סיכום"]
+        count = len(odt_reviews)
+        avg = sum([r.grade for r in odt_reviews if r.grade is not None])
         review = Review.query.filter_by(station="ODT סיכום", subject_id=candidate.id).first()
         if review and count == 0:
             db.session.delete(review)
-            db.session.commit()
         if count != 0 and not review:
             new_review = Review(station="ODT סיכום",
                                 subject_id=candidate.id,
                                 grade=0, note="", author=current_user,
                                 subject=candidate)
             db.session.add(new_review)
-            db.session.commit()
         if count != 0 and review:
             review.grade = avg/count
-            db.session.commit()
+        # Commit once per candidate rather than once per mutation.
+        db.session.commit()
 
 def update_avgs(form):
     physical_stations = getPhysicalStations()
@@ -933,9 +934,14 @@ def counter_review():
 
 @app.route('/update-counter-reviews', methods=["POST"])
 def update_counter_reviews():
-    data = request.get_json()
-    station = data['station']
-    reviews = data['reviews']
+    data = request.get_json(silent=True) or {}
+    station = data.get('station')
+    reviews = data.get('reviews') or []
+
+    if not station or not reviews:
+        # Nothing to save (e.g. a group with no active candidates, or an empty
+        # replay from the offline outbox). Treat as a no-op instead of 500ing.
+        return jsonify({'success': True, 'message': 'לא נמצאו נתונים לשמירה'})
 
     # Find max counter value for normalization
     max_counter = max(review['counter'] for review in reviews)
@@ -1049,18 +1055,22 @@ def manageGroups():
     return render_template('admin-panel.html', groups=groups)
 
 
-@app.route("/delete-candidate/<candidate_id>")
+@app.route("/delete-candidate/<candidate_id>", methods=["GET", "POST"])
 def delete_candidate(candidate_id):
     candidate_to_delete = Candidate.query.get(str(current_user.id) + "/" + candidate_id)
+    if not candidate_to_delete:
+        abort(404)
     candidate_to_delete.status = "פרש"
     candidate_to_delete.withdraw_reason = "רפואי" if request.args.get("reason") == "medical" else None
     db.session.commit()
     update_avgs_nf()
     return redirect(url_for('manageCandidates'))
 
-@app.route("/return/<candidate_id>")
+@app.route("/return/<candidate_id>", methods=["GET", "POST"])
 def return_candidate(candidate_id):
     user_to_return = Candidate.query.get(str(current_user.id) +"/" + candidate_id)
+    if not user_to_return:
+        abort(404)
     user_to_return.status = ""
     user_to_return.withdraw_reason = None
     db.session.commit()

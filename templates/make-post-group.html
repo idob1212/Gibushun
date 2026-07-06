@@ -32,21 +32,21 @@
           {{ user_form.odt(class="input input-bordered w-full") }}
         </div>
 
-        <div class="overflow-x-auto rounded-box border border-base-300">
-          <table class="table table-zebra">
+        <div class="rounded-box border border-base-300">
+          <table class="table table-zebra score-table">
             <thead>
               <tr>
-                <th>מספר מגובש</th>
-                <th class="text-center">ציון</th>
-                <th>הערה</th>
+                <th class="w-px whitespace-nowrap">מס׳</th>
+                <th class="w-px whitespace-nowrap text-center">ציון</th>
+                <th class="w-full">הערה</th>
               </tr>
             </thead>
             <tbody>
               {% for candidate in candidates %}
               <tr>
-                <td class="font-semibold">{{ candidate }}</td>
-                <td>{{ user_form.grade(class="select select-bordered select-sm w-full") }}</td>
-                <td>{{ user_form.note(class="input input-bordered input-sm w-full") }}</td>
+                <td class="font-semibold w-px whitespace-nowrap">{{ candidate }}</td>
+                <td class="w-px whitespace-nowrap">{{ user_form.grade(class="select select-bordered select-sm w-20 text-center font-bold group-grade") }}</td>
+                <td class="w-full">{{ user_form.note(class="input input-bordered input-sm w-full", placeholder="הערה…") }}</td>
               </tr>
               {% endfor %}
             </tbody>
@@ -67,6 +67,17 @@
     stationField.addEventListener('change', function () {
       var v = stationField.value;
       additionalField.style.display = (v === 'ODT' || v === 'אחר') ? 'block' : 'none';
+    });
+
+    // Mark rows that actually have a score (grade != 0) so it's obvious at a
+    // glance who has been graded and who hasn't.
+    function markScored(sel) {
+      var scored = sel.value && sel.value !== '0';
+      sel.classList.toggle('is-scored', scored);
+    }
+    document.querySelectorAll('.group-grade').forEach(function (sel) {
+      markScored(sel);
+      sel.addEventListener('change', function () { markScored(sel); });
     });
   });
 </script>

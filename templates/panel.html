@@ -29,10 +29,16 @@
           </div>
           <div class="flex flex-wrap gap-2 mt-3 pt-3 border-t border-base-200">
             {% if candidate.status != "פרש" %}
-              <a href="#" onclick="confirmDelete('{{ url_for('delete_candidate', candidate_id=candidate.id.split('/')[1]) }}')" class="delete-btn btn btn-sm btn-outline btn-warning">פרש</a>
-              <a href="#" onclick="confirmMedical('{{ url_for('delete_candidate', candidate_id=candidate.id.split('/')[1], reason='medical') }}')" class="delete-btn btn btn-sm btn-outline btn-error">פרש (רופא)</a>
+              <form method="POST" data-offline class="inline" action="{{ url_for('delete_candidate', candidate_id=candidate.id.split('/')[1]) }}">
+                <button type="submit" class="btn btn-sm btn-outline btn-warning" onclick="return confirm('האם אתה בטוח שברצונך לסמן מועמד זה כפורש?')">פרש</button>
+              </form>
+              <form method="POST" data-offline class="inline" action="{{ url_for('delete_candidate', candidate_id=candidate.id.split('/')[1], reason='medical') }}">
+                <button type="submit" class="btn btn-sm btn-outline btn-error" onclick="return confirm('האם אתה בטוח שברצונך לסמן מועמד זה כפורש בעקבות החלטת רופא?')">פרש (רופא)</button>
+              </form>
             {% else %}
-              <a href="{{ url_for('return_candidate', candidate_id=candidate.id.split('**')[0].split('/')[1]) }}" class="btn btn-sm btn-outline btn-success">הפוך לפעיל</a>
+              <form method="POST" data-offline class="inline" action="{{ url_for('return_candidate', candidate_id=candidate.id.split('**')[0].split('/')[1]) }}">
+                <button type="submit" class="btn btn-sm btn-outline btn-success">הפוך לפעיל</button>
+              </form>
             {% endif %}
           </div>
         </div>
@@ -60,9 +66,13 @@
               {% endif %}
             </div>
             {% if candidate.status != "פרש" %}
-              <a href="#" onclick="confirmDelete('{{ url_for('delete_candidate', candidate_id=candidate.id.split('/')[1]) }}')" class="delete-btn btn btn-sm btn-outline btn-warning">פרש</a>
+              <form method="POST" data-offline class="inline" action="{{ url_for('delete_candidate', candidate_id=candidate.id.split('/')[1]) }}">
+                <button type="submit" class="btn btn-sm btn-outline btn-warning" onclick="return confirm('האם אתה בטוח שברצונך לסמן מועמד זה כפורש?')">פרש</button>
+              </form>
             {% else %}
-              <a href="{{ url_for('return_candidate', candidate_id=candidate.id.split('**')[0].split('/')[1]) }}" class="btn btn-sm btn-outline btn-success">הפוך לפעיל</a>
+              <form method="POST" data-offline class="inline" action="{{ url_for('return_candidate', candidate_id=candidate.id.split('**')[0].split('/')[1]) }}">
+                <button type="submit" class="btn btn-sm btn-outline btn-success">הפוך לפעיל</button>
+              </form>
             {% endif %}
           </div>
         </div>
@@ -70,19 +80,6 @@
     {% endfor %}
   </div>
 </section>
-
-<script>
-function confirmDelete(deleteUrl) {
-    if (confirm('האם אתה בטוח שברצונך לסמן מועמד זה כפורש?')) {
-        window.location.href = deleteUrl;
-    }
-}
-function confirmMedical(deleteUrl) {
-    if (confirm('האם אתה בטוח שברצונך לסמן מועמד זה כפורש בעקבות החלטת רופא?')) {
-        window.location.href = deleteUrl;
-    }
-}
-</script>
 
 {% include "footer.html" %}
 {% endblock %}

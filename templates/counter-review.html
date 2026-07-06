@@ -28,29 +28,29 @@
         </select>
       </div>
 
-      <div class="overflow-x-auto rounded-box border border-base-300">
-        <table class="table table-zebra">
+      <div class="rounded-box border border-base-300">
+        <table class="table table-zebra score-table">
           <thead>
             <tr>
-              <th>מספר מועמד</th>
-              <th class="text-center">ציון</th>
-              <th>הערות</th>
+              <th class="w-px whitespace-nowrap">מס׳</th>
+              <th class="w-px whitespace-nowrap text-center">ציון</th>
+              <th class="w-full">הערות</th>
             </tr>
           </thead>
           <tbody>
             {% for candidate in form.subject.choices %}
             {% set review = get_existing_review(candidate, form.station.choices[0]) %}
             <tr>
-              <td class="font-semibold">{{ candidate }}</td>
-              <td>
-                <div class="flex items-center justify-center gap-3">
+              <td class="font-semibold w-px whitespace-nowrap">{{ candidate }}</td>
+              <td class="w-px whitespace-nowrap">
+                <div class="flex items-center justify-center gap-2">
                   <button type="button" class="btn btn-error btn-circle btn-sm minus-btn" data-candidate="{{ candidate }}">-</button>
-                  <span class="grade-value font-display text-xl font-bold min-w-8 text-center" id="grade-{{ candidate }}">{{ review.counter_value if review else 0 }}</span>
+                  <span class="grade-value font-display text-xl font-bold w-6 text-center" id="grade-{{ candidate }}">{{ review.counter_value if review else 0 }}</span>
                   <button type="button" class="btn btn-success btn-circle btn-sm plus-btn" data-candidate="{{ candidate }}">+</button>
                 </div>
               </td>
-              <td>
-                <input type="text" class="input input-bordered input-sm w-full note-input" id="note-{{ candidate }}" name="note-{{ candidate }}" value="{{ review.note if review else '' }}">
+              <td class="w-full">
+                <input type="text" class="input input-bordered input-sm w-full note-input" id="note-{{ candidate }}" name="note-{{ candidate }}" value="{{ review.note if review else '' }}" placeholder="הערה…">
               </td>
             </tr>
             {% endfor %}
@@ -99,7 +99,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const flashContainer = document.getElementById('flash-messages-container');
                 flashContainer.innerHTML = `
                     <div class="alert alert-success shadow-sm" role="alert">
-                        <i class="fas fa-circle-check"></i>
+                        <i class="fas fa-check-circle"></i>
                         <span class="font-medium">${data.message}</span>
                         <button type="button" class="btn btn-ghost btn-xs btn-circle" aria-label="סגור" onclick="this.parentElement.remove()">✕</button>
                     </div>

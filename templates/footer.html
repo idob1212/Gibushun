@@ -2,17 +2,17 @@
 
     {% if current_user.is_authenticated %}
     <!-- Bottom navigation (mobile) -->
-    <div class="dock bg-base-100 border-t border-base-300 md:hidden">
+    <div class="dock bg-base-100 border-t border-base-300 md:hidden app-dock">
       {% if is_admin %}
-        <a href="{{ url_for('admin_home') }}"><i class="fas fa-house"></i><span class="dock-label">בית</span></a>
+        <a href="{{ url_for('admin_home') }}"><i class="fas fa-home"></i><span class="dock-label">בית</span></a>
         <a href="{{ url_for('showCandidateAdmin') }}"><i class="fas fa-user"></i><span class="dock-label">מגובש</span></a>
-        <a href="{{ url_for('showStationReviewsAdmin') }}"><i class="fas fa-ranking-star"></i><span class="dock-label">דירוג</span></a>
+        <a href="{{ url_for('showStationReviewsAdmin') }}"><i class="fas fa-list-ol"></i><span class="dock-label">דירוג</span></a>
         <a href="{{ url_for('manageGroups') }}"><i class="fas fa-users"></i><span class="dock-label">קבוצות</span></a>
       {% else %}
-        <a href="{{ url_for('home') }}"><i class="fas fa-house"></i><span class="dock-label">בית</span></a>
-        <a href="{{ url_for('circles') }}"><i class="fas fa-pen-to-square"></i><span class="dock-label">ציונים</span></a>
+        <a href="{{ url_for('home') }}"><i class="fas fa-home"></i><span class="dock-label">בית</span></a>
+        <a href="{{ url_for('circles') }}"><i class="fas fa-edit"></i><span class="dock-label">ציונים</span></a>
         <a href="{{ url_for('showCandidate') }}"><i class="fas fa-users"></i><span class="dock-label">הקבוצה</span></a>
-        <a href="{{ url_for('showStationReviews') }}"><i class="fas fa-ranking-star"></i><span class="dock-label">דירוג</span></a>
+        <a href="{{ url_for('showStationReviews') }}"><i class="fas fa-list-ol"></i><span class="dock-label">דירוג</span></a>
       {% endif %}
       <label for="nav-drawer"><i class="fas fa-bars"></i><span class="dock-label">עוד</span></label>
     </div>
@@ -29,25 +29,25 @@
     </div>
     <ul class="menu p-4 gap-1 text-base">
       {% if is_admin %}
-        <li><a href="{{ url_for('admin_home') }}"><i class="fas fa-house w-5"></i>בית</a></li>
+        <li><a href="{{ url_for('admin_home') }}"><i class="fas fa-home w-5"></i>בית</a></li>
         <li><a href="{{ url_for('register') }}"><i class="fas fa-user-plus w-5"></i>הוסף מגבש</a></li>
         <li><a href="{{ url_for('showCandidateAdmin') }}"><i class="fas fa-user w-5"></i>צפייה במגובש</a></li>
         <li><a href="{{ url_for('showNotesAdmin') }}"><i class="fas fa-comment w-5"></i>הערות</a></li>
-        <li><a href="{{ url_for('showStationReviewsAdmin') }}"><i class="fas fa-ranking-star w-5"></i>דירוג לפי תחנה</a></li>
+        <li><a href="{{ url_for('showStationReviewsAdmin') }}"><i class="fas fa-list-ol w-5"></i>דירוג לפי תחנה</a></li>
         <li><a href="{{ url_for('manageGroups') }}"><i class="fas fa-users w-5"></i>ניהול קבוצות</a></li>
         <li><a href="{{ url_for('showInterviewAdmin') }}"><i class="fas fa-comments w-5"></i>ראיונות</a></li>
       {% else %}
-        <li><a href="{{ url_for('home') }}"><i class="fas fa-house w-5"></i>בית</a></li>
-        <li><a href="{{ url_for('circles') }}"><i class="fas fa-pen-to-square w-5"></i>הזן ציונים</a></li>
+        <li><a href="{{ url_for('home') }}"><i class="fas fa-home w-5"></i>בית</a></li>
+        <li><a href="{{ url_for('circles') }}"><i class="fas fa-edit w-5"></i>הזן ציונים</a></li>
         <li><a href="{{ url_for('add_new_note') }}"><i class="fas fa-comment w-5"></i>הערות</a></li>
         <li><a href="{{ url_for('addCandidate') }}"><i class="fas fa-user-plus w-5"></i>הוסף מגובש</a></li>
         <li><a href="{{ url_for('showCandidate') }}"><i class="fas fa-users w-5"></i>הקבוצה שלי</a></li>
-        <li><a href="{{ url_for('showStationReviews') }}"><i class="fas fa-ranking-star w-5"></i>דירוג לפי תחנה</a></li>
-        <li><a href="{{ url_for('manageCandidates') }}"><i class="fas fa-sliders w-5"></i>ניהול קבוצה</a></li>
+        <li><a href="{{ url_for('showStationReviews') }}"><i class="fas fa-list-ol w-5"></i>דירוג לפי תחנה</a></li>
+        <li><a href="{{ url_for('manageCandidates') }}"><i class="fas fa-sliders-h w-5"></i>ניהול קבוצה</a></li>
         <li><a href="{{ url_for('AddStatus') }}"><i class="fas fa-clipboard-check w-5"></i>הזן חוות דעת</a></li>
         <li><a href="{{ url_for('Interview') }}"><i class="fas fa-comment-dots w-5"></i>הזן ראיון</a></li>
         <li><a href="{{ url_for('showInterview') }}"><i class="fas fa-comments w-5"></i>סיכומי ראיונות</a></li>
-        <li><a href="{{ url_for('addName') }}"><i class="fas fa-gear w-5"></i>ערוך פרטים</a></li>
+        <li><a href="{{ url_for('addName') }}"><i class="fas fa-cog w-5"></i>ערוך פרטים</a></li>
       {% endif %}
       <li class="mt-2 border-t border-base-200 pt-2"><a href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt w-5"></i>התנתק</a></li>
     </ul>
