@@ -66,16 +66,18 @@
   // clobbered by) the persistent offline strip:
   //   * offlineBar — sticky status, shown only while offline, sits above the dock
   //   * toastEl    — transient success/sync message, auto-dismisses
-  var BAR_CSS = 'position:fixed;left:0;right:0;z-index:60;transform:translateY(150%);' +
+  // pointer-events:none — nothing in the banners is interactive, so taps must
+  // always pass through to the dock/page beneath.
+  var BAR_CSS = 'position:fixed;left:0;right:0;z-index:60;pointer-events:none;transform:translateY(150%);' +
     'transition:transform .25s ease;padding:10px 14px;text-align:center;font-weight:600;' +
     'font-size:14px;color:#fff;box-shadow:0 -2px 10px rgba(0,0,0,.18)';
 
   function dockOffset() {
     // Recomputed every time we show something, so the bar always clears the
     // dock even if the dock wasn't laid out yet when the element was created.
+    // offsetHeight is already 0 when the dock is display:none.
     var dock = document.querySelector('.dock');
-    if (dock && getComputedStyle(dock).display !== 'none') return dock.offsetHeight;
-    return 0;
+    return dock ? dock.offsetHeight : 0;
   }
 
   var offlineBar, offlineBarShown = false;
@@ -99,6 +101,12 @@
     if (offlineBar) offlineBar.style.transform = 'translateY(150%)';
     offlineBarShown = false;
   }
+  // Rotation/resize can change the dock height — keep the shown bar above it.
+  function repositionOfflineBar() {
+    if (offlineBarShown && offlineBar) offlineBar.style.bottom = dockOffset() + 'px';
+  }
+  window.addEventListener('resize', repositionOfflineBar);
+  window.addEventListener('orientationchange', repositionOfflineBar);
 
   var toastEl, toastTimer;
   function ensureToast() {
@@ -264,6 +272,20 @@
       });
     });
   }
+
+  // --- online-only forms ----------------------------------------------------
+  // Any form NOT marked data-offline needs the server right now (login, batch
+  // add, report filters). Offline, block it with a clear message instead of
+  // letting the browser navigate to its native error page. Capture phase so we
+  // run before the form's own submit handlers.
+  document.addEventListener('submit', function (e) {
+    if (!offline) return;
+    var form = e.target;
+    if (!form || form.hasAttribute('data-offline')) return; // queued by bindForms
+    e.preventDefault();
+    e.stopPropagation();
+    toast('אין חיבור לרשת — פעולה זו דורשת אינטרנט');
+  }, true);
 
   // --- wiring ---------------------------------------------------------------
   if ('serviceWorker' in navigator) {

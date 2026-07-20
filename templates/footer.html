@@ -1,5 +1,9 @@
     </main>
 
+    {# `set` inside an include doesn't escape its scope, so header.html's
+       is_admin never reaches this file — recompute it here. #}
+    {% set is_admin = current_user.is_authenticated and current_user.id == 0 %}
+
     {% if current_user.is_authenticated %}
     <!-- Bottom navigation (mobile) -->
     <div class="dock bg-base-100 border-t border-base-300 md:hidden app-dock">
