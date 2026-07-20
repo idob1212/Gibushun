@@ -1009,30 +1009,35 @@ def update_all():
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     candidates = [int(candidate.id.split("/")[1]) for candidate in candidates if candidate.status != "פרש"]
     candidates.sort()
-    counter = 0
-    output = []
     result2 = request.form.to_dict(flat=False)
+    if 'station' not in result2:
+        return redirect(url_for('add_new_group_review'))
     station = result2['station'][0]
     if station == "ODT":
-        station = station + " " + result2['odt'][0]
+        station = station + " " + result2.get('odt', [''])[0]
     if station == "אחר":
-        station = result2['odt'][0]
-    result2.pop('station')
-    result2.pop("odt")
-    datamap = [{key: value[i] for key, value in result2.items()} for i in range(len(result2['grade']))]
-    for point in datamap:
-        if int(point['grade']) != 0:
+        station = result2.get('odt', [''])[0]
+    # Only look at grade/note - the form may carry extra keys (csrf_token,
+    # request_id from the offline replay) with a different number of values.
+    grades = result2.get('grade', [])
+    notes = result2.get('note', [])
+    for i, (candidate_num, grade) in enumerate(zip(candidates, grades)):
+        try:
+            grade = int(grade)
+        except ValueError:
+            continue
+        if grade != 0:
+            note = notes[i] if i < len(notes) else ''
             new_review = Review(
                 station=station,
-                subject_id=str(current_user.id) + "/" + str(candidates[counter]),
-                grade=int(point['grade']),
-                note=point['note'],
+                subject_id=str(current_user.id) + "/" + str(candidate_num),
+                grade=grade,
+                note=note,
                 author=current_user,
-                subject=Candidate.query.filter_by(id=str(current_user.id) + "/" + str(candidates[counter])).first()
+                subject=Candidate.query.filter_by(id=str(current_user.id) + "/" + str(candidate_num)).first()
             )
             db.session.add(new_review)
             db.session.commit()
-        counter += 1
     update_avgs_nf()
     flash(f'ציוני התחנה {station} נשמרו בהצלחה!', 'success')
     return redirect(url_for('add_new_group_review'))

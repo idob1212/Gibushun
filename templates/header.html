@@ -33,7 +33,10 @@
   <!-- Modern Hebrew font -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&family=Rubik:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+  {# Loaded non-blocking: offline, a hanging fonts.googleapis.com request would
+     otherwise stall CSSOM and block every end-of-body script (frozen taps). #}
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&family=Rubik:wght@500;600;700;800;900&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&family=Rubik:wght@500;600;700;800;900&display=swap" rel="stylesheet"></noscript>
   <!-- App styles (Tailwind v4 + DaisyUI, built from static/src/input.css) -->
   <link href="{{ url_for('static', filename='css/app.css') }}" rel="stylesheet">
 </head>

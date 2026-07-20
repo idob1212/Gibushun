@@ -19,7 +19,7 @@
 <section class="px-4 mt-2">
   <div class="card bg-base-100 shadow-sm">
     <div class="card-body p-4 gap-4">
-      <form method="POST" action="{{ url_for('update_all') }}" class="flex flex-col gap-4">
+      <form method="POST" action="{{ url_for('update_all') }}" data-offline class="flex flex-col gap-4">
         {{ user_form.csrf_token }}
 
         <div class="form-control w-full">

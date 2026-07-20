@@ -65,9 +65,23 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const stationSelect = document.getElementById('station');
+    var currentStation = stationSelect.value;
+    // Per-station in-page cache: station -> { candidateId: {counter, note} }.
+    // Keeps this session's entries when switching stations offline.
+    var stationData = {};
+
+    function cacheRow(candidateId) {
+        if (!stationData[currentStation]) stationData[currentStation] = {};
+        stationData[currentStation][candidateId] = {
+            counter: parseInt(document.getElementById(`grade-${candidateId}`).textContent),
+            note: document.getElementById(`note-${candidateId}`).value
+        };
+    }
+
     function updateAllReviews(showMessage = false) {
         const data = {
-            station: document.getElementById('station').value,
+            station: currentStation,
             reviews: []
         };
 
@@ -119,6 +133,24 @@ document.addEventListener('DOMContentLoaded', function() {
         .catch(error => console.error('Error:', error));
     }
 
+    // ponytail: 400ms trailing debounce on +/- POSTs — every tap used to fire one,
+    // which flooded the offline outbox. "סיים מסע" and station switches flush it.
+    var debounceTimer = null;
+    function scheduleUpdate() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(function() {
+            debounceTimer = null;
+            updateAllReviews();
+        }, 400);
+    }
+    function flushPendingUpdate() {
+        if (debounceTimer !== null) {
+            clearTimeout(debounceTimer);
+            debounceTimer = null;
+            updateAllReviews();
+        }
+    }
+
     // Handle plus/minus buttons
     document.querySelectorAll('.plus-btn, .minus-btn').forEach(button => {
         button.addEventListener('click', function() {
@@ -133,14 +165,25 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             gradeSpan.textContent = currentCounter;
+            cacheRow(candidateId);
 
-            // Update all reviews whenever a counter changes
-            updateAllReviews();
+            // Update all reviews whenever a counter changes (debounced)
+            scheduleUpdate();
+        });
+    });
+
+    // Keep the local cache fresh on note edits (notes are still only
+    // submitted with the next counter change or "סיים מסע")
+    document.querySelectorAll('.note-input').forEach(input => {
+        input.addEventListener('change', function() {
+            cacheRow(this.id.replace('note-', ''));
         });
     });
 
     // Handle submit all button (finish march)
     document.getElementById('submitAll').addEventListener('click', function() {
+        clearTimeout(debounceTimer);
+        debounceTimer = null;
         updateAllReviews(true);  // Show success message when explicitly finishing march
     });
 
@@ -149,25 +192,45 @@ document.addEventListener('DOMContentLoaded', function() {
         fetch(`/get-station-reviews/${station}`)
             .then(response => response.json())
             .then(data => {
+                if (station !== currentStation) return; // stale response, user switched again
+                if (!stationData[station]) stationData[station] = {};
                 data.reviews.forEach(review => {
                     const gradeSpan = document.getElementById(`grade-${review.subject}`);
                     const noteInput = document.getElementById(`note-${review.subject}`);
 
                     if (gradeSpan) gradeSpan.textContent = review.counter_value || 0;
                     if (noteInput) noteInput.value = review.note || '';
+                    stationData[station][review.subject] = {
+                        counter: review.counter_value || 0,
+                        note: review.note || ''
+                    };
                 });
             })
-            .catch(error => console.error('Error:', error));
+            .catch(error => console.error('Error:', error)); // offline: keep reset/local-cache values
     }
 
-    // Handle station changes
-    const stationSelect = document.getElementById('station');
+    // Handle station changes: flush pending POST for the old station, then
+    // reset every row synchronously so a slow/failed fetch can never leave
+    // the previous station's values on screen.
     stationSelect.addEventListener('change', function() {
-        loadStationReviews(this.value);
+        flushPendingUpdate();
+        currentStation = this.value;
+        const cached = stationData[currentStation] || {};
+        document.querySelectorAll('tbody tr').forEach(row => {
+            const candidateId = row.querySelector('.plus-btn').dataset.candidate;
+            const entry = cached[candidateId];
+            document.getElementById(`grade-${candidateId}`).textContent = entry ? entry.counter : 0;
+            document.getElementById(`note-${candidateId}`).value = entry ? entry.note : '';
+        });
+        loadStationReviews(currentStation);
     });
 
-    // Load initial station data
-    loadStationReviews(stationSelect.value);
+    // Seed the cache for the initial station from the server-rendered DOM,
+    // then reconcile with the server.
+    document.querySelectorAll('tbody tr').forEach(row => {
+        cacheRow(row.querySelector('.plus-btn').dataset.candidate);
+    });
+    loadStationReviews(currentStation);
 });
 </script>
 {% include "footer.html" %}

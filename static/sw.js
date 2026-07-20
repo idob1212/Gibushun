@@ -1,4 +1,4 @@
-const VERSION = 'v7';
+const VERSION = 'v8';
 const SHELL_CACHE = 'meymadion-shell-' + VERSION;
 const PAGE_CACHE = 'meymadion-pages-' + VERSION;
 
@@ -79,5 +79,13 @@ self.addEventListener('fetch', event => {
     );
     return;
   }
-  // Everything else (admin, downloads, exports): straight to network.
+
+  // Other navigations (admin, downloads, exports) are online-only and never
+  // cached — but a failure should land on our branded offline page, not the
+  // browser's native error.
+  if (req.mode === 'navigate') {
+    event.respondWith(fetch(req).catch(() => caches.match('/offline')));
+    return;
+  }
+  // Non-navigation requests (API fetches etc.): straight to network.
 });
