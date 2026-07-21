@@ -25,7 +25,7 @@
       {% if review.subject.status != "פרש" %}
         {% if review.subject_id %}
           {% set g = review.grade|float %}
-          <div class="card bg-base-100 shadow-sm">
+          <a href="{{ url_for('candidate_profile', candidate_id=review.subject_id) }}" class="card bg-base-100 shadow-sm hover:shadow-md transition-shadow active:scale-[.99]">
             <div class="card-body p-3 flex-row items-center gap-3">
               <div class="bib">{{ review.subject_id.split("/")[1] }}</div>
               <div class="flex-1 min-w-0">
@@ -33,7 +33,7 @@
               </div>
               <span class="score-chip {% if g >= 3.3 %}score-good{% elif g >= 2.5 %}score-mid{% elif g > 0 %}score-low{% else %}bg-base-200 text-base-content/50{% endif %}">ציון <b>{{ review.grade|round(2) }}</b></span>
             </div>
-          </div>
+          </a>
         {% endif %}
       {% endif %}
     {% endfor %}

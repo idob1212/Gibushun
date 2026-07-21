@@ -11,7 +11,10 @@
 </div>
 
 <section class="px-4 mt-4">
-  <a href="{{ url_for('downloadb') }}" class="btn btn-accent w-full btn-lg shadow-lg font-bold">
+  {# target=_blank: navigating the PWA itself to the file response left a dead
+     page with no way back (iOS standalone has no browser chrome). A new
+     context opens iOS's in-app sheet with a Done button instead. #}
+  <a href="{{ url_for('downloadb') }}" target="_blank" rel="noopener" class="btn btn-accent w-full btn-lg shadow-lg font-bold">
     <i class="fas fa-download"></i> הורד נתונים
   </a>
 </section>
