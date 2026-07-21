@@ -198,6 +198,12 @@ app.config['WTF_CSRF_TIME_LIMIT'] = None
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 
 
+def latest_review_per_candidate(reviews):
+    # Historical double-saves left some candidates with two reviews for the
+    # same station; rankings should show each candidate once — the latest wins.
+    return list({r.subject_id: r for r in sorted(reviews, key=lambda r: r.id)}.values())
+
+
 def is_duplicate_request():
     request_id = request.headers.get("X-Request-Id")
     if not request_id and request.is_json:
@@ -839,6 +845,9 @@ def add_new_review():
     candidate_nums.sort()
     form.subject.choices = candidate_nums
     if form.validate_on_submit():
+        if is_duplicate_request():
+            flash('חוות הדעת כבר נשמרה', 'success')
+            return redirect(url_for('add_new_review'))
         if form.station.data == "ODT":
             form.station.data = form.station.data + " " + form.odt.data
         if form.station.data == "אחר":
@@ -1006,6 +1015,9 @@ def addOneReview():
 
 @app.route('/add-all', methods=['GET','POST'])
 def update_all():
+    if is_duplicate_request():
+        flash('הציונים כבר נשמרו', 'success')
+        return redirect(url_for('add_new_group_review'))
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     candidates = [int(candidate.id.split("/")[1]) for candidate in candidates if candidate.status != "פרש"]
     candidates.sort()
@@ -1028,15 +1040,25 @@ def update_all():
             continue
         if grade != 0:
             note = notes[i] if i < len(notes) else ''
-            new_review = Review(
-                station=station,
-                subject_id=str(current_user.id) + "/" + str(candidate_num),
-                grade=grade,
-                note=note,
-                author=current_user,
-                subject=Candidate.query.filter_by(id=str(current_user.id) + "/" + str(candidate_num)).first()
-            )
-            db.session.add(new_review)
+            subject_id = str(current_user.id) + "/" + str(candidate_num)
+            # Upsert: re-submitting the group station form is a correction,
+            # not a second review — duplicates here double candidates in the
+            # station ranking and skew averages.
+            review = Review.query.filter_by(
+                station=station, subject_id=subject_id, author_id=current_user.id
+            ).first()
+            if review:
+                review.grade = grade
+                review.note = note
+            else:
+                db.session.add(Review(
+                    station=station,
+                    subject_id=subject_id,
+                    grade=grade,
+                    note=note,
+                    author=current_user,
+                    subject=Candidate.query.filter_by(id=subject_id).first()
+                ))
             db.session.commit()
     update_avgs_nf()
     flash(f'ציוני התחנה {station} נשמרו בהצלחה!', 'success')
@@ -1495,7 +1517,8 @@ def showStationReviewsAdmin():
             reviews.sort(key=lambda x: x.grade, reverse=True)
         if "ODT" == form.station.data:
             reviews = Review.query.filter_by(author_id=form.group.data, station="ODT סיכום").all()
-            reviews.sort(key=lambda x: x.grade, reverse=True)
+        reviews = latest_review_per_candidate(reviews)
+        reviews.sort(key=lambda x: x.grade, reverse=True)
         return render_template('rankings-admin.html', reviews=reviews, form=form, stations=unique_station_values)
     return render_template('rankings-admin.html', form=form, stations=unique_station_values)
 
@@ -1521,7 +1544,8 @@ def showStationReviews():
         if "ODT" == form.station.data:
             reviews = Review.query.filter_by(station="ODT סיכום").all()
             reviews = [review for review in reviews if str(review.author_id) == str(current_user.id)]
-            reviews.sort(key=lambda x: x.grade, reverse=True)
+        reviews = latest_review_per_candidate(reviews)
+        reviews.sort(key=lambda x: x.grade, reverse=True)
         return render_template('rankings.html', reviews=reviews, form=form)
     return render_template('rankings.html', form=form)
 

@@ -59,6 +59,14 @@
     });
   }
 
+  function put(item) {
+    return tx('readwrite').then(function (store) {
+      return new Promise(function (resolve) {
+        store.put(item).onsuccess = function () { resolve(); };
+      });
+    });
+  }
+
   function pendingCount() { return allItems().then(function (a) { return a.length; }); }
 
   // --- Connectivity banner / toast -----------------------------------------
@@ -80,26 +88,48 @@
     return dock ? dock.offsetHeight : 0;
   }
 
-  var offlineBar, offlineBarShown = false;
+  var offlineBar, offlineBarText, offlineBarShown = false, offlineBarDismissed = false;
   function ensureOfflineBar() {
     if (offlineBar) return offlineBar;
     offlineBar = document.createElement('div');
     offlineBar.id = 'net-banner';
     offlineBar.style.cssText = BAR_CSS + ';bottom:0;background:#b45309';
+    offlineBarText = document.createElement('span');
+    var close = document.createElement('button');
+    close.type = 'button';
+    close.textContent = '✕';
+    close.setAttribute('aria-label', 'סגור');
+    // The bar itself is pointer-events:none so taps pass through — the close
+    // button is the one interactive exception.
+    close.style.cssText = 'pointer-events:auto;background:none;border:0;color:#fff;' +
+      'font-weight:700;font-size:16px;margin-inline-start:10px;padding:0 4px;cursor:pointer';
+    close.addEventListener('click', function () {
+      offlineBarDismissed = true; // stays hidden until we're back online
+      hideOfflineBar();
+    });
+    offlineBar.appendChild(offlineBarText);
+    offlineBar.appendChild(close);
     document.body.appendChild(offlineBar);
     return offlineBar;
   }
   function offlineBarVisible() { return offlineBarShown; }
+  // Reserve scroll space so the bar never permanently covers page content.
+  function reserveBarSpace() {
+    document.body.style.paddingBottom = (offlineBarShown && offlineBar) ? (offlineBar.offsetHeight + 8) + 'px' : '';
+  }
   function showOfflineBar(text) {
     var b = ensureOfflineBar();
-    b.textContent = text;
+    offlineBarText.textContent = text;
+    if (offlineBarDismissed) return;
     b.style.bottom = dockOffset() + 'px';
     b.style.transform = 'translateY(0)';
     offlineBarShown = true;
+    reserveBarSpace();
   }
   function hideOfflineBar() {
     if (offlineBar) offlineBar.style.transform = 'translateY(150%)';
     offlineBarShown = false;
+    reserveBarSpace();
   }
   // Rotation/resize can change the dock height — keep the shown bar above it.
   function repositionOfflineBar() {
@@ -147,7 +177,9 @@
   function probe() {
     return new Promise(function (resolve) {
       var done = false;
-      var timer = setTimeout(function () { if (!done) { done = true; resolve(false); } }, 4000);
+      // 8s: field 5G can be slow enough that a healthy round-trip takes >4s,
+      // and a false negative here is what makes the offline banner stick.
+      var timer = setTimeout(function () { if (!done) { done = true; resolve(false); } }, 8000);
       nativeFetch('/sw.js', { method: 'HEAD', cache: 'no-store' })
         .then(function (r) { if (!done) { done = true; clearTimeout(timer); resolve(!!r && (r.ok || r.status === 200)); } })
         .catch(function () { if (!done) { done = true; clearTimeout(timer); resolve(false); } });
@@ -156,6 +188,7 @@
   function setOffline(v) {
     var changed = v !== offline;
     offline = v;
+    if (!v) offlineBarDismissed = false; // a dismissed bar may show again next time we go offline
     refreshStatus();
     if (!v && changed) flush();
   }
@@ -171,10 +204,10 @@
     if (flushing || offline) return Promise.resolve();
     flushing = true;
     return allItems().then(function (items) {
-      if (!items.length) return 0;
-      var synced = 0;
+      if (!items.length) return { synced: 0, dropped: 0 };
+      var synced = 0, dropped = 0;
       function step(i) {
-        if (i >= items.length) return Promise.resolve(synced);
+        if (i >= items.length) return Promise.resolve({ synced: synced, dropped: dropped });
         var item = items[i];
         var opts = { method: 'POST', headers: { 'X-Request-Id': item.requestId } };
         if (item.kind === 'json') {
@@ -190,13 +223,24 @@
             synced++;
             return remove(item.id).then(function () { return step(i + 1); });
           }
-          return step(i + 1); // server rejected (e.g. validation) — leave queued, try next
-        }).catch(function () { return synced; }); // network died — stop
+          // Server actively rejected it (validation, auth, 500). Retrying
+          // forever is what left the "N pending" banner stuck — cap it.
+          item.tries = (item.tries || 0) + 1;
+          if (item.tries >= 5) {
+            dropped++;
+            console.error('outbox item dropped after 5 rejections', item.url, res.status);
+            return remove(item.id).then(function () { return step(i + 1); });
+          }
+          return put(item).then(function () { return step(i + 1); });
+        }).catch(function () { return { synced: synced, dropped: dropped }; }); // network died — stop
       }
       return step(0);
-    }).then(function (synced) {
+    }).then(function (r) {
       flushing = false;
-      if (synced > 0) toast('סונכרנו ' + synced + ' פעולות ✓');
+      var parts = [];
+      if (r.synced > 0) parts.push('סונכרנו ' + r.synced + ' פעולות ✓');
+      if (r.dropped > 0) parts.push(r.dropped + ' פעולות נדחו על ידי השרת והוסרו');
+      if (parts.length) toast(parts.join(' · '));
       refreshStatus();
     }).catch(function () { flushing = false; });
   }
@@ -228,7 +272,12 @@
     }
 
     if (!navigator.onLine) return queueAndAck();
-    return nativeFetch(url, init).catch(function () { return queueAndAck(); });
+    return nativeFetch(url, init).then(function (res) {
+      // A write just reached the server — we're online, whatever the flag
+      // said. Clears a stale banner and drains the outbox immediately.
+      if (res && res.ok && offline) setOffline(false);
+      return res;
+    }).catch(function () { return queueAndAck(); });
   };
 
   // --- offline form interception (interview / note / add-candidate) ---------
@@ -258,7 +307,13 @@
         nativeFetch(action, { method: 'POST', headers: { 'X-Request-Id': requestId }, body: fd })
           .then(function (res) {
             if (res.redirected) {
-              window.location.href = res.url; // PRG success — show server flash
+              // PRG success. fetch already followed the redirect and that GET
+              // consumed the one-shot flash message — navigating again would
+              // render the page without it. Paint the HTML we already have.
+              res.text().then(function (html) {
+                history.replaceState(null, '', res.url);
+                document.open(); document.write(html); document.close();
+              });
             } else if (res.ok) {
               // 200 without redirect = validation errors re-rendered; show them
               res.text().then(function (html) {
