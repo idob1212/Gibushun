@@ -72,20 +72,25 @@
   // --- Connectivity banner / toast -----------------------------------------
   // Two distinct pieces of UI, so a transient toast never clobbers (or gets
   // clobbered by) the persistent offline strip:
-  //   * offlineBar — sticky status, shown only while offline, sits above the dock
+  //   * offlineBar — sticky status, shown only while offline
   //   * toastEl    — transient success/sync message, auto-dismisses
-  // pointer-events:none — nothing in the banners is interactive, so taps must
-  // always pass through to the dock/page beneath.
-  var BAR_CSS = 'position:fixed;left:0;right:0;z-index:60;pointer-events:none;transform:translateY(150%);' +
-    'transition:transform .25s ease;padding:10px 14px;text-align:center;font-weight:600;' +
-    'font-size:14px;color:#fff;box-shadow:0 -2px 10px rgba(0,0,0,.18)';
+  // Both sit at the TOP of the screen, under the navbar — at the bottom they
+  // covered action rows and the dock (field feedback: "למעלה זה היה טוב").
+  // pointer-events:none — taps pass through to the page beneath; the ✕ button
+  // is the one interactive exception.
+  var BAR_CSS = 'position:fixed;left:0;right:0;z-index:60;pointer-events:none;opacity:0;visibility:hidden;' +
+    'transition:opacity .25s ease,visibility .25s;padding:10px 14px;text-align:center;font-weight:600;' +
+    'font-size:14px;color:#fff;box-shadow:0 2px 10px rgba(0,0,0,.25)';
 
-  function dockOffset() {
-    // Recomputed every time we show something, so the bar always clears the
-    // dock even if the dock wasn't laid out yet when the element was created.
-    // offsetHeight is already 0 when the dock is display:none.
-    var dock = document.querySelector('.dock');
-    return dock ? dock.offsetHeight : 0;
+  function topOffset() {
+    // The navbar is sticky top-0, so its rect ends where the banners should
+    // start. Recomputed on every show — covers rotation and safe-area changes.
+    var nav = document.querySelector('.app-topbar');
+    return nav ? Math.max(0, nav.getBoundingClientRect().bottom) : 0;
+  }
+  function setVisible(el, on) {
+    el.style.opacity = on ? '1' : '0';
+    el.style.visibility = on ? 'visible' : 'hidden';
   }
 
   var offlineBar, offlineBarText, offlineBarShown = false, offlineBarDismissed = false;
@@ -93,16 +98,17 @@
     if (offlineBar) return offlineBar;
     offlineBar = document.createElement('div');
     offlineBar.id = 'net-banner';
-    offlineBar.style.cssText = BAR_CSS + ';bottom:0;background:#b45309';
+    offlineBar.style.cssText = BAR_CSS + ';background:#b45309';
     offlineBarText = document.createElement('span');
     var close = document.createElement('button');
     close.type = 'button';
     close.textContent = '✕';
     close.setAttribute('aria-label', 'סגור');
-    // The bar itself is pointer-events:none so taps pass through — the close
-    // button is the one interactive exception.
-    close.style.cssText = 'pointer-events:auto;background:none;border:0;color:#fff;' +
-      'font-weight:700;font-size:16px;margin-inline-start:10px;padding:0 4px;cursor:pointer';
+    // Generous padding: the previous 4px-wide target was effectively
+    // untappable on a phone (field feedback: "האיקס לא עובד").
+    close.style.cssText = 'pointer-events:auto;background:rgba(0,0,0,.15);border:0;border-radius:8px;' +
+      'color:#fff;font-weight:700;font-size:16px;line-height:1;margin-inline-start:12px;' +
+      'padding:8px 12px;cursor:pointer;vertical-align:middle';
     close.addEventListener('click', function () {
       offlineBarDismissed = true; // stays hidden until we're back online
       hideOfflineBar();
@@ -113,27 +119,28 @@
     return offlineBar;
   }
   function offlineBarVisible() { return offlineBarShown; }
-  // Reserve scroll space so the bar never permanently covers page content.
+  // Reserve space in the page flow so the bar never covers the top of the content.
   function reserveBarSpace() {
-    document.body.style.paddingBottom = (offlineBarShown && offlineBar) ? (offlineBar.offsetHeight + 8) + 'px' : '';
+    var main = document.querySelector('main');
+    if (main) main.style.paddingTop = (offlineBarShown && offlineBar) ? (offlineBar.offsetHeight + 12) + 'px' : '';
   }
   function showOfflineBar(text) {
     var b = ensureOfflineBar();
     offlineBarText.textContent = text;
     if (offlineBarDismissed) return;
-    b.style.bottom = dockOffset() + 'px';
-    b.style.transform = 'translateY(0)';
+    b.style.top = topOffset() + 'px';
+    setVisible(b, true);
     offlineBarShown = true;
     reserveBarSpace();
   }
   function hideOfflineBar() {
-    if (offlineBar) offlineBar.style.transform = 'translateY(150%)';
+    if (offlineBar) setVisible(offlineBar, false);
     offlineBarShown = false;
     reserveBarSpace();
   }
-  // Rotation/resize can change the dock height — keep the shown bar above it.
+  // Rotation/resize can change the navbar height — keep the shown bar under it.
   function repositionOfflineBar() {
-    if (offlineBarShown && offlineBar) offlineBar.style.bottom = dockOffset() + 'px';
+    if (offlineBarShown && offlineBar) offlineBar.style.top = topOffset() + 'px';
   }
   window.addEventListener('resize', repositionOfflineBar);
   window.addEventListener('orientationchange', repositionOfflineBar);
@@ -143,20 +150,19 @@
     if (toastEl) return toastEl;
     toastEl = document.createElement('div');
     toastEl.id = 'net-toast';
-    toastEl.style.cssText = BAR_CSS + ';bottom:0;background:#16a34a';
+    toastEl.style.cssText = BAR_CSS + ';background:#16a34a';
     document.body.appendChild(toastEl);
     return toastEl;
   }
-  // Transient "push": always removed after a few seconds, and stacked above the
-  // dock + offline bar so it never hides the bottom navigation.
+  // Transient "push": always removed after a few seconds, stacked under the
+  // navbar and the offline bar (if shown).
   function toast(text) {
     var t = ensureToast();
     t.textContent = text;
-    var above = dockOffset() + (offlineBarVisible() ? offlineBar.offsetHeight : 0);
-    t.style.bottom = above + 'px';
-    t.style.transform = 'translateY(0)';
+    t.style.top = (topOffset() + (offlineBarVisible() ? offlineBar.offsetHeight + 6 : 0)) + 'px';
+    setVisible(t, true);
     if (toastTimer) clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { t.style.transform = 'translateY(150%)'; }, 3200);
+    toastTimer = setTimeout(function () { setVisible(t, false); }, 3200);
   }
 
   function refreshStatus() {
