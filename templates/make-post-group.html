@@ -61,6 +61,17 @@
 
 <script>
   document.addEventListener('DOMContentLoaded', function () {
+    // Enter inside a text field must NOT submit the whole batch form (mobile
+    // keyboards make this an easy accident that wipes unentered grades).
+    // Blur instead, which closes the on-screen keyboard. Submitting stays
+    // explicit via the הזן ציונים button.
+    document.querySelector('form[data-offline]').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && e.target.matches('input, select')) {
+        e.preventDefault();
+        e.target.blur();
+      }
+    });
+
     var stationField = document.getElementById('station');
     var additionalField = document.getElementById('additionalField');
     if (!stationField) return;

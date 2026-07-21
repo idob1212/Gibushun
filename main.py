@@ -2118,8 +2118,14 @@ def downloadb():
     engine = sqlalchemy.create_engine(app.config['SQLALCHEMY_DATABASE_URI'])
     df1 = pd.read_sql(db.session.query(Candidate).statement, db.session.bind)
     df1 = df1[df1["status"] != "פרש"]
-    df1.drop(['status'], axis=1, inplace=True)
-    df1.columns = ["מספר מגובש", "מספר קבוצה", "שם", "סטטוס סיכום", "הערת סיכום", "שם מראיין", "ציון ראיון", "סיכום ראיון", "בעיות תש", "בעיות רפואיות"]
+    # Rename by name and select explicitly, so adding columns to Candidate
+    # (e.g. withdraw_reason) can't shift the mapping and 500 the export.
+    export_columns = {"id": "מספר מגובש", "group_id": "מספר קבוצה", "name": "שם",
+                      "final_status": "סטטוס סיכום", "final_note": "הערת סיכום",
+                      "interviewer": "שם מראיין", "interview_grade": "ציון ראיון",
+                      "interview_note": "סיכום ראיון", "tash_prob": "בעיות תש",
+                      "medical_prob": "בעיות רפואיות"}
+    df1 = df1.rename(columns=export_columns)[list(export_columns.values())]
     df1["מתאם(קבוצת ליבה)"] = pd.Series()
     df1["מגבש"] = pd.Series()
     df1.index = df1['מספר מגובש']
