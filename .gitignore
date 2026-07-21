@@ -174,4 +174,4 @@ venv/
 
 # Node / Tailwind build (the generated static/css/app.css IS committed)
 node_modules/
-.playwright-mcp/
+.playwright-mcp/multiple.xlsx
