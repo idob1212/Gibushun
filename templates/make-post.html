@@ -25,7 +25,10 @@
         {{ form.hidden_tag() }}
 
         <div class="form-control w-full">
-          <label class="label pb-1" for="station"><span class="label-text font-medium">תחנה</span></label>
+          <div class="flex items-center justify-between pb-1">
+            <label class="label p-0" for="station"><span class="label-text font-medium">תחנה</span></label>
+            <button type="button" class="station-help-dot" data-sg-open aria-label="הסבר על התחנה" title="הסבר על התחנה">?</button>
+          </div>
           {{ form.station(class="select select-bordered w-full", required="required") }}
         </div>
 
@@ -70,6 +73,10 @@
     });
   });
 </script>
+
+{% set help_mode = "individual" %}
+{% set help_select_id = "station" %}
+{% include "_station-help.html" %}
 
 {% include "footer.html" %}
 {% endblock %}
