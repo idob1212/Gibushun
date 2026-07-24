@@ -11,13 +11,56 @@
 </div>
 
 <section class="px-4 mt-4">
-  {# target=_blank: navigating the PWA itself to the file response left a dead
-     page with no way back (iOS standalone has no browser chrome). A new
-     context opens iOS's in-app sheet with a Done button instead. #}
-  <a href="{{ url_for('downloadb') }}" target="_blank" rel="noopener" class="btn btn-accent w-full btn-lg shadow-lg font-bold">
-    <i class="fas fa-download"></i> הורד נתונים
-  </a>
+  {# An iOS standalone PWA can't deliver a file download through a normal
+     navigation: same-window lands on a dead page (no browser chrome to get
+     back), and target=_blank opens SFSafariViewController, which can't handle
+     an attachment response and just shows a blank page. Field feedback:
+     "ההורד נתונים לא עובד ... זה מחזיר לדף לבן". So fetch the file as a blob
+     in-app and save it via a programmatic <a download> — never leaves the PWA
+     and actually writes the file. #}
+  <button type="button" id="download-btn" data-url="{{ url_for('downloadb') }}"
+          class="btn btn-accent w-full btn-lg shadow-lg font-bold">
+    <i class="fas fa-download"></i> <span id="download-label">הורד נתונים</span>
+  </button>
 </section>
+
+<script>
+(function () {
+  var btn = document.getElementById('download-btn');
+  var label = document.getElementById('download-label');
+  if (!btn || !label) return;
+  var original = label.textContent;
+  btn.addEventListener('click', function () {
+    if (btn.dataset.busy) return;          // ignore double-taps mid-download
+    btn.dataset.busy = '1';
+    label.textContent = 'מוריד…';
+    fetch(btn.dataset.url, { credentials: 'same-origin' })
+      .then(function (res) {
+        if (!res.ok) throw new Error('status ' + res.status);
+        return res.arrayBuffer();
+      })
+      .then(function (buf) {
+        // Type it as a real xlsx so iOS Quick Look recognises the file.
+        var blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'data.xlsx';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+        label.textContent = original;
+        delete btn.dataset.busy;
+      })
+      .catch(function () {
+        label.textContent = 'ההורדה נכשלה — נסו שוב';
+        setTimeout(function () { label.textContent = original; }, 3000);
+        delete btn.dataset.busy;
+      });
+  });
+})();
+</script>
 
 <section class="px-4 mt-4">
   <h2 class="font-display text-lg font-bold mb-3">קבוצות</h2>
