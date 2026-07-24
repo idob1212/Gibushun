@@ -1,4 +1,4 @@
-const VERSION = 'v10';
+const VERSION = 'v11';
 const SHELL_CACHE = 'meymadion-shell-' + VERSION;
 const PAGE_CACHE = 'meymadion-pages-' + VERSION;
 
@@ -25,6 +25,30 @@ const FIELD_PREFIXES = [
 function isFieldNavigation(url) {
   if (url.pathname === '/') return true;
   return FIELD_PREFIXES.some(p => url.pathname === p || url.pathname.startsWith(p + '/') || url.pathname.startsWith(p));
+}
+
+// The scoring modes link to each other; a user who opened one online but never
+// the others can't switch to them offline (network-first only caches a page
+// after it's been visited) and dead-ends on /offline. Field feedback:
+// "אני במצב אופליין ולא מצליח לעבור למצב יחיד / קבוצתי". So the moment any one
+// (or home) loads online, warm the whole set into the page cache — carrying the
+// live session cookie — so every mode stays switchable in the field.
+const SCORING_MODES = ['/new-review', '/new-group-review', '/counter-review', '/circles'];
+let lastWarm = 0;
+function warmScoringModes() {
+  const now = Date.now();
+  if (now - lastWarm < 60000) return; // throttle: at most once a minute
+  lastWarm = now;
+  caches.open(PAGE_CACHE).then(cache => {
+    SCORING_MODES.forEach(path => {
+      fetch(path, { credentials: 'same-origin' }).then(res => {
+        // Cache only a real authenticated render — never a 302→/login or error.
+        if (res && res.ok && res.type === 'basic' && new URL(res.url).pathname === path) {
+          cache.put(path, res.clone());
+        }
+      }).catch(() => {}); // offline/flaky at warm time — retry on the next online load
+    });
+  });
 }
 
 self.addEventListener('install', event => {
@@ -72,6 +96,7 @@ self.addEventListener('fetch', event => {
       fetch(req).then(res => {
         const copy = res.clone();
         caches.open(PAGE_CACHE).then(c => c.put(req, copy));
+        if (url.pathname === '/' || SCORING_MODES.indexOf(url.pathname) !== -1) warmScoringModes();
         return res;
       }).catch(() =>
         caches.match(req).then(hit => hit || caches.match('/offline'))
