@@ -937,7 +937,8 @@ def getAllStations():
 
 @app.route("/new-review", methods=["GET", "POST"])
 def add_new_review():
-    stations = getAllStations()
+    # Only the stations for this mode (plus "אחר" for a one-off custom name).
+    stations = MODE_STATIONS["individual"] + ["אחר"]
     form = CreateReviewForm()
     form.station.choices = stations
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
@@ -976,7 +977,8 @@ def add_new_review():
 @app.route("/new-group-review", methods=["GET", "POST"])
 def add_new_group_review():
     form = GroupReviewForm()
-    stations = getAllStations()
+    # Only the stations for this mode (plus "אחר" for a one-off custom name).
+    stations = MODE_STATIONS["group"] + ["אחר"]
     form.station.choices = stations
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     candidates = [int(candidate.id.split("/")[1]) for candidate in candidates if candidate.status != "פרש"]
@@ -1034,7 +1036,7 @@ def get_existing_review(candidate_id, station):
 
 @app.route('/counter-review', methods=["GET", "POST"])
 def counter_review():
-    counter_stations = ["מסע 1", "מסע 2", "מסע 3", "שקי חול", "שקי חול 2"]
+    counter_stations = MODE_STATIONS["counter"]
     form = CounterReviewForm()
     form.station.choices = counter_stations
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()

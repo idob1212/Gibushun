@@ -30,14 +30,8 @@
           <button type="button" class="station-help-dot" data-sg-open aria-label="הסבר על התחנה" title="הסבר על התחנה">?</button>
         </div>
         <select class="select select-bordered w-full" id="movementType">
-          <option value="ספרינטים">ספרינט</option>
-          <option value="זחילות">זחילות</option>
-          <option value="אלונקה סוציומטרית">אלונקה סוציומטרית</option>
-          <option value="מתלה שזיפים">מתלה שזיפים</option>
-          {% for station in physical_stations %}
-          {% if station != "מתלה שזיפים" %}
+          {% for station in MODE_STATIONS["circles"] %}
           <option value="{{ station }}">{{ station }}</option>
-          {% endif %}
           {% endfor %}
           <option value="אחר">אחר</option>
         </select>
