@@ -32,6 +32,7 @@
                 {% if review.note %}<div class="text-sm text-base-content/70 whitespace-pre-wrap break-words">{{ review.note }}</div>{% endif %}
               </div>
               <span class="score-chip {% if g >= 3.3 %}score-good{% elif g >= 2.5 %}score-mid{% elif g > 0 %}score-low{% else %}bg-base-200 text-base-content/50{% endif %}">ציון <b>{{ review.grade|round(2) }}</b></span>
+              <i class="fas fa-chevron-left text-base-content/30 text-sm"></i>
             </div>
           </a>
         {% endif %}
