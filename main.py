@@ -669,6 +669,109 @@ def logout():
     return redirect(url_for('home'))
 
 stations = ["ספרינטים", "זחילות", "משימת מחשבה", "דיון מילוט", "פירוק והרכבת נשק", "מסע", "שקים", "ODT", "מעגל זנבות", "אלונקה סוציומטרית", "הרצאות", "בניית שוח", "חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול", "נאסא","מתלה שזיפים", "אחר"]
+
+# --- Station guide (the "?" help feature) ---------------------------------
+# Per-station explanation shown behind the "?" on the scoring screens.
+# Text comes from the unit's "תחנות גיבוש" doc; keys are the app's own station
+# names (some doc names differ — e.g. doc "ריצות קצרות" is our "ספרינטים",
+# doc "מתח" is "מתלה שזיפים"). "values" are the ערכי צה"ל examined at the station.
+_MARCH_INFO = {
+    "purpose": "מסע אלונקות — תרגיל קבוצתי ואישי הכולל מאמץ פיזי עצים, שמטרתו להכין 'את הקרקע' לקראת מילוי חוות דעת עמיתים.",
+    "values": ["דבקות במשימה וחתירה לניצחון", "חיי אדם", "אחריות", "רעות", "דוגמא אישית"],
+}
+STATION_INFO = {
+    "ספרינטים": {
+        "purpose": "תרגיל ריצות קצרות (ספרינטים) — תרגיל אישי הכולל מאמץ פיזי קצר ועצים, לבחינת המועמדים תחת מאמץ.",
+        "values": ["דבקות במשימה וחתירה לניצחון", "מקצועיות", "משמעת"],
+    },
+    "זחילות": {
+        "purpose": "תרגיל זחילות הינו תרגיל אישי הכולל מאמץ פיזי עצים ומהווה סימולציה לתפקוד המועמדים.",
+        "values": ["דבקות במשימה וחתירה לניצחון", "מקצועיות", "משמעת"],
+    },
+    "הרכבה ופירוק נשק": {
+        "purpose": "פירוק והרכבת נשק — תרגיל אישי וביצועי הבודק יכולת למידת משימה טכנית, בחלקה תחת לחץ זמן ועומס מנטאלי או פיזי, לחץ חברתי ותחת אש נוכח כישלון.",
+        "values": ["דבקות במשימה וחתירה לניצחון", "מקצועיות", "אחריות", "טוהר הנשק"],
+    },
+    "הרצאות": {
+        "purpose": "תרגיל אישי לא פיזי המהווה סימולציה לתפקוד המועמדים.",
+        "values": ["דוגמא אישית", "מקצועיות", "אחריות"],
+    },
+    "פינוי לאלונקה": {
+        "purpose": "תרגיל קבוצתי הכולל מאמץ פיזי עצים ומהווה סימולציה לתפקוד המועמדים.",
+        "values": ["דבקות במשימה וחתירה לניצחון", "מקצועיות", "משמעת"],
+    },
+    "הסתתרות": {
+        "purpose": "תרגיל אישי הכולל מאמץ פיזי לא עצים, לבחינת ההתמדה וההשקעה של היכולות האישיות של המועמדים.",
+        "values": ["דבקות במשימה וחתירה לניצחון", "מקצועיות", "אחריות", "דוגמא אישית"],
+    },
+    "קורי עכביש": {
+        "purpose": "משימה קבוצתית שבה על החיילים להעביר את כלל הצוות — לרבות האפודים והפק\"לים — וכן אלונקה פתוחה דרך רשת חבלים. המטרה: השתלבות בצוות.",
+        "values": ["רעות", "אחריות", "אמינות", "שליחות"],
+    },
+    "תחנות פשיטה": {
+        "purpose": "תחנת תכנון פשיטה — תרגיל ביצועי קבוצתי הכולל מאמץ פיזי מתון ומהווה סימולציה לתפקוד המועמדים.",
+        "values": ["אחריות", "רעות", "שליחות"],
+    },
+    "דיון מילוט": {
+        "purpose": "דיון מילוט הינו תרגיל קבוצתי ללא מאמץ פיזי ומהווה סימולציה לתפקוד המועמדים.",
+        "values": ["אחריות", "רעות", "דוגמא אישית", "דבקות במשימה וחתירה לניצחון"],
+    },
+    "בניית פסל סביבתי": {
+        "purpose": "תרגיל ביצועי קבוצתי הכולל מאמץ פיזי ומהווה סימולציה לתפקוד המועמדים.",
+        "values": ["חיי אדם", "דבקות במשימה וחתירה לניצחון", "אחריות", "רעות", "מקצועיות"],
+    },
+    "בניית מאהל": {
+        "purpose": "תרגיל קבוצתי הכולל מאמץ פיזי לא עצים ומהווה סימולציה לתפקוד המועמדים.",
+        "values": ["אחריות", "רעות", "חיי אדם", "מקצועיות"],
+    },
+    "בניית צילייה": {
+        "purpose": "תרגיל קבוצתי הכולל מאמץ פיזי לא עצים ומהווה סימולציה לתפקוד.",
+        "values": ["אחריות", "רעות", "חיי אדם", "מקצועיות"],
+    },
+    "שולחן חול": {
+        "purpose": "תרגיל ביצועי אישי לא פיזי, המהווה סימולציה לתפקוד המועמדים ביכולת קוגניטיבית ועמידה בתנאי לחץ.",
+        "values": ["דבקות במשימה וחתירה לניצחון", "מקצועיות", "אחריות"],
+    },
+    "חפירת בור": {
+        "purpose": "תרגיל אישי בו על המתמיין לחפור, במשך זמן מוקצב ולא ידוע, בור עמוק ככל הניתן.",
+        "values": ["דבקות במשימה וחתירה לניצחון", "מקצועיות"],
+    },
+    "כיול תדרים": {
+        "purpose": "תרגיל אישי ללא מאמץ פיזי, הכולל למידה עצמאית של כיול תדרים במכשיר קשר ובחינה אישית. נבחנים הבנה וזיכרון של סדר פעולות, סקרנות, חוש לוגי ואחריות ללמידה עצמאית.",
+        "values": ["אחריות", "אמינות", "משמעת"],
+    },
+    "מתלה שזיפים": {
+        "purpose": "תרגיל מתח (מתלה שזיפים) — ביצועי אישי וקבוצתי הכולל מאמץ פיזי מתון ומהווה סימולציה לתפקוד המועמדים.",
+        "values": ["אחריות", "רעות", "דבקות במשימה וחתירה לניצחון", "מקצועיות"],
+    },
+    "אלונקה סוציומטרית": {
+        "purpose": "תחנת משימה אישית הבודקת תפקוד תחת מאמץ עצים ולחץ, בשילוב קואורדינציה וביצוע משימה מוגדרת — תוך הקפדה על הנחיות מדויקות והעלאה הדרגתית של רמת הקושי.",
+        "values": ["אחריות", "רעות", "דבקות במשימה וחתירה לניצחון", "מקצועיות"],
+    },
+    "מסע 1": _MARCH_INFO,
+    "מסע 2": _MARCH_INFO,
+    "מסע 3": _MARCH_INFO,
+}
+
+# Which stations the guide lists per scoring mode. This mirrors the app's
+# existing mode split — it does NOT change what's gradable, only what the "?"
+# guide shows, opened to the mode the user is in.
+MODE_STATIONS = {
+    "circles": ["ספרינטים", "זחילות", "אלונקה סוציומטרית", "מתלה שזיפים"],
+    "group": ["פינוי לאלונקה", "קורי עכביש", "תחנות פשיטה", "דיון מילוט", "בניית פסל סביבתי",
+              "בניית מאהל", "בניית צילייה", "הסתתרות", "שולחן חול", "חפירת בור", "כיול תדרים"],
+    "individual": ["בניית פסל סביבתי", "הרכבה ופירוק נשק", "הרצאות", "הסתתרות",
+                   "שולחן חול", "חפירת בור", "כיול תדרים"],
+    "counter": ["מסע 1", "מסע 2", "מסע 3"],
+}
+
+
+@app.context_processor
+def inject_station_guide():
+    # Available to every template so the scoring screens can render the guide.
+    return {"STATION_INFO": STATION_INFO, "MODE_STATIONS": MODE_STATIONS}
+
+
 def update_avgs_nf():
     physical_stations = getPhysicalStations()
     physical_stations = physical_stations + ["ספרינטים", "זחילות", "אלונקה סוציומטרית", "מתלה שזיפים"]
@@ -834,7 +937,8 @@ def getAllStations():
 
 @app.route("/new-review", methods=["GET", "POST"])
 def add_new_review():
-    stations = getAllStations()
+    # Only the stations for this mode (plus "אחר" for a one-off custom name).
+    stations = MODE_STATIONS["individual"] + ["אחר"]
     form = CreateReviewForm()
     form.station.choices = stations
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
@@ -873,7 +977,8 @@ def add_new_review():
 @app.route("/new-group-review", methods=["GET", "POST"])
 def add_new_group_review():
     form = GroupReviewForm()
-    stations = getAllStations()
+    # Only the stations for this mode (plus "אחר" for a one-off custom name).
+    stations = MODE_STATIONS["group"] + ["אחר"]
     form.station.choices = stations
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     candidates = [int(candidate.id.split("/")[1]) for candidate in candidates if candidate.status != "פרש"]
@@ -931,7 +1036,7 @@ def get_existing_review(candidate_id, station):
 
 @app.route('/counter-review', methods=["GET", "POST"])
 def counter_review():
-    counter_stations = ["מסע 1", "מסע 2", "מסע 3", "שקי חול", "שקי חול 2"]
+    counter_stations = MODE_STATIONS["counter"]
     form = CounterReviewForm()
     form.station.choices = counter_stations
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()

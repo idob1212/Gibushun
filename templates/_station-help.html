@@ -1,0 +1,147 @@
+{# Station guide ("?" help). Include once per scoring screen and set, before it:
+     {% set help_mode = "individual" %}   # circles | group | individual | counter
+     {% set help_select_id = "station" %} # id of that screen's station <select>
+   The trigger is a separate button carrying data-sg-open (placed in the field
+   label so it's out of the scoring tap-zone). This renders the dialog + its
+   styles + script. STATION_INFO / MODE_STATIONS come from the context processor. #}
+{% set _mode_label = {"circles":"מצב סדרי הגעה","group":"מצב קבוצתי","individual":"מצב יחיד","counter":"מצב מסע"} %}
+<dialog id="station-help-modal" data-select="{{ help_select_id }}" aria-label="מדריך התחנות">
+  <div class="sg-shell">
+    <header class="sg-head">
+      <div>
+        <div class="sg-eyebrow">{{ _mode_label.get(help_mode, "") }}</div>
+        <h2 class="sg-title">מדריך התחנות</h2>
+      </div>
+      <button type="button" class="sg-close" aria-label="סגור" onclick="document.getElementById('station-help-modal').close()">&times;</button>
+    </header>
+    <div class="sg-body">
+      {% for s in MODE_STATIONS.get(help_mode, []) %}
+        {% set info = STATION_INFO.get(s) %}
+        {% if info %}
+        <div class="sg-item" data-station="{{ s }}">
+          <button type="button" class="sg-row" onclick="sgToggle(this)">
+            <span class="sg-name">{{ s }}<span class="sg-now">התחנה הנוכחית</span></span>
+            <i class="fas fa-chevron-down sg-caret" aria-hidden="true"></i>
+          </button>
+          <div class="sg-detail">
+            <p class="sg-purpose">{{ info['purpose'] }}</p>
+            {% if info['values'] %}
+            <div class="sg-values">
+              <span class="sg-values-label">נבחן ב־</span>
+              {% for v in info['values'] %}<span class="sg-chip">{{ v }}</span>{% endfor %}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+</dialog>
+
+<style>
+  /* The "?" affordance — deliberately inverted against the app's cool violet
+     palette so it reads as a distinct help mark: dark disc on the light theme,
+     white disc in dark mode (as requested). Lives in the field label, away
+     from the scoring controls, so it isn't tapped by accident. */
+  .station-help-dot {
+    -webkit-appearance: none; appearance: none; border: 0; cursor: pointer;
+    width: 1.7rem; height: 1.7rem; flex: 0 0 auto; border-radius: 999px;
+    display: grid; place-items: center; line-height: 1; padding: 0;
+    font-family: var(--font-display); font-weight: 800; font-size: .95rem;
+    background: var(--color-neutral); color: var(--color-neutral-content);
+    box-shadow: 0 2px 8px -2px rgba(0,0,0,.4);
+    transition: transform .12s ease;
+  }
+  .station-help-dot:active { transform: scale(.9); }
+  [data-theme="meymadion-dark"] .station-help-dot { background: #fff; color: #1b1827; }
+
+  #station-help-modal {
+    border: 0; padding: 0; margin: auto;
+    max-width: 32rem; width: calc(100% - 2rem);
+    border-radius: var(--radius-box, 1.1rem);
+    background: var(--color-base-100); color: var(--color-base-content);
+    box-shadow: 0 24px 60px -12px rgba(0,0,0,.5);
+    overflow: hidden;
+  }
+  #station-help-modal::backdrop { background: rgba(10,8,20,.55); }
+  #station-help-modal[open] { animation: sg-in .18s ease-out; }
+  @keyframes sg-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { #station-help-modal[open] { animation: none; } }
+
+  .sg-head {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 1rem; padding: 1.05rem 1.15rem .8rem;
+    border-bottom: 1px solid var(--color-base-300);
+    background: linear-gradient(135deg,
+      color-mix(in oklab, var(--color-brand-violet) 12%, var(--color-base-100)),
+      var(--color-base-100));
+  }
+  .sg-eyebrow { font-size: .7rem; font-weight: 700; letter-spacing: .02em;
+    color: var(--color-primary); opacity: .85; margin-bottom: .1rem; }
+  .sg-title { font-family: var(--font-display); font-weight: 800; font-size: 1.3rem; line-height: 1.1; }
+  .sg-close { -webkit-appearance: none; appearance: none; border: 0; cursor: pointer;
+    width: 2rem; height: 2rem; border-radius: 999px; flex: 0 0 auto; line-height: 1;
+    font-size: 1.5rem; background: var(--color-base-200); color: var(--color-base-content); }
+
+  .sg-body { max-height: 68vh; overflow-y: auto; padding: .1rem 1.15rem 1.1rem; }
+  .sg-item { border-bottom: 1px solid var(--color-base-200); }
+  .sg-item:last-child { border-bottom: 0; }
+  .sg-row { width: 100%; display: flex; align-items: center; gap: .6rem;
+    background: transparent; border: 0; cursor: pointer; color: inherit;
+    padding: .9rem .3rem; text-align: right;
+    font-family: var(--font-display); font-weight: 700; font-size: 1rem; }
+  .sg-name { flex: 1; }
+  .sg-caret { color: var(--color-base-content); opacity: .35; font-size: .8rem; transition: transform .2s ease; }
+  .sg-item.open .sg-caret { transform: rotate(180deg); }
+  .sg-detail { display: none; padding: 0 .3rem 1rem; }
+  .sg-item.open .sg-detail { display: block; }
+  .sg-purpose { font-family: var(--font-sans); font-weight: 400; font-size: .9rem;
+    line-height: 1.6; opacity: .85; margin: 0 0 .75rem; }
+  .sg-values { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; }
+  .sg-values-label { width: 100%; font-size: .72rem; font-weight: 600; opacity: .55; margin-bottom: .15rem; }
+  .sg-chip { display: inline-flex; padding: .2rem .6rem; border-radius: 999px;
+    font-size: .72rem; font-weight: 600;
+    background: color-mix(in oklab, var(--color-primary) 14%, var(--color-base-100));
+    color: color-mix(in oklab, var(--color-primary) 72%, var(--color-base-content)); }
+
+  /* Current station: the app's brand gradient ties the guide to the identity. */
+  .sg-now { display: none; font-family: var(--font-sans); font-size: .6rem; font-weight: 700;
+    padding: .12rem .5rem; border-radius: 999px; color: #fff; vertical-align: middle;
+    margin-inline-start: .45rem;
+    background: linear-gradient(135deg, var(--color-brand-violet), var(--color-brand-blue)); }
+  .sg-item.is-current { background: color-mix(in oklab, var(--color-primary) 7%, transparent); border-radius: .85rem; }
+  .sg-item.is-current .sg-row { color: var(--color-primary); }
+  .sg-item.is-current .sg-now { display: inline-block; }
+</style>
+
+<script>
+  (function () {
+    var modal = document.getElementById('station-help-modal');
+    if (!modal) return;
+    var selectId = modal.getAttribute('data-select');
+
+    // Accordion toggle (global so the inline onclick can reach it).
+    window.sgToggle = function (btn) { btn.closest('.sg-item').classList.toggle('open'); };
+
+    function openGuide() {
+      var sel = document.getElementById(selectId);
+      var cur = sel ? sel.value : null;
+      var target = null;
+      modal.querySelectorAll('.sg-item').forEach(function (it) {
+        var isCur = !!cur && it.getAttribute('data-station') === cur;
+        it.classList.toggle('is-current', isCur);
+        it.classList.toggle('open', isCur);   // expand current, collapse the rest
+        if (isCur) target = it;
+      });
+      if (modal.showModal) modal.showModal(); else modal.setAttribute('open', '');
+      if (target && target.scrollIntoView) target.scrollIntoView({ block: 'nearest' });
+    }
+
+    document.querySelectorAll('[data-sg-open]').forEach(function (b) {
+      b.addEventListener('click', openGuide);
+    });
+    // Click on the backdrop (outside the shell) closes.
+    modal.addEventListener('click', function (e) { if (e.target === modal) modal.close(); });
+  })();
+</script>

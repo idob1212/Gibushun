@@ -20,7 +20,10 @@
   <div class="card bg-base-100 shadow-sm">
     <div class="card-body p-4 gap-4">
       <div>
-        <label for="station" class="label"><span class="label-text font-semibold">בחר תחנה</span></label>
+        <div class="flex items-center justify-between">
+          <label for="station" class="label"><span class="label-text font-semibold">בחר תחנה</span></label>
+          <button type="button" class="station-help-dot" data-sg-open aria-label="הסבר על התחנה" title="הסבר על התחנה">?</button>
+        </div>
         <select class="select select-bordered w-full" id="station" name="station">
           {% for station in form.station.choices %}
           <option value="{{ station }}">{{ station }}</option>
@@ -233,5 +236,9 @@ document.addEventListener('DOMContentLoaded', function() {
     loadStationReviews(currentStation);
 });
 </script>
+{% set help_mode = "counter" %}
+{% set help_select_id = "station" %}
+{% include "_station-help.html" %}
+
 {% include "footer.html" %}
 {% endblock %}

@@ -25,12 +25,12 @@
   <div class="card bg-base-100 shadow-sm">
     <div class="card-body p-4 gap-4">
       <div>
-        <label for="movementType" class="label"><span class="label-text font-semibold">סוג תחנה</span></label>
+        <div class="flex items-center justify-between">
+          <label for="movementType" class="label"><span class="label-text font-semibold">סוג תחנה</span></label>
+          <button type="button" class="station-help-dot" data-sg-open aria-label="הסבר על התחנה" title="הסבר על התחנה">?</button>
+        </div>
         <select class="select select-bordered w-full" id="movementType">
-          <option value="ספרינטים">ספרינט</option>
-          <option value="זחילות">זחילות</option>
-          <option value="אלונקה סוציומטרית">אלונקה סוציומטרית</option>
-          {% for station in physical_stations %}
+          {% for station in MODE_STATIONS["circles"] %}
           <option value="{{ station }}">{{ station }}</option>
           {% endfor %}
           <option value="אחר">אחר</option>
@@ -123,6 +123,12 @@
       additionalField.style.display = 'block';
     } else {
       additionalField.style.display = 'none';
+    }
+    // מתלה שזיפים is scored in reverse finishing order — default the reverse
+    // toggle on when it's picked (the מגבש can still turn it off).
+    if (movementTypeSelect.value === 'מתלה שזיפים') {
+      const rev = document.getElementById('reverseMode');
+      if (rev && !rev.checked) { rev.checked = true; updateCircleColors(); }
     }
   });
 
@@ -382,5 +388,9 @@
     background-color: green;
   }
 </style>
+{% set help_mode = "circles" %}
+{% set help_select_id = "movementType" %}
+{% include "_station-help.html" %}
+
 {% include "footer.html" %}
 {% endblock %}
