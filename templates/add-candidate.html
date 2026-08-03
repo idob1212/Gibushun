@@ -28,7 +28,9 @@
 
   <div class="card bg-base-100 shadow-sm">
     <div class="card-body p-4">
-      {{ f.render_form(form, submit_label="שמור", offline=True) }}
+      {# Online-only: an offline-queued candidate can collide with a number
+         that someone else adds first — the server must validate it live. #}
+      {{ f.render_form(form, submit_label="שמור") }}
     </div>
   </div>
 </section>

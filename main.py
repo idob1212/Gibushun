@@ -19,7 +19,7 @@ from flask_login import UserMixin, login_user, LoginManager, login_required, cur
 from forms import CounterReviewForm, LoginForm, RegisterForm, CreateReviewForm, EditUserForm, Search_review, EditReviewForm, \
     UpdateDateForm, NewCandidateForm, SelectPhysicalReviewsForm, ShowStaionForm, selectCandidate, AddFinalStatusForm, \
     SelectPhysicalReviewsFormAdmin, ShowStaionFormAdmin, selectCandidateAdmin, selectGroup, AddNameForm, InterviewForm, \
-    GroupReviewForm, CreateNoteForm
+    GroupReviewForm, CreateNoteForm, FinalWeightedGradeForm
 from flask_gravatar import Gravatar
 import sys
 import logging
@@ -120,6 +120,8 @@ class Candidate(db.Model):
     interview_note = db.Column(db.Text)
     tash_prob = db.Column(db.String(1000))
     medical_prob = db.Column(db.String(1000))
+    final_weighted_grade = db.Column(db.String(1000))
+    final_weighted_note = db.Column(db.Text)
     reviews = relationship("Review", back_populates="subject")
     notes = relationship("Note", back_populates="subject")
 
@@ -192,6 +194,26 @@ def _add_withdraw_reason_column():
 
 _add_withdraw_reason_column()
 
+
+def _add_final_weighted_columns():
+    inspector = sqlalchemy.inspect(db.engine)
+    columns = [col["name"] for col in inspector.get_columns("candidates")]
+    to_add = [
+        ("final_weighted_grade", "VARCHAR(1000)"),
+        ("final_weighted_note", "TEXT"),
+    ]
+    with db.engine.connect() as conn:
+        for name, col_type in to_add:
+            if name not in columns:
+                conn.execute(
+                    sqlalchemy.text(
+                        f"ALTER TABLE candidates ADD COLUMN {name} {col_type}"
+                    )
+                )
+
+
+_add_final_weighted_columns()
+
 app.config['WTF_CSRF_TIME_LIMIT'] = None
 # Let the service worker own asset caching; without this Flask's 12h HTTP cache
 # would serve stale CSS/JS to both the browser and the SW after a deploy.
@@ -205,6 +227,11 @@ def latest_review_per_candidate(reviews):
 
 
 def is_duplicate_request():
+    # Only writes count. fetch() keeps the X-Request-Id header when it
+    # follows the post-save 302 as a GET — without this guard that GET is
+    # seen as a duplicate and redirects to itself in an infinite loop.
+    if request.method != "POST":
+        return False
     request_id = request.headers.get("X-Request-Id")
     if not request_id and request.is_json:
         request_id = (request.json or {}).get("request_id")
@@ -245,15 +272,16 @@ def admin_home():
 def homeAdmin(group_id):
     form = selectGroup()
     form.group.choices = get_groups()
-    form.group.default = group_id
     if form.validate_on_submit():
         return redirect(url_for('homeAdmin', group_id=form.group.data))
+    # Keep the current group selected — .default is a no-op after process().
+    form.group.data = str(group_id)
     candidates = Candidate.query.filter_by(group_id=group_id).all()
     tiz_avgs = []
     total_avgs = []
     physical_stations = getPhysicalStationsGroup(int(group_id))
     physical_stations = physical_stations + ["ספרינטים", "זחילות", "אלונקה סוציומטרית", "מתלה שזיפים"]
-    counter_stations = ["מסע 1", "מסע 2", "מסע 3", "שקי חול", "שקי חול 2"]
+    counter_stations = MODE_STATIONS["counter"]
     station_reviews = []
     counter_reviews = []
 
@@ -312,7 +340,7 @@ def home():
     tiz_avgs = []
     total_avgs = []
     physical_stations = getPhysicalStations()
-    counter_stations = ["מסע 1", "מסע 2", "מסע 3", "שקי חול", "שקי חול 2"]
+    counter_stations = MODE_STATIONS["counter"]
     physical_stations = physical_stations + ["ספרינטים", "זחילות", "אלונקה סוציומטרית", "מתלה שזיפים"]
     station_reviews = []
     counter_reviews = []
@@ -348,12 +376,19 @@ def home():
             else:
                 total_avg = round(total_sum / total_count, 2)
                 total_avgs.append(total_avg)
-        zipped = zip(candidates, total_avgs, tiz_avgs)
         candidates = [x for _, x in sorted(zip(total_avgs, candidates), key=lambda pair: pair[0], reverse=True)]
         tiz_avgs = [x for _, x in sorted(zip(total_avgs, tiz_avgs), key=lambda pair: pair[0], reverse=True)]
         total_avgs.sort(reverse=True)
-        return render_template("home.html", current_user=current_user, candidates=enumerate(candidates), tiz_avg =tiz_avgs, total_avg =total_avgs, active_candidates_count=active_candidates_count)
-    return render_template("home.html", current_user=current_user, candidates = candidates, active_candidates_count=active_candidates_count)
+        sort = request.args.get('sort')
+        if sort == 'number':
+            # Re-order the three parallel lists together — the template
+            # indexes the score lists by the candidate's position.
+            order = sorted(range(len(candidates)), key=lambda i: int(candidates[i].id.split("/")[1]))
+            candidates = [candidates[i] for i in order]
+            tiz_avgs = [tiz_avgs[i] for i in order]
+            total_avgs = [total_avgs[i] for i in order]
+        return render_template("home.html", current_user=current_user, candidates=enumerate(candidates), tiz_avg =tiz_avgs, total_avg =total_avgs, active_candidates_count=active_candidates_count, sort=sort)
+    return render_template("home.html", current_user=current_user, candidates = candidates, active_candidates_count=active_candidates_count, sort=None)
 
 
 @app.route("/candidate/<path:candidate_id>")
@@ -368,7 +403,7 @@ def candidate_profile(candidate_id):
     update_avgs_nf()
 
     physical_stations = getPhysicalStationsGroup(candidate.group_id) + ["ספרינטים", "זחילות", "אלונקה סוציומטרית", "מתלה שזיפים"]
-    counter_stations = ["מסע 1", "מסע 2", "מסע 3", "שקי חול", "שקי חול 2"]
+    counter_stations = MODE_STATIONS["counter"]
     all_reviews = Review.query.filter_by(subject_id=candidate.id).all()
 
     physical_reviews = []
@@ -679,6 +714,10 @@ _MARCH_INFO = {
     "purpose": "מסע אלונקות — תרגיל קבוצתי ואישי הכולל מאמץ פיזי עצים, שמטרתו להכין 'את הקרקע' לקראת מילוי חוות דעת עמיתים.",
     "values": ["דבקות במשימה וחתירה לניצחון", "חיי אדם", "אחריות", "רעות", "דוגמא אישית"],
 }
+_SANDBAG_INFO = {
+    "purpose": "סחיבת שקי חול — תרגיל אישי הכולל מאמץ פיזי עצים, לבחינת התמדה ותפקוד המועמדים תחת עומס.",
+    "values": ["דבקות במשימה וחתירה לניצחון", "מקצועיות", "משמעת"],
+}
 STATION_INFO = {
     "ספרינטים": {
         "purpose": "תרגיל ריצות קצרות (ספרינטים) — תרגיל אישי הכולל מאמץ פיזי קצר ועצים, לבחינת המועמדים תחת מאמץ.",
@@ -751,6 +790,8 @@ STATION_INFO = {
     "מסע 1": _MARCH_INFO,
     "מסע 2": _MARCH_INFO,
     "מסע 3": _MARCH_INFO,
+    "שקי חול": _SANDBAG_INFO,
+    "שקי חול 2": _SANDBAG_INFO,
 }
 
 # Which stations the guide lists per scoring mode. This mirrors the app's
@@ -762,7 +803,7 @@ MODE_STATIONS = {
               "בניית מאהל", "בניית צילייה", "הסתתרות", "שולחן חול", "חפירת בור", "כיול תדרים"],
     "individual": ["בניית פסל סביבתי", "הרכבה ופירוק נשק", "הרצאות", "הסתתרות",
                    "שולחן חול", "חפירת בור", "כיול תדרים"],
-    "counter": ["מסע 1", "מסע 2", "מסע 3"],
+    "counter": ["מסע 1", "מסע 2", "מסע 3", "שקי חול", "שקי חול 2"],
 }
 
 
@@ -892,17 +933,10 @@ def physicals(group):
 
 @app.route('/stations/<group>')
 def getStations(group):
-    unique_stations = db.session.query(distinct(Review.station)).all()
-    unique_station_values = [station[0] for station in unique_stations]
-    stations = ["ספרינטים", "זחילות", "משימת מחשבה", "דיון מילוט", "פירוק והרכבת נשק", "מסע", "שקים", "ODT", "מעגל זנבות",
-                "אלונקה סוציומטרית","מתלה שזיפים", "הרצאות", "בניית שוח","חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול","נאסא"]
-    unique_station_values = [station for station in unique_station_values if "אקט" not in station and "סיכום" not in station]
-    final_stations = [station for station in unique_station_values if station not in stations]
-    unique_station_values = stations + final_stations
-    stations = unique_station_values + getPhysicalStationsGroup(int(group))
+    # Same trimmed list as the rankings screens — only scored stations.
     stationsArray = []
 
-    for station in stations:
+    for station in _scored_stations():
         stationObj = {}
         stationObj['id'] = station
 
@@ -1099,7 +1133,7 @@ def update_counter_reviews():
 def addOneReview():
   form = GroupReviewForm()
   if form.validate_on_submit():
-    if form.grade != 0:
+    if int(form.grade.data) != 0:
         if form.station.data == "ODT":
             form.station.data = form.station.data + " " + form.odt.data
         if form.station.data == "אחר":
@@ -1138,10 +1172,29 @@ def update_all():
     # request_id from the offline replay) with a different number of values.
     grades = result2.get('grade', [])
     notes = result2.get('note', [])
+    any_scored = any(g not in ('', '0') for g in grades)
     for i, (candidate_num, grade) in enumerate(zip(candidates, grades)):
         try:
             grade = int(grade)
         except ValueError:
+            continue
+        if grade == 0 and any_scored:
+            # Unscored candidate gets the last-place grade, but an existing
+            # review is never overwritten by the sentinel.
+            subject_id = str(current_user.id) + "/" + str(candidate_num)
+            existing = Review.query.filter_by(
+                station=station, subject_id=subject_id, author_id=current_user.id
+            ).first()
+            if not existing:
+                db.session.add(Review(
+                    station=station,
+                    subject_id=subject_id,
+                    grade=1.0,
+                    note="",
+                    author=current_user,
+                    subject=Candidate.query.filter_by(id=subject_id).first()
+                ))
+                db.session.commit()
             continue
         if grade != 0:
             note = notes[i] if i < len(notes) else ''
@@ -1368,6 +1421,18 @@ def showODTReviewsAdmin():
         return render_template('ODT-sum-admin.html', reviews=reviews, candidate_id=candidate.id.split("/")[1], form=form)
     return render_template('ODT-sum-admin.html', form=form)
 
+def _board_reviews(subject_id, physical_stations):
+    # One filter for the scores board — the "כולם" and single-candidate views
+    # must show the same rows. Keeps act summaries, drops raw act rows.
+    reviews = Review.query.filter_by(subject_id=subject_id).all()
+    clean = [review for review in reviews
+             if review.station not in physical_stations
+             and ("ODT" not in review.station or review.station == "ODT סיכום")
+             and ("אקט" not in review.station or "סיכום" in review.station)]
+    clean.sort(key=lambda x: x.grade, reverse=True)
+    return clean
+
+
 @app.route("/candidates/", methods=["GET", "POST"])
 def showCandidate():
     form = selectCandidate()
@@ -1375,7 +1440,6 @@ def showCandidate():
     all_reviews = []
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     candidate_nums = []
-    clean_reviews = []
     for candidate in candidates:
         if candidate.status != "פרש":
             candidate_nums.append(int(candidate.id.split("/")[1]))
@@ -1386,21 +1450,13 @@ def showCandidate():
     if form.validate_on_submit():
         if form.id.data == "כולם":
             for candidate_num in candidate_nums[1:]:
-                candidate = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(candidate_num)).first()
-                reviews = Review.query.filter_by(subject_id=candidate.id).all()
-                clean_reviews = [review for review in reviews if
-                                 "אקט" not in review.station and review.station != "זחילות" and (
-                                             "ODT" not in review.station or review.station == "ODT סיכום")]
-                clean_reviews.sort(key=lambda x: x.grade, reverse=True)
-                all_reviews.append(clean_reviews)
-            if len(candidate_nums) == 1:
-                return render_template('candidate.html', form=form)
-            return render_template('candidate.html', reviews=clean_reviews, candidate_id=candidate.id.split("/")[1], form=form, all_reviews=all_reviews)
+                subject_id = str(current_user.id) + "/" + str(candidate_num)
+                all_reviews.append(_board_reviews(subject_id, physical_stations))
+            return render_template('candidate.html', form=form, all_reviews=all_reviews)
         candidate = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(form.id.data)).first()
-        reviews = Review.query.filter_by(subject_id=candidate.id).all()
-        clean_reviews = [review for review in reviews if review.station not in physical_stations and ("ODT" not in review.station or review.station == "ODT סיכום")]
-        clean_reviews = [review for review in clean_reviews if ("אקט" not in review.station) or ("אקט" in review.station and "סיכום" in review.station)]
-        clean_reviews.sort(key=lambda x: x.grade, reverse=True)
+        if not candidate:
+            return render_template('candidate.html', form=form)
+        clean_reviews = _board_reviews(candidate.id, physical_stations)
         return render_template('candidate.html', reviews=clean_reviews, candidate_id=candidate.id.split("/")[1], form=form, all_reviews=all_reviews)
     return render_template('candidate.html', form=form)
 
@@ -1427,23 +1483,13 @@ def showCandidateAdmin():
         if form.id.data == "כולם":
             all_reviews = []
             for candidate_num in candidates[1:]:
-                candidate = Candidate.query.filter_by(id=str(form.group.data) + "/" + str(candidate_num)).first()
-                reviews = Review.query.filter_by(subject_id=candidate.id).all()
-                clean_reviews = [review for review in reviews if
-                                 "אקט" not in review.station and review.station != "זחילות" and (
-                                             "ODT" not in review.station or review.station == "ODT סיכום")]
-                clean_reviews.sort(key=lambda x: x.grade, reverse=True)
-                all_reviews.append(clean_reviews)
-            if len(candidates) == 1 :
-                return render_template('candidate-admin.html', form=form)
-            return render_template('candidate-admin.html', reviews=clean_reviews, candidate_id=candidate.id.split("/")[1], form=form, all_reviews=all_reviews, group = form.group.data)
+                subject_id = str(form.group.data) + "/" + str(candidate_num)
+                all_reviews.append(_board_reviews(subject_id, physical_stations))
+            return render_template('candidate-admin.html', form=form, all_reviews=all_reviews, group=form.group.data)
         candidate = Candidate.query.filter_by(id=str(form.group.data) + "/" + str(form.id.data)).first()
         if not candidate:
             return render_template('candidate-admin.html', form=form)
-        reviews = Review.query.filter_by(subject_id=candidate.id).all()
-        clean_reviews = [review for review in reviews if review.station not in physical_stations and ("ODT" not in review.station or review.station == "ODT סיכום")]
-        clean_reviews = [review for review in clean_reviews if ("אקט" not in review.station) or ("אקט" in review.station and "סיכום" in review.station)]
-        clean_reviews.sort(key=lambda x: x.grade, reverse=True)
+        clean_reviews = _board_reviews(candidate.id, physical_stations)
         return render_template('candidate-admin.html', reviews=clean_reviews, candidate_id=candidate.id.split("/")[1], form=form)
     return render_template('candidate-admin.html', form=form)
 
@@ -1489,12 +1535,19 @@ def AddStatus():
 
 @app.route("/interview/", methods=["GET", "POST"])
 def Interview():
+    if is_duplicate_request():
+        flash('הראיון כבר נשמר', 'success')
+        return redirect(url_for('Interview'))
     form = InterviewForm()
     candidates = Candidate.query.filter_by(group_id=current_user.id).all()
     candidate_nums = []
+    interviewed = []
     for candidate in candidates:
         if candidate.status != "פרש":
-            candidate_nums.append(int(candidate.id.split("/")[1]))
+            num = int(candidate.id.split("/")[1])
+            candidate_nums.append(num)
+            if candidate.interview_grade:
+                interviewed.append(num)
     candidate_nums.sort()
     form.id.choices = candidate_nums
     form.grade.choices = ["לא לגעת - קו אדום", "בלית ברירה", "כן, אבל", "להתאבד"]
@@ -1509,7 +1562,45 @@ def Interview():
         db.session.commit()
         flash(f'הראיון עבור {candidate.name} נשמר בהצלחה!', 'success')
         return redirect(url_for('Interview'))
-    return render_template('interview.html', form=form)
+    return render_template('interview.html', form=form, interviewed=interviewed)
+
+@app.route("/final-grade/", methods=["GET", "POST"])
+def final_weighted_grade():
+    if is_duplicate_request():
+        flash('הציון כבר נשמר', 'success')
+        return redirect(url_for('final_weighted_grade'))
+    form = FinalWeightedGradeForm()
+    candidates = Candidate.query.filter_by(group_id=current_user.id).all()
+    candidate_nums = []
+    for candidate in candidates:
+        if candidate.status != "פרש":
+            candidate_nums.append(int(candidate.id.split("/")[1]))
+    candidate_nums.sort()
+    form.id.choices = candidate_nums
+
+    selected_id = request.args.get('candidate_id')
+    if form.is_submitted():
+        selected_id = form.id.data
+    elif selected_id is None and candidate_nums:
+        selected_id = candidate_nums[0]
+
+    if selected_id and not form.is_submitted():
+        candidate = Candidate.query.filter_by(id=f"{current_user.id}/{selected_id}").first()
+        if candidate:
+            form.id.default = int(selected_id)
+            form.grade.default = candidate.final_weighted_grade
+            form.note.default = candidate.final_weighted_note
+            form.process()
+
+    if form.validate_on_submit():
+        candidate = Candidate.query.filter_by(id=f"{current_user.id}/{form.id.data}").first()
+        candidate.final_weighted_grade = form.grade.data
+        candidate.final_weighted_note = form.note.data
+        db.session.commit()
+        flash(f'הציון הסופי המשוקלל עבור {candidate.name} נשמר בהצלחה!', 'success')
+        return redirect(url_for('final_weighted_grade', candidate_id=form.id.data))
+    return render_template('final-grade.html', form=form)
+
 
 @app.route("/edit-interview/<string:candidate_id>", methods=["GET", "POST"])
 def edit_interview(candidate_id):
@@ -1594,27 +1685,37 @@ def showInterviewAdmin():
         return render_template('show-interview-admin.html', form=form, candidate=candidate, candidate_id=candidate.id.split("/")[1])
     return render_template('show-interview-admin.html', form=form)
 
+def _scored_stations(author_id=None):
+    # Only stations that actually have at least one score. Summary rows
+    # ("X סיכום") surface their base station name; raw act rows are skipped.
+    query = db.session.query(distinct(Review.station))
+    if author_id is not None:
+        query = query.filter(Review.author_id == author_id)
+    scored = set()
+    for (station,) in query.all():
+        if "אקט" in station:
+            continue
+        if station.endswith(" סיכום"):
+            scored.add(station[:-len(" סיכום")])
+        else:
+            scored.add(station)
+    # Familiar order first, then any custom station names.
+    known = stations + getPhysicalStations() if author_id else stations
+    ordered = [s for s in known if s in scored]
+    ordered += sorted(s for s in scored if s not in known)
+    return ordered
+
+
 @app.route("/station-reviews-admin/", methods=["GET", "POST"])
 @admin_only
 def showStationReviewsAdmin():
     form = ShowStaionFormAdmin()
     form.group.choices = get_groups()
-    unique_stations = db.session.query(distinct(Review.station)).all()
-    unique_station_values = [station[0] for station in unique_stations]
-    stations = ["ספרינטים", "זחילות", "משימת מחשבה", "דיון מילוט", "פירוק והרכבת נשק", "מסע", "שקים", "ODT", "מעגל זנבות",
-                "אלונקה סוציומטרית","מתלה שזיפים", "הרצאות", "בניית שוח","חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול","נאסא"]
-    unique_station_values = [station for station in unique_station_values if "אקט" not in station and "סיכום" not in station]
-    final_stations = [station for station in unique_station_values if station not in stations]
-    unique_station_values = stations + final_stations
-    if form.group.data:
-        form.station.choices = unique_station_values + getPhysicalStationsGroup(int(form.group.data))
-    if len(form.group.choices) > 0:
-        form.station.choices = unique_station_values + getPhysicalStationsGroup(int(form.group.choices[0]))
-    # form.station.choices = unique_station_values
+    unique_station_values = _scored_stations()
+    form.station.choices = unique_station_values
     if form.validate_on_submit():
-        # form.station.choices = unique_station_values
         form.group.choices = get_groups()
-        form.station.choices = unique_station_values + getPhysicalStationsGroup(int(form.group.data))
+        form.station.choices = unique_station_values
         reviews = Review.query.filter_by(author_id=form.group.data, station=form.station.data).all()
         reviews.sort(key=lambda x: x.grade, reverse=True)
         if form.station.data == "זחילות" or form.station.data == "ספרינטים" or form.station.data in getPhysicalStationsGroup(form.group.data) + ["אלונקה סוציומטרית", "מתלה שזיפים"]:
@@ -1631,14 +1732,7 @@ def showStationReviewsAdmin():
 def showStationReviews():
     form = ShowStaionForm()
     update_avgs_nf()
-    unique_stations = db.session.query(distinct(Review.station)).filter(Review.author_id == current_user.id).all()
-    unique_station_values = [station[0] for station in unique_stations]
-    stations = ["ספרינטים", "זחילות", "משימת מחשבה", "דיון מילוט", "פירוק והרכבת נשק", "מסע", "שקים", "ODT", "מעגל זנבות",
-                "אלונקה סוציומטרית","מתלה שזיפים", "הרצאות", "בניית שוח", "חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול","נאסא"] + getPhysicalStations()
-    unique_station_values = [station for station in unique_station_values if "אקט" not in station and "סיכום" not in station]
-    final_stations = [station for station in unique_station_values if station not in stations]
-    unique_station_values = stations + final_stations
-    form.station.choices = unique_station_values
+    form.station.choices = _scored_stations(author_id=current_user.id)
     if form.validate_on_submit():
         reviews = Review.query.filter_by(author_id=current_user.id, station=form.station.data).all()
         reviews.sort(key=lambda x: x.grade, reverse=True)
@@ -2253,7 +2347,9 @@ def downloadb():
                       "final_status": "סטטוס סיכום", "final_note": "הערת סיכום",
                       "interviewer": "שם מראיין", "interview_grade": "ציון ראיון",
                       "interview_note": "סיכום ראיון", "tash_prob": "בעיות תש",
-                      "medical_prob": "בעיות רפואיות"}
+                      "medical_prob": "בעיות רפואיות",
+                      "final_weighted_note": "הערות ציון סופי",
+                      "final_weighted_grade": "ציון סופי משוקלל ראיון וגיבוש"}
     df1 = df1.rename(columns=export_columns)[list(export_columns.values())]
     df1["מתאם(קבוצת ליבה)"] = pd.Series()
     df1["מגבש"] = pd.Series()
@@ -2307,6 +2403,9 @@ def downloadb():
     names = []
     df1["מגבש"] = pd.Series()
     df1["חוות דעת סופית"] = final_review
+    # The weighted final grade must stay the LAST column in the sheet.
+    for col in ["הערות ציון סופי", "ציון סופי משוקלל ראיון וגיבוש"]:
+        df1[col] = df1.pop(col)
     for value in df1.index:
         df1.loc[value,"מגבש"] = User.query.filter_by(id=int(df1.loc[value,"מספר קבוצה"])).first().name
     df2 = pd.DataFrame(columns=["שם","מספר בגיבוש", "מספר אישי", "שם מראיין", "מגבש", "ציון ממוצע בתחנות הגיבוש", 'חו"ד מראיין', 'חו"ד מגבש', "מצב עדכני במסלול(שליש)", "מתאם(קבוצת ליבה)"])

@@ -1,0 +1,33 @@
+{% import "_formhelpers.html" as f %}
+
+{% block content %}
+{% include "header.html" %}
+
+<section class="app-hero px-5 pt-6 pb-6" style="background-image:url('{{ url_for('static', filename='img/ODT.jpg') }}')">
+  <h1 class="text-2xl font-extrabold leading-tight">הזן ציון סופי משוקלל</h1>
+  <p class="text-sm opacity-80">ציון סופי משוקלל ראיון וגיבוש</p>
+</section>
+
+<div class="px-4 mt-4">
+  {% include "flash-messages.html" %}
+</div>
+
+<section class="px-4 mt-4 max-w-md mx-auto">
+  <div class="card bg-base-100 shadow-sm">
+    <div class="card-body p-4">
+      {{ f.render_form(form, submit_label="שמור", offline=True) }}
+    </div>
+  </div>
+</section>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var candidateSelect = document.getElementById('id');
+    candidateSelect.addEventListener('change', function() {
+        window.location.href = "{{ url_for('final_weighted_grade') }}?candidate_id=" + this.value;
+    });
+});
+</script>
+
+{% include "footer.html" %}
+{% endblock %}

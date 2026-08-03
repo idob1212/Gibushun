@@ -20,6 +20,23 @@
   </div>
 </section>
 
+<div id="pending-sync-note" class="px-4 mt-3 hidden" data-refresh-on-sync>
+  <div class="alert alert-warning"><span></span></div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  if (!window.MeymadionOffline) return;
+  window.MeymadionOffline.pendingCount().then(function (n) {
+    if (n > 0) {
+      var el = document.getElementById('pending-sync-note');
+      el.querySelector('span').textContent =
+        'יש ' + n + ' פעולות שממתינות לסנכרון — ציונים שהוזנו באופליין יופיעו כאן אחרי חזרת החיבור';
+      el.classList.remove('hidden');
+    }
+  });
+});
+</script>
+
 {% if all_reviews|length > 0 %}
   {% for list in all_reviews %}
     {% if list|length > 0 %}

@@ -1,4 +1,4 @@
-const VERSION = 'v11';
+const VERSION = 'v12';
 const SHELL_CACHE = 'meymadion-shell-' + VERSION;
 const PAGE_CACHE = 'meymadion-pages-' + VERSION;
 
@@ -19,6 +19,8 @@ const FIELD_PREFIXES = [
   '/circles', '/counter-review', '/new-review', '/new-group-review',
   '/interview', '/show-interview', '/new-note', '/show-notes',
   '/candidate', '/candidates', '/add-candidate', '/group-manage', '/final-status',
+  '/final-grade', '/station-reviews', '/physical-reviews', '/odt-reviews',
+  '/edit-interview', '/edit-candidate', '/edit-note',
   '/add-name', '/login'
 ];
 
@@ -27,20 +29,23 @@ function isFieldNavigation(url) {
   return FIELD_PREFIXES.some(p => url.pathname === p || url.pathname.startsWith(p + '/') || url.pathname.startsWith(p));
 }
 
-// The scoring modes link to each other; a user who opened one online but never
-// the others can't switch to them offline (network-first only caches a page
-// after it's been visited) and dead-ends on /offline. Field feedback:
-// "אני במצב אופליין ולא מצליח לעבור למצב יחיד / קבוצתי". So the moment any one
-// (or home) loads online, warm the whole set into the page cache — carrying the
-// live session cookie — so every mode stays switchable in the field.
-const SCORING_MODES = ['/new-review', '/new-group-review', '/counter-review', '/circles'];
+// Warm ALL field pages into the page cache the moment any page loads online,
+// carrying the live session cookie — so the whole app is usable offline after
+// the first online load (iOS Safari PWA has no Background Sync). Field
+// feedback: "לשמור את כל העמודים בטעינה הראשונה כשיש אינטרנט".
+const WARM_PAGES = [
+  '/', '/new-review', '/new-group-review', '/counter-review', '/circles',
+  '/candidates/', '/interview/', '/show-interview/', '/new-note', '/show-notes',
+  '/group-manage', '/final-status/', '/final-grade/', '/add-candidate',
+  '/station-reviews/', '/physical-reviews/', '/odt-reviews/', '/add-name'
+];
 let lastWarm = 0;
-function warmScoringModes() {
+function warmFieldPages() {
   const now = Date.now();
   if (now - lastWarm < 60000) return; // throttle: at most once a minute
   lastWarm = now;
   caches.open(PAGE_CACHE).then(cache => {
-    SCORING_MODES.forEach(path => {
+    WARM_PAGES.forEach(path => {
       fetch(path, { credentials: 'same-origin' }).then(res => {
         // Cache only a real authenticated render — never a 302→/login or error.
         if (res && res.ok && res.type === 'basic' && new URL(res.url).pathname === path) {
@@ -94,9 +99,13 @@ self.addEventListener('fetch', event => {
   if (req.mode === 'navigate' && isFieldNavigation(url)) {
     event.respondWith(
       fetch(req).then(res => {
-        const copy = res.clone();
-        caches.open(PAGE_CACHE).then(c => c.put(req, copy));
-        if (url.pathname === '/' || SCORING_MODES.indexOf(url.pathname) !== -1) warmScoringModes();
+        // Cache only a real authenticated render — a session-expiry 302→/login
+        // would otherwise poison the cache entry for this page.
+        if (res && res.ok && new URL(res.url).pathname === url.pathname) {
+          const copy = res.clone();
+          caches.open(PAGE_CACHE).then(c => c.put(req, copy));
+        }
+        warmFieldPages();
         return res;
       }).catch(() =>
         caches.match(req).then(hit => hit || caches.match('/offline'))

@@ -75,6 +75,11 @@
     <a href="{{ url_for('showStationReviews') }}" class="text-sm text-primary font-semibold">דירוג מלא <i class="fas fa-chevron-left text-xs"></i></a>
   </div>
 
+  <div class="join mb-3">
+    <a href="{{ url_for('home') }}" class="btn btn-xs join-item {{ 'btn-primary' if sort != 'number' else 'btn-outline' }}">מיון לפי ציון</a>
+    <a href="{{ url_for('home', sort='number') }}" class="btn btn-xs join-item {{ 'btn-primary' if sort == 'number' else 'btn-outline' }}">מיון לפי מספר</a>
+  </div>
+
   <div class="grid gap-2.5">
     {% set rows = namespace(count=0) %}
     {% if candidates %}
