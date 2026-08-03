@@ -9,7 +9,7 @@ from flask import Flask, render_template, redirect, url_for, flash, abort, reque
     send_file, after_this_request, request, session
 from flask_bootstrap import Bootstrap
 from flask_ckeditor import CKEditor
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from functools import wraps
 from sqlalchemy import engine, distinct, func
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -215,6 +215,9 @@ def _add_final_weighted_columns():
 _add_final_weighted_columns()
 
 app.config['WTF_CSRF_TIME_LIMIT'] = None
+# iOS can drop the session-only cookie between field days; the remember cookie
+# logs the group back in so queued offline writes do not bounce to /login.
+app.config['REMEMBER_COOKIE_DURATION'] = timedelta(days=60)
 # Let the service worker own asset caching; without this Flask's 12h HTTP cache
 # would serve stale CSS/JS to both the browser and the SW after a deploy.
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
@@ -683,7 +686,7 @@ def login():
             flash('סיסמה לא נכונה')
             return redirect(url_for('login'))
         else:
-            login_user(user)
+            login_user(user, remember=True)
             return redirect(url_for('home'))
     return render_template("login.html", form=form, current_user=current_user)
 

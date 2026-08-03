@@ -1,4 +1,4 @@
-const VERSION = 'v12';
+const VERSION = 'v13';
 const SHELL_CACHE = 'meymadion-shell-' + VERSION;
 const PAGE_CACHE = 'meymadion-pages-' + VERSION;
 
@@ -96,20 +96,33 @@ self.addEventListener('fetch', event => {
   }
 
   // Network-first for field navigations, cache fallback, then offline page.
+  // The network gets 5s: on lie-fi (connected but dead radio) an uncapped
+  // fetch hangs navigation for the browser's full timeout. After the cap the
+  // cached copy is served and the network response, if it ever lands, still
+  // refreshes the cache for next time.
   if (req.mode === 'navigate' && isFieldNavigation(url)) {
+    const network = fetch(req).then(res => {
+      // Cache only a real authenticated render — a session-expiry 302→/login
+      // would otherwise poison the cache entry for this page.
+      if (res && res.ok && new URL(res.url).pathname === url.pathname) {
+        const copy = res.clone();
+        caches.open(PAGE_CACHE).then(c => c.put(req, copy));
+      }
+      warmFieldPages();
+      return res;
+    });
     event.respondWith(
-      fetch(req).then(res => {
-        // Cache only a real authenticated render — a session-expiry 302→/login
-        // would otherwise poison the cache entry for this page.
-        if (res && res.ok && new URL(res.url).pathname === url.pathname) {
-          const copy = res.clone();
-          caches.open(PAGE_CACHE).then(c => c.put(req, copy));
-        }
-        warmFieldPages();
-        return res;
-      }).catch(() =>
-        caches.match(req).then(hit => hit || caches.match('/offline'))
-      )
+      Promise.race([
+        network.catch(() => undefined),
+        new Promise(resolve => setTimeout(() => resolve(undefined), 5000))
+      ]).then(res => {
+        if (res) return res;
+        // Timed out or failed: cached page if we have one, else wait the
+        // network out in full, else the branded offline page.
+        return caches.match(req).then(hit =>
+          hit || network.catch(() => caches.match('/offline'))
+        );
+      })
     );
     return;
   }
