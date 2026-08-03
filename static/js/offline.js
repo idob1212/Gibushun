@@ -1,6 +1,12 @@
 (function () {
   'use strict';
 
+  // The PRG path in bindForms re-renders via document.write, which re-executes
+  // this file into the SAME window. Window-level generation state keeps that
+  // from stacking fetch wrappers, heartbeats and window listeners.
+  var GEN = window.__mmOfflineGen = (window.__mmOfflineGen || 0) + 1;
+  function isCurrent() { return GEN === window.__mmOfflineGen; }
+
   // Endpoints whose JSON POSTs may be queued and replayed when offline.
   var JSON_WRITE = ['/circles/finished', '/circles/finished-act', '/update-counter-reviews'];
 
@@ -67,7 +73,16 @@
     });
   }
 
-  function pendingCount() { return allItems().then(function (a) { return a.length; }); }
+  // "dead" items were rejected by the server (bad choice, stale CSRF, 5×4xx/5xx).
+  // They are kept — visibly — instead of vanishing with a "synced" toast.
+  function pendingItems() { return allItems().then(function (a) { return a.filter(function (i) { return !i.dead; }); }); }
+  function deadItems() { return allItems().then(function (a) { return a.filter(function (i) { return i.dead; }); }); }
+  function pendingCount() { return pendingItems().then(function (a) { return a.length; }); }
+  function clearDead() {
+    return deadItems().then(function (items) {
+      return Promise.all(items.map(function (i) { return remove(i.id); }));
+    });
+  }
 
   // --- Connectivity banner / toast -----------------------------------------
   // Two distinct pieces of UI, so a transient toast never clobbers (or gets
@@ -94,6 +109,7 @@
   }
 
   var offlineBar, offlineBarText, offlineBarShown = false, offlineBarDismissed = false;
+  var barKind = null; // 'offline' | 'login' | 'dead' — drives color and ✕ behavior
   function ensureOfflineBar() {
     if (offlineBar) return offlineBar;
     offlineBar = document.createElement('div');
@@ -110,7 +126,14 @@
       'color:#fff;font-weight:700;font-size:16px;line-height:1;margin-inline-start:12px;' +
       'padding:8px 12px;cursor:pointer;vertical-align:middle';
     close.addEventListener('click', function () {
-      offlineBarDismissed = true; // stays hidden until we're back online
+      if (barKind === 'dead') {
+        // Dismissing the rejected-items bar is an explicit acknowledgment —
+        // the items are deleted, so it never nags again.
+        if (!window.confirm('להסיר את הפעולות שנדחו? לא ניתן יהיה לשחזר אותן מהמכשיר.')) return;
+        clearDead().then(function () { hideOfflineBar(); refreshStatus(); });
+        return;
+      }
+      offlineBarDismissed = true; // stays hidden until the condition changes
       hideOfflineBar();
     });
     offlineBar.appendChild(offlineBarText);
@@ -124,8 +147,11 @@
     var main = document.querySelector('main');
     if (main) main.style.paddingTop = (offlineBarShown && offlineBar) ? (offlineBar.offsetHeight + 12) + 'px' : '';
   }
-  function showOfflineBar(text) {
+  function showOfflineBar(text, kind) {
     var b = ensureOfflineBar();
+    if (kind !== barKind) offlineBarDismissed = false; // new condition — show again
+    barKind = kind;
+    b.style.background = kind === 'dead' ? '#dc2626' : '#b45309';
     offlineBarText.textContent = text;
     if (offlineBarDismissed) return;
     b.style.top = topOffset() + 'px';
@@ -142,8 +168,10 @@
   function repositionOfflineBar() {
     if (offlineBarShown && offlineBar) offlineBar.style.top = topOffset() + 'px';
   }
-  window.addEventListener('resize', repositionOfflineBar);
-  window.addEventListener('orientationchange', repositionOfflineBar);
+  // Window listeners survive document.write (unlike document listeners), so
+  // stale generations must go inert instead of fighting the current one.
+  window.addEventListener('resize', function () { if (isCurrent()) repositionOfflineBar(); });
+  window.addEventListener('orientationchange', function () { if (isCurrent()) repositionOfflineBar(); });
 
   var toastEl, toastTimer;
   function ensureToast() {
@@ -166,13 +194,19 @@
   }
 
   function refreshStatus() {
-    if (offline) {
-      pendingCount().then(function (n) {
-        showOfflineBar(n ? ('אופליין — ' + n + ' פעולות ממתינות לסנכרון') : 'אופליין — נתונים יישמרו במכשיר');
-      });
-    } else {
-      hideOfflineBar();
-    }
+    allItems().then(function (all) {
+      var pending = 0, dead = 0;
+      all.forEach(function (i) { if (i.dead) dead++; else pending++; });
+      if (needLogin && pending) {
+        showOfflineBar('ההתחברות פגה — התחבר מחדש כדי לסנכרן ' + pending + ' פעולות ממתינות', 'login');
+      } else if (offline) {
+        showOfflineBar(pending ? ('אופליין — ' + pending + ' פעולות ממתינות לסנכרון') : 'אופליין — נתונים יישמרו במכשיר', 'offline');
+      } else if (dead) {
+        showOfflineBar(dead + ' פעולות נדחו על ידי השרת ולא נשמרו — בדוק והזן אותן מחדש', 'dead');
+      } else {
+        hideOfflineBar();
+      }
+    });
   }
 
   // --- Connectivity truth ---------------------------------------------------
@@ -180,6 +214,7 @@
   // so we actively probe the server and treat a positive probe as the source of
   // truth. This is what clears a "stuck" offline banner once the net is back.
   var offline = !navigator.onLine;
+  var needLogin = false; // last replay bounced to /login — items are kept
   function probe() {
     return new Promise(function (resolve) {
       var done = false;
@@ -205,15 +240,25 @@
   }
 
   // --- Replay ---------------------------------------------------------------
+  // Form endpoints where success is ALWAYS a redirect (PRG). A plain 200 from
+  // one of these is a re-render with errors (bad choice, stale CSRF) — a
+  // rejection, not a save. /new-review is absent on purpose: its success path
+  // renders 200 directly, so 200 must keep counting as success there.
+  var PRG_FORM_PATHS = ['/add-all', '/interview/', '/final-grade/', '/final-status/', '/new-note'];
+  function pathOf(u) {
+    try { return new URL(u, location.origin).pathname; } catch (e) { return u; }
+  }
+
   var flushing = false;
   function flush() {
     if (flushing || offline) return Promise.resolve();
     flushing = true;
-    return allItems().then(function (items) {
-      if (!items.length) return { synced: 0, dropped: 0 };
-      var synced = 0, dropped = 0;
+    needLogin = false; // re-verify each drain; a re-login may have fixed it
+    return pendingItems().then(function (items) {
+      if (!items.length) return { synced: 0, dead: 0 };
+      var synced = 0, dead = 0;
       function step(i) {
-        if (i >= items.length) return Promise.resolve({ synced: synced, dropped: dropped });
+        if (i >= items.length) return Promise.resolve({ synced: synced, dead: dead });
         var item = items[i];
         var opts = { method: 'POST', headers: { 'X-Request-Id': item.requestId } };
         if (item.kind === 'json') {
@@ -225,27 +270,42 @@
           opts.body = fd;
         }
         return nativeFetch(item.url, opts).then(function (res) {
-          if (res.ok || res.redirected || res.status === 200) {
-            synced++;
-            return remove(item.id).then(function () { return step(i + 1); });
+          // Session expired: the POST bounced to the login page. That page is
+          // a 200, which the old code counted as "synced" — silently deleting
+          // the data. Keep everything and stop; the banner asks for a login.
+          if (pathOf(res.url) === '/login') {
+            needLogin = true;
+            return { synced: synced, dead: dead };
           }
-          // Server actively rejected it (validation, auth, 500). Retrying
-          // forever is what left the "N pending" banner stuck — cap it.
+          if (res.ok) {
+            var rejected = item.kind === 'form' && !res.redirected &&
+              PRG_FORM_PATHS.indexOf(pathOf(item.url)) !== -1;
+            if (!rejected) {
+              synced++;
+              return remove(item.id).then(function () { return step(i + 1); });
+            }
+            // Deterministic rejection — same payload gives the same answer,
+            // so no retries. Dead-letter it where the user can see it.
+            item.dead = true;
+            dead++;
+            return put(item).then(function () { return step(i + 1); });
+          }
+          // 4xx/5xx may be transient (worker hiccup) — retry a few times.
           item.tries = (item.tries || 0) + 1;
           if (item.tries >= 5) {
-            dropped++;
-            console.error('outbox item dropped after 5 rejections', item.url, res.status);
-            return remove(item.id).then(function () { return step(i + 1); });
+            item.dead = true;
+            dead++;
+            console.error('outbox item dead-lettered after 5 rejections', item.url, res.status);
           }
           return put(item).then(function () { return step(i + 1); });
-        }).catch(function () { return { synced: synced, dropped: dropped }; }); // network died — stop
+        }).catch(function () { return { synced: synced, dead: dead }; }); // network died — stop
       }
       return step(0);
     }).then(function (r) {
       flushing = false;
       var parts = [];
       if (r.synced > 0) parts.push('סונכרנו ' + r.synced + ' פעולות ✓');
-      if (r.dropped > 0) parts.push(r.dropped + ' פעולות נדחו על ידי השרת והוסרו');
+      if (r.dead > 0) parts.push(r.dead + ' פעולות נדחו על ידי השרת');
       if (parts.length) toast(parts.join(' · '));
       refreshStatus();
       // View pages (e.g. the scores board) opt in to a reload after a sync,
@@ -257,7 +317,10 @@
   }
 
   // --- fetch wrapper for JSON write endpoints -------------------------------
-  var nativeFetch = window.fetch.bind(window);
+  // The true native fetch is stashed on window once: a re-executed script must
+  // not capture the previous generation's wrapper as its "native", or wrappers
+  // nest one level deeper on every PRG re-render.
+  var nativeFetch = window.__mmNativeFetch = window.__mmNativeFetch || window.fetch.bind(window);
   window.fetch = function (input, init) {
     init = init || {};
     var url = typeof input === 'string' ? input : (input && input.url);
@@ -372,15 +435,37 @@
 
   // Browser hints are advisory; confirm with a probe (going online) but trust
   // 'offline' immediately (it's the safe direction).
-  window.addEventListener('online', recheck);
-  window.addEventListener('offline', function () { setOffline(true); });
+  window.addEventListener('online', function () { if (isCurrent()) recheck(); });
+  window.addEventListener('offline', function () { if (isCurrent()) setOffline(true); });
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState === 'visible') recheck();
   });
 
   // Heartbeat: periodically reconcile so a returned connection clears the
   // offline banner (and drains the outbox) even if no 'online' event fired.
-  setInterval(recheck, 15000);
+  // setInterval survives document.write — clear the previous generation's.
+  if (window.__mmHeartbeat) clearInterval(window.__mmHeartbeat);
+  window.__mmHeartbeat = setInterval(recheck, 15000);
+
+  // --- logout guard ----------------------------------------------------------
+  // Logging out with unsynced items would replay them under the NEXT login —
+  // possibly a different group. Warn, and clear the outbox on a confirmed
+  // logout so nothing leaks across accounts. (document-level listener: dies
+  // with the document, so PRG re-renders never stack it.)
+  document.addEventListener('click', function (e) {
+    var a = e.target && e.target.closest ? e.target.closest('a[href$="/logout"]') : null;
+    if (!a) return;
+    e.preventDefault();
+    e.stopPropagation();
+    allItems().then(function (all) {
+      var pending = all.filter(function (i) { return !i.dead; }).length;
+      if (pending && !window.confirm(pending + ' פעולות עדיין לא סונכרנו ויימחקו אם תתנתק. להתנתק בכל זאת?')) return;
+      Promise.all(all.map(function (i) { return remove(i.id); })).then(
+        function () { location.href = a.href; },
+        function () { location.href = a.href; }
+      );
+    });
+  }, true);
 
   document.addEventListener('DOMContentLoaded', function () {
     bindForms();
@@ -392,7 +477,7 @@
     flush();
   });
 
-  // Small read-only API for pages that want to reflect the outbox state
-  // (e.g. the scores board shows "pending sync" when items are queued).
-  window.MeymadionOffline = { pendingCount: pendingCount };
+  // Small API for pages that want to reflect the outbox state (e.g. the
+  // scores board shows "pending sync"), plus dead-letter inspection.
+  window.MeymadionOffline = { pendingCount: pendingCount, deadItems: deadItems, clearDead: clearDead };
 })();
