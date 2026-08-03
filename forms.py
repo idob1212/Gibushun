@@ -90,8 +90,14 @@ class InterviewForm(FlaskForm):
 class AddFinalStatusForm(FlaskForm):
     id = SelectField("מספר מגובש", validators=[DataRequired("זהו סעיף חובה")])
     final_status = SelectField("סטטוס סיכום", validators=[DataRequired("זהו סעיף חובה")])
-    final_note = StringField("הערת סיכום", validators=[DataRequired("זהו סעיף חובה")])
+    final_note = TextAreaField("הערת סיכום", validators=[DataRequired("זהו סעיף חובה")])
     submit = SubmitField("הזן סיכום")
+
+class FinalWeightedGradeForm(FlaskForm):
+    id = SelectField("מספר מגובש", validators=[DataRequired("זהו סעיף חובה")])
+    grade = StringField("ציון סופי משוקלל ראיון וגיבוש", validators=[DataRequired("זהו סעיף חובה")])
+    note = TextAreaField("הערות")
+    submit = SubmitField("שמור ציון")
 
 class EditUserForm(FlaskForm):
     name = StringField("שם", validators=[DataRequired("זהו סעיף חובה")])

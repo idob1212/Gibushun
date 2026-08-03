@@ -216,3 +216,18 @@
     font-weight: 700;
   }
 }
+
+/* Tappable 1-4 grade circles (replaces the grade dropdown). The radio is
+   visually hidden but still submits a normal `grade` field, so the offline
+   form replay keeps working. Unlayered on purpose — it must beat DaisyUI's
+   layered .btn background. */
+.grade-pick input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.grade-pick input[type="radio"]:checked + .btn {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-primary-content);
+}

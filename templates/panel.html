@@ -29,14 +29,14 @@
           </div>
           <div class="flex flex-wrap gap-2 mt-3 pt-3 border-t border-base-200">
             {% if candidate.status != "פרש" %}
-              <form method="POST" data-offline class="inline" action="{{ url_for('delete_candidate', candidate_id=candidate.id.split('/')[1]) }}">
+              <form method="POST" class="inline" action="{{ url_for('delete_candidate', candidate_id=candidate.id.split('/')[1]) }}">
                 <button type="submit" class="btn btn-sm btn-outline btn-warning" onclick="return confirm('האם אתה בטוח שברצונך לסמן מועמד זה כפורש?')">פרש</button>
               </form>
-              <form method="POST" data-offline class="inline" action="{{ url_for('delete_candidate', candidate_id=candidate.id.split('/')[1], reason='medical') }}">
+              <form method="POST" class="inline" action="{{ url_for('delete_candidate', candidate_id=candidate.id.split('/')[1], reason='medical') }}">
                 <button type="submit" class="btn btn-sm btn-outline btn-error" onclick="return confirm('האם אתה בטוח שברצונך לסמן מועמד זה כפורש בעקבות החלטת רופא?')">הופרש על ידי הרופא</button>
               </form>
             {% else %}
-              <form method="POST" data-offline class="inline" action="{{ url_for('return_candidate', candidate_id=candidate.id.split('**')[0].split('/')[1]) }}">
+              <form method="POST" class="inline" action="{{ url_for('return_candidate', candidate_id=candidate.id.split('**')[0].split('/')[1]) }}">
                 <button type="submit" class="btn btn-sm btn-outline btn-success">הפוך לפעיל</button>
               </form>
             {% endif %}
@@ -66,11 +66,11 @@
               {% endif %}
             </div>
             {% if candidate.status != "פרש" %}
-              <form method="POST" data-offline class="inline" action="{{ url_for('delete_candidate', candidate_id=candidate.id.split('/')[1]) }}">
+              <form method="POST" class="inline" action="{{ url_for('delete_candidate', candidate_id=candidate.id.split('/')[1]) }}">
                 <button type="submit" class="btn btn-sm btn-outline btn-warning" onclick="return confirm('האם אתה בטוח שברצונך לסמן מועמד זה כפורש?')">פרש</button>
               </form>
             {% else %}
-              <form method="POST" data-offline class="inline" action="{{ url_for('return_candidate', candidate_id=candidate.id.split('**')[0].split('/')[1]) }}">
+              <form method="POST" class="inline" action="{{ url_for('return_candidate', candidate_id=candidate.id.split('**')[0].split('/')[1]) }}">
                 <button type="submit" class="btn btn-sm btn-outline btn-success">הפוך לפעיל</button>
               </form>
             {% endif %}

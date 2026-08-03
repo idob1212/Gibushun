@@ -99,7 +99,9 @@
         fetch('/subjects/' + group).then(function(response) {
 
             response.json().then(function(data) {
-                var optionHTML = '';
+                // "כולם" must survive the rebuild — without it the option
+                // disappears after any group change.
+                var optionHTML = '<option value="כולם">כולם</option>';
 
                 for (var candidate of data.subjects) {
                     optionHTML += '<option value="' + candidate.id + '">' + candidate.id + '</option>';

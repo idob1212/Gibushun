@@ -43,12 +43,15 @@
         </div>
 
         <div class="form-control w-full">
-          <label class="label pb-1" for="grade"><span class="label-text font-medium">ציון</span></label>
-          <select class="select select-bordered w-full" name="grade">
+          <label class="label pb-1"><span class="label-text font-medium">ציון</span></label>
+          <div class="grade-pick flex justify-center gap-4 py-1">
             {% for value, label in form.grade.choices %}
-            <option value="{{ value }}" {% if value == grade %}selected{% endif %}>{{ label }}</option>
+            <label>
+              <input type="radio" name="grade" value="{{ value }}" {% if value == grade or (not grade and loop.first) %}checked{% endif %}>
+              <span class="btn btn-circle btn-lg text-lg">{{ label }}</span>
+            </label>
             {% endfor %}
-          </select>
+          </div>
         </div>
 
         <div class="form-control w-full">

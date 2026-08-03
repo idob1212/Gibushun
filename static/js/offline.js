@@ -248,6 +248,11 @@
       if (r.dropped > 0) parts.push(r.dropped + ' פעולות נדחו על ידי השרת והוסרו');
       if (parts.length) toast(parts.join(' · '));
       refreshStatus();
+      // View pages (e.g. the scores board) opt in to a reload after a sync,
+      // so freshly synced reviews actually appear without a manual refresh.
+      if (r.synced > 0 && document.querySelector('[data-refresh-on-sync]')) {
+        setTimeout(function () { location.reload(); }, 1500);
+      }
     }).catch(function () { flushing = false; });
   }
 
@@ -293,6 +298,14 @@
       form._offlineBound = true;
       form.addEventListener('submit', function (e) {
         e.preventDefault();
+        // Native validation still works under novalidate when called by hand.
+        // Without this, an offline submit with an empty required field is
+        // queued, then silently rejected by the server on replay.
+        if (!form.checkValidity()) { form.reportValidity(); return; }
+        // A page can arm a confirmation (e.g. "you are about to overwrite an
+        // existing interview") by setting data-confirm on the form.
+        var confirmMsg = form.getAttribute('data-confirm');
+        if (confirmMsg && !window.confirm(confirmMsg)) return;
         var requestId = uuid();
         var fd = new FormData(form);
         fd.append('request_id', requestId);
@@ -372,6 +385,14 @@
   document.addEventListener('DOMContentLoaded', function () {
     bindForms();
     refreshStatus();   // paint immediately from the current best guess
-    recheck();         // then confirm against the server and flush if online
+    recheck();         // then confirm against the server
+    // Always try to drain the outbox on load. setOffline(false) only flushes
+    // on an offline→online EDGE, so items queued in a previous page load
+    // never synced when the app reopened already-online.
+    flush();
   });
+
+  // Small read-only API for pages that want to reflect the outbox state
+  // (e.g. the scores board shows "pending sync" when items are queued).
+  window.MeymadionOffline = { pendingCount: pendingCount };
 })();

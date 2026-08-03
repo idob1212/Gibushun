@@ -23,5 +23,26 @@
   </div>
 </section>
 
+{% if not is_edit %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  // Numbers of candidates that already have a saved interview.
+  var interviewed = {{ (interviewed or []) | tojson }};
+  var select = document.getElementById('id');
+  var form = select && select.closest('form');
+  if (!form) return;
+  function arm() {
+    if (interviewed.indexOf(parseInt(select.value, 10)) !== -1) {
+      form.setAttribute('data-confirm', 'אתה עומד לדרוס ראיון קיים ולהזין ראיון חדש. להמשיך?');
+    } else {
+      form.removeAttribute('data-confirm');
+    }
+  }
+  select.addEventListener('change', arm);
+  arm();
+});
+</script>
+{% endif %}
+
 {% include "footer.html" %}
 {% endblock %}

@@ -28,6 +28,8 @@ with app.app_context():
     active = Candidate(id="1/1", group_id=1, name="a", status="פעיל")
     withdrawn = Candidate(id="1/2", group_id=1, name="b", status="פרש",
                           withdraw_reason="רפואי")
+    active.final_weighted_grade = "88"
+    active.final_weighted_note = "מצוין"
     db.session.add_all([active, withdrawn])
     db.session.add(Review(author_id=1, station="בוחן", subject_id="1/1", grade=3.0))
     db.session.commit()
@@ -42,4 +44,22 @@ data = resp.get_data()
 assert data[:2] == b"PK", "response is not an xlsx (zip) file"
 zf = zipfile.ZipFile(io.BytesIO(data))
 assert any(n.startswith("xl/") for n in zf.namelist())
+
+# The weighted final grade must be the LAST column of the results sheet.
+# (No xlsx reader in the image — parse the sheet XML directly.)
+from xml.etree import ElementTree as ET  # noqa: E402
+
+shared = ET.fromstring(zf.read("xl/sharedStrings.xml"))
+strings = ["".join(t.text or "" for t in si.iter() if t.tag.endswith("}t"))
+           for si in shared]
+sheet = ET.fromstring(zf.read("xl/worksheets/sheet1.xml"))
+ns = {"m": sheet.tag.split("}")[0][1:]}
+header = sheet.find(".//m:sheetData/m:row", ns)
+last_cell = header.findall("m:c", ns)[-1]
+val = last_cell.findtext("m:v", namespaces=ns)
+if last_cell.get("t") == "s":
+    val = strings[int(val)]
+assert val == "ציון סופי משוקלל ראיון וגיבוש", f"last column is {val!r}"
+assert "88" in strings, "weighted grade value missing from the sheet"
 print("OK: /download-sheet/ returned 200 with a valid xlsx,", len(data), "bytes")
+print("OK: weighted final grade is the last column")

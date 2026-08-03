@@ -77,20 +77,22 @@ function checkDuplicateIds() {
     const rows = document.querySelectorAll('.candidate-row');
     const ids = {};
     const duplicates = [];
+    const duplicateValues = new Set();
 
     rows.forEach((row, index) => {
         const idInput = row.querySelector('input[name="id"]');
         const id = idInput.value.trim();
 
-        // Reset styling
-        idInput.classList.remove('is-invalid');
-        idInput.style.backgroundColor = '';
+        // Reset styling. input-error is theme-aware (readable in dark mode),
+        // unlike the old hardcoded pink background.
+        idInput.classList.remove('input-error');
 
         if (id) {
             if (ids[id]) {
                 // Mark both current and previous as duplicates
                 duplicates.push(index);
                 duplicates.push(ids[id].index);
+                duplicateValues.add(id);
             } else {
                 ids[id] = { index: index, input: idInput };
             }
@@ -101,11 +103,10 @@ function checkDuplicateIds() {
     duplicates.forEach(index => {
         const row = document.querySelectorAll('.candidate-row')[index];
         const idInput = row.querySelector('input[name="id"]');
-        idInput.classList.add('is-invalid');
-        idInput.style.backgroundColor = '#ffe6e6';
+        idInput.classList.add('input-error');
     });
 
-    return duplicates.length === 0;
+    return Array.from(duplicateValues);
 }
 
 // Function to show validation results
@@ -189,8 +190,7 @@ document.getElementById('add-row').addEventListener('click', function() {
     // Clear the values in the cloned row
     template.querySelectorAll('input, select').forEach(input => {
         input.value = '';
-        input.classList.remove('is-invalid');
-        input.style.backgroundColor = '';
+        input.classList.remove('input-error');
     });
 
     tbody.appendChild(template);
@@ -219,10 +219,11 @@ document.getElementById('batch-form').addEventListener('submit', function(e) {
     e.preventDefault();
 
     // Check for client-side duplicates first
-    if (!checkDuplicateIds()) {
+    const duplicateIds = checkDuplicateIds();
+    if (duplicateIds.length > 0) {
         const duplicateAlert = document.createElement('div');
         duplicateAlert.className = 'alert alert-danger validation-alert';
-        duplicateAlert.innerHTML = '<strong>שגיאה:</strong> יש מספרים כפולים בטופס. אנא תקן את הכפילויות לפני השליחה.';
+        duplicateAlert.innerHTML = '<strong>שגיאה:</strong> יש מספרים כפולים בטופס: ' + duplicateIds.join(', ') + '. אנא תקן את הכפילויות לפני השליחה.';
 
         const container = document.querySelector('.col-lg-8.col-md-10.mx-auto');
         const existingAlerts = document.querySelectorAll('.validation-alert');
