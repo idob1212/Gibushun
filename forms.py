@@ -95,7 +95,7 @@ class AddFinalStatusForm(FlaskForm):
 
 class FinalWeightedGradeForm(FlaskForm):
     id = SelectField("מספר מגובש", validators=[DataRequired("זהו סעיף חובה")])
-    grade = StringField("ציון סופי משוקלל ראיון וגיבוש", validators=[DataRequired("זהו סעיף חובה")])
+    grade = SelectField("ציון סופי משוקלל ראיון וגיבוש", validators=[DataRequired("זהו סעיף חובה")])
     note = TextAreaField("הערות")
     submit = SubmitField("שמור ציון")
 

@@ -85,12 +85,16 @@ with app.app_context():
     assert r1.grade == 4.0
 print("OK: unscored candidates get the last-place grade")
 
-# 6) final weighted grade page saves
+# 6) final weighted grade page saves; only the interview-style options pass
 resp = client.post("/final-grade/", data={"id": "1", "grade": "91", "note": "חזק"})
 with app.app_context():
+    assert Candidate.query.get("1/1").final_weighted_grade is None, \
+        "a free-text grade must be rejected"
+resp = client.post("/final-grade/", data={"id": "1", "grade": "להתאבד", "note": "חזק"})
+with app.app_context():
     c = Candidate.query.get("1/1")
-    assert c.final_weighted_grade == "91" and c.final_weighted_note == "חזק"
-print("OK: final weighted grade saves")
+    assert c.final_weighted_grade == "להתאבד" and c.final_weighted_note == "חזק"
+print("OK: final weighted grade saves with the option scale")
 
 # 7) station rankings list only scored stations
 resp = client.get("/station-reviews/")

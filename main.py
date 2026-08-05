@@ -1580,6 +1580,7 @@ def final_weighted_grade():
             candidate_nums.append(int(candidate.id.split("/")[1]))
     candidate_nums.sort()
     form.id.choices = candidate_nums
+    form.grade.choices = ["לא לגעת - קו אדום", "בלית ברירה", "כן, אבל", "להתאבד"]
 
     selected_id = request.args.get('candidate_id')
     if form.is_submitted():
