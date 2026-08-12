@@ -63,6 +63,12 @@
 </script>
 
 <section class="px-4 mt-4">
+  <a href="{{ url_for('medicalRetire') }}" class="btn btn-outline btn-error w-full btn-lg font-bold">
+    <i class="fas fa-user-md"></i> הפרשת רופא
+  </a>
+</section>
+
+<section class="px-4 mt-4">
   <h2 class="font-display text-lg font-bold mb-3">קבוצות</h2>
   <div class="grid gap-2.5">
     {% for group in groups %}

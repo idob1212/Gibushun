@@ -1,0 +1,120 @@
+{% block content %}
+{% include "header.html" %}
+
+<section class="app-hero px-5 pt-6 pb-6" style="background-image:url('{{ url_for('static', filename='img/admin-panel.jpg') }}')">
+  <h1 class="text-2xl font-extrabold leading-tight">הפרשת רופא</h1>
+  <p class="text-white/75 text-sm mt-1">סימון מגובשים שהופרשו בעקבות החלטת רופא</p>
+</section>
+
+<div class="px-4 mt-4">
+  {% include "flash-messages.html" %}
+</div>
+
+{% if group_id is none %}
+  <section class="px-4 mt-4">
+    <div class="card bg-base-100 shadow-sm">
+      <div class="card-body p-4 text-sm">אין קבוצות במערכת.</div>
+    </div>
+  </section>
+{% else %}
+
+<section class="px-4 mt-4 max-w-md mx-auto">
+  <div class="card bg-base-100 shadow-sm">
+    <div class="card-body p-4">
+      <form method="POST" class="flex flex-col gap-3">
+        {{ form.csrf_token }}
+        <div class="form-control w-full">
+          <label class="label pb-1" for="group"><span class="label-text font-medium">קבוצה</span></label>
+          {{ form.group(class="select select-bordered w-full") }}
+        </div>
+        <button type="submit" class="btn btn-primary btn-lg w-full">הצג</button>
+      </form>
+    </div>
+  </div>
+</section>
+
+<section class="px-4 mt-4 max-w-md mx-auto">
+  <input type="text" id="candidate-filter" class="input input-bordered w-full" placeholder="חיפוש לפי מספר או שם…" autocomplete="off">
+</section>
+
+<section class="px-4 mt-4">
+  <h2 class="font-display text-lg font-bold mb-3">מגובשים פעילים · קבוצה {{ group_id }}</h2>
+  <div class="grid gap-2.5" id="active-list">
+    {% for candidate in candidates %}
+      {% set number = candidate.id.split("/")[1] %}
+      <div class="card bg-base-100 shadow-sm" data-candidate="{{ number }} {{ candidate.name }}">
+        <div class="card-body p-3">
+          <div class="flex items-center gap-3">
+            <div class="bib">{{ number }}</div>
+            <div class="flex-1 min-w-0 font-semibold truncate">{{ candidate.name }}</div>
+            <a href="{{ url_for('candidate_profile', candidate_id=candidate.id) }}" class="btn btn-ghost btn-sm">
+              <i class="fas fa-eye"></i> כרטיס
+            </a>
+          </div>
+          <div class="flex flex-wrap gap-2 mt-3 pt-3 border-t border-base-200">
+            <form method="POST" class="inline" action="{{ url_for('retireCandidateAdmin', group_id=candidate.group_id, candidate_num=number) }}">
+              <button type="submit" class="btn btn-sm btn-outline btn-error" onclick="return confirm('האם אתה בטוח שברצונך לסמן מגובש {{ number }} כהופרש בעקבות החלטת רופא?')">הופרש על ידי הרופא</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+  {% if candidates|length == 0 %}
+    <p class="text-sm text-base-content/60">אין מגובשים פעילים בקבוצה זו.</p>
+  {% endif %}
+</section>
+
+<section class="px-4 mt-4">
+  <h2 class="font-display text-lg font-bold mb-3">מגובשים שפרשו</h2>
+  <div class="grid gap-2.5" id="retired-list">
+    {% for candidate in retired %}
+      {% set number = candidate.id.split("/")[1] %}
+      <div class="card bg-base-100 shadow-sm" data-candidate="{{ number }} {{ candidate.name }}">
+        <div class="card-body p-3">
+          <div class="flex items-center gap-3">
+            <div class="bib ring-2 ring-error">{{ number }}</div>
+            <div class="flex-1 min-w-0 flex items-center gap-2">
+              <span class="font-semibold truncate">{{ candidate.name }}</span>
+              {% if candidate.withdraw_reason == "רפואי" %}
+                <span class="badge badge-error badge-sm font-medium">הופרש ע"י הרופא</span>
+              {% endif %}
+            </div>
+            <a href="{{ url_for('candidate_profile', candidate_id=candidate.id) }}" class="btn btn-ghost btn-sm">
+              <i class="fas fa-eye"></i> כרטיס
+            </a>
+          </div>
+          <div class="flex flex-wrap gap-2 mt-3 pt-3 border-t border-base-200">
+            <form method="POST" class="inline" action="{{ url_for('returnCandidateAdmin', group_id=candidate.group_id, candidate_num=number) }}">
+              <button type="submit" class="btn btn-sm btn-outline btn-success" onclick="return confirm('להחזיר את מגובש {{ number }} לפעילות?')">הפוך לפעיל</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+  {% if retired|length == 0 %}
+    <p class="text-sm text-base-content/60">אין מגובשים שפרשו בקבוצה זו.</p>
+  {% endif %}
+</section>
+
+<script>
+(function () {
+  var box = document.getElementById('candidate-filter');
+  if (!box) return;
+  var cards = document.querySelectorAll('[data-candidate]');
+  box.addEventListener('input', function () {
+    var q = box.value.trim();
+    cards.forEach(function (card) {
+      // Inline style, not a utility class: app.css is a pre-built Tailwind
+      // bundle, so a class that appears only here might not be in it.
+      card.style.display = (!q || card.dataset.candidate.indexOf(q) !== -1) ? '' : 'none';
+    });
+  });
+})();
+</script>
+
+{% endif %}
+
+{% include "footer.html" %}
+{% endblock %}

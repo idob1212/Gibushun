@@ -1266,6 +1266,63 @@ def return_candidate(candidate_id):
     return redirect(url_for('manageCandidates'))
 
 
+# The doctor works from the admin account, and the group panel's retire buttons
+# can't serve them: /delete-candidate builds the id from current_user.id, so as
+# admin (id=0) it looks up "0/<num>" and 404s. Admin therefore gets its own
+# page — pick a group, retire (or reinstate) any candidate in it.
+@app.route('/medical-retire', methods=["GET", "POST"])
+@admin_only
+def medicalRetire():
+    form = selectGroup()
+    groups = get_groups()
+    form.group.choices = [(group, str(group)) for group in groups]
+    group_id = None
+    if groups:
+        if form.validate_on_submit():
+            group_id = int(form.group.data)
+        else:
+            requested = request.args.get("group", "")
+            group_id = int(requested) if requested.isdigit() and int(requested) in groups else groups[0]
+        # Keep the picked group selected — .default is a no-op after process().
+        form.group.data = str(group_id)
+    candidates = Candidate.query.filter_by(group_id=group_id).all() if group_id is not None else []
+    candidates.sort(key=lambda candidate: int(candidate.id.split("/")[1]))
+    return render_template('medical-retire.html', form=form, group_id=group_id,
+                           candidates=[c for c in candidates if c.status != "פרש"],
+                           retired=[c for c in candidates if c.status == "פרש"])
+
+
+def _candidate_or_404(group_id, candidate_num):
+    candidate = Candidate.query.get(str(group_id) + "/" + str(candidate_num))
+    if not candidate:
+        abort(404)
+    return candidate
+
+
+@app.route("/medical-retire/retire/<int:group_id>/<int:candidate_num>", methods=["POST"])
+@admin_only
+def retireCandidateAdmin(group_id, candidate_num):
+    candidate = _candidate_or_404(group_id, candidate_num)
+    candidate.status = "פרש"
+    candidate.withdraw_reason = "רפואי"
+    db.session.commit()
+    # No update_avgs_nf() here: it walks the *logged-in* group's candidates
+    # (none for admin), and withdrawing doesn't change any station average.
+    flash(f'מגובש {candidate_num} בקבוצה {group_id} סומן כהופרש על ידי הרופא', 'success')
+    return redirect(url_for('medicalRetire', group=group_id))
+
+
+@app.route("/medical-retire/return/<int:group_id>/<int:candidate_num>", methods=["POST"])
+@admin_only
+def returnCandidateAdmin(group_id, candidate_num):
+    candidate = _candidate_or_404(group_id, candidate_num)
+    candidate.status = ""
+    candidate.withdraw_reason = None
+    db.session.commit()
+    flash(f'מגובש {candidate_num} בקבוצה {group_id} הוחזר לפעילות', 'success')
+    return redirect(url_for('medicalRetire', group=group_id))
+
+
 @app.route("/edit-user/<int:user_id>", methods=["GET", "POST"])
 @admin_only
 def edit_user(user_id):
