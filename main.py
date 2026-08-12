@@ -1243,26 +1243,43 @@ def manageGroups():
     return render_template('admin-panel.html', groups=groups)
 
 
+def _retire_group_id():
+    # The admin (id 0) can act on any group through the "group" query
+    # argument; a regular user can act only on the own group.
+    group_id = request.args.get("group", type=int)
+    if group_id is None:
+        return current_user.id
+    if current_user.id != 0:
+        abort(403)
+    return group_id
+
+
 @app.route("/delete-candidate/<candidate_id>", methods=["GET", "POST"])
 def delete_candidate(candidate_id):
-    candidate_to_delete = Candidate.query.get(str(current_user.id) + "/" + candidate_id)
+    group_id = _retire_group_id()
+    candidate_to_delete = Candidate.query.get(f"{group_id}/{candidate_id}")
     if not candidate_to_delete:
         abort(404)
     candidate_to_delete.status = "פרש"
     candidate_to_delete.withdraw_reason = "רפואי" if request.args.get("reason") == "medical" else None
     db.session.commit()
     update_avgs_nf()
+    if current_user.id == 0:
+        return redirect(url_for('homeAdmin', group_id=group_id))
     return redirect(url_for('manageCandidates'))
 
 @app.route("/return/<candidate_id>", methods=["GET", "POST"])
 def return_candidate(candidate_id):
-    user_to_return = Candidate.query.get(str(current_user.id) +"/" + candidate_id)
+    group_id = _retire_group_id()
+    user_to_return = Candidate.query.get(f"{group_id}/{candidate_id}")
     if not user_to_return:
         abort(404)
     user_to_return.status = ""
     user_to_return.withdraw_reason = None
     db.session.commit()
     update_avgs_nf()
+    if current_user.id == 0:
+        return redirect(url_for('homeAdmin', group_id=group_id))
     return redirect(url_for('manageCandidates'))
 
 
