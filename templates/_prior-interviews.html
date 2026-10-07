@@ -1,0 +1,108 @@
+{# Candidates whose name is in the unit's interview form (synced by the admin
+   from the form's Excel export). Import with context:
+     {% import "_prior-interviews.html" as pi with context %}
+   The sheet pops up by itself when the page has a match this phone has not
+   seen yet; any [data-pi-open] button reopens it. Behaviour: static/js/app.js.
+   Groups see that and when a candidate was interviewed; the rating and the
+   interviewer's impression are for the admin only. #}
+
+{% macro when(interview) -%}
+  {{ interview.interviewed_at.strftime('%d/%m/%Y') if interview.interviewed_at else '' }}
+{%- endmacro %}
+
+{% macro count_text(n) -%}
+  {% if n == 1 %}מגובש אחד כבר רואיין{% else %}{{ n }} מגובשים כבר רואיינו{% endif %}
+{%- endmacro %}
+
+{% macro rating_badge(rating) -%}
+  {% if rating %}
+    {% if "אדום" in rating %}{% set tone = "badge-error" %}
+    {% elif rating.startswith("בלית") %}{% set tone = "badge-warning" %}
+    {% else %}{% set tone = "badge-success" %}{% endif %}
+    <span class="badge {{ tone }} badge-sm font-medium h-auto py-0.5 text-start">{{ rating }}</span>
+  {%- endif %}
+{%- endmacro %}
+
+{# One line under a candidate's name in a list. #}
+{% macro line(m, admin=False) -%}
+  {% if m %}
+    {% set latest = m.latest %}
+    <div class="pi-note mt-1.5">
+      <i class="fas fa-user-check mt-0.5" aria-hidden="true"></i>
+      <span class="flex-1 min-w-0 break-words">
+        {#- Each part wraps as a unit ("סגן עידן" never splits) but can still break if longer than the line. -#}
+        <b>{{ 'רואיין' if m.exact else 'ייתכן שרואיין' }}</b>{% if latest.interviewed_at %} · <span class="inline-block max-w-full">{{ latest.interviewed_at.strftime('%d/%m/%y') }}</span>{% endif %}{% if latest.interviewer %} <span class="inline-block max-w-full">· {{ latest.interviewer }}</span>{% endif %}
+        {% if not m.exact %}<span class="block opacity-80">שם בטופס: {{ latest.name }}</span>{% endif %}
+      </span>
+      {% if admin %}{{ rating_badge(latest.rating) }}{% endif %}
+    </div>
+  {% endif %}
+{%- endmacro %}
+
+{# The tappable summary that reopens the sheet. #}
+{% macro banner(matches, scope_text) -%}
+  {% if matches %}
+    <button type="button" class="pi-banner" data-pi-open aria-haspopup="dialog" aria-controls="pi-sheet">
+      <span class="pi-banner-icon" aria-hidden="true"><i class="fas fa-user-check"></i></span>
+      <span class="flex-1 min-w-0 text-start">
+        <span class="block font-bold">{{ count_text(matches|length) }}</span>
+        <span class="block text-xs opacity-75">{{ scope_text }} · לחצו לרשימה</span>
+      </span>
+      <i class="fas fa-chevron-left opacity-60" aria-hidden="true"></i>
+    </button>
+  {% endif %}
+{%- endmacro %}
+
+{% macro sheet(matches, admin=False, open_now=False) -%}
+  {% if matches %}
+  <dialog id="pi-sheet" class="app-sheet" aria-labelledby="pi-title"
+          data-scope="{{ current_user.id }}" data-keys="{{ matches|map(attribute='key')|join(' ') }}"
+          {% if open_now %}data-open-now{% endif %}>
+    <div class="sheet-form">
+      <header class="sheet-head">
+        <div class="sheet-grabber" aria-hidden="true"></div>
+        <div class="flex items-center justify-between gap-3">
+          <h2 id="pi-title" class="font-display text-xl font-extrabold flex items-center gap-2">
+            <span class="pi-banner-icon !w-9 !h-9 !text-base" aria-hidden="true"><i class="fas fa-user-check"></i></span>
+            {{ count_text(matches|length) }}
+          </h2>
+          <button type="button" class="btn btn-ghost btn-circle btn-sm text-lg" data-pi-close aria-label="סגור" autofocus>✕</button>
+        </div>
+        <p class="text-sm text-base-content/70 mt-1.5">
+          {% if admin %}מגובשים בגיבוש ששמם מופיע בטופס הראיונות.{% else %}מגובשים בקבוצה שלך ששמם מופיע בטופס הראיונות של היחידה.{% endif %}
+        </p>
+      </header>
+
+      <div class="sheet-body !gap-2">
+        {% for group_id, items in matches|groupby('group_id') %}
+          {% if admin %}<h3 class="pi-group">קבוצה {{ group_id }}</h3>{% endif %}
+          {% for m in items %}
+            {% set latest = m.latest %}
+            <a href="{{ url_for('candidate_profile', candidate_id=m.candidate.id) }}" class="pi-row">
+              <div class="bib shrink-0">{{ m.number }}</div>
+              <div class="flex-1 min-w-0">
+                <div class="font-semibold break-words">{{ m.candidate.name }}</div>
+                <div class="text-xs text-base-content/70 mt-0.5 break-words">
+                  {% if latest.interviewed_at %}ראיון {{ when(latest) }}{% else %}רואיין{% endif %}{% if latest.interviewer %} · {{ latest.interviewer }}{% endif %}{% if latest.gibush %} · {{ latest.gibush }}{% endif %}
+                </div>
+                {% if not m.exact or (admin and latest.rating) or m.interviews|length > 1 %}
+                <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
+                  {% if not m.exact %}<span class="badge badge-outline badge-warning badge-sm h-auto py-0.5 text-start">שם דומה: {{ latest.name }}</span>{% endif %}
+                  {% if admin %}{{ rating_badge(latest.rating) }}{% endif %}
+                  {% if m.interviews|length > 1 %}<span class="badge badge-ghost badge-sm">{{ m.interviews|length }} ראיונות</span>{% endif %}
+                </div>
+                {% endif %}
+              </div>
+              <i class="fas fa-chevron-left text-base-content/30 text-sm self-center" aria-hidden="true"></i>
+            </a>
+          {% endfor %}
+        {% endfor %}
+      </div>
+
+      <footer class="sheet-foot">
+        <button type="button" class="btn btn-primary btn-lg w-full" data-pi-close>הבנתי</button>
+      </footer>
+    </div>
+  </dialog>
+  {% endif %}
+{%- endmacro %}

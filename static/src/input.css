@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @source "../../templates";
+@source "../js/app.js";
 
 @plugin "daisyui";
 
@@ -194,7 +195,7 @@
     vertical-align: middle;
   }
   .score-table .note-input {
-    min-width: 6rem;
+    min-width: 4rem;
   }
 
   /* A grade select that actually holds a score (grade != 0) is tinted green so
@@ -207,17 +208,455 @@
   }
 }
 
-/* Keep the fixed top bar clear of the iOS status bar / in-call banner, and
-   the mobile dock clear of the home indicator (viewport-fit=cover).
-   Unlayered on purpose — DaisyUI's layered .navbar/.dock padding rules win
-   the cascade inside @layer components, which put the menu and the theme
-   toggle under the phone status bar. */
+/* ---- App shell -------------------------------------------------------------
+   The document never scrolls: the shell is pinned to the viewport and only
+   <main> scrolls, with the top bar and the bottom nav as ordinary flex rows.
+   Field users on iPhone saw the bottom nav stuck in the middle of the screen
+   and jumping while scrolling (and the sticky top bar gone): iOS leaves the
+   layout viewport offset after the keyboard closes or during overscroll, and
+   every position:fixed/sticky element moves with it. Nothing here depends on
+   fixed positioning relative to a scrolling page any more; app.js snaps any
+   leftover document offset back to 0.
+   Unlayered on purpose — it must beat DaisyUI's layered .navbar/.dock rules
+   (.dock is position:fixed there). */
+html, body {
+  height: 100%;
+}
+body {
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.app-shell {
+  position: fixed;
+  inset: 0;
+  grid-template-rows: minmax(0, 1fr);
+}
+.app-frame {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+/* Keep the top bar clear of the iOS status bar / in-call banner, and the
+   dock clear of the home indicator (viewport-fit=cover). */
 .app-topbar {
+  position: relative;
+  flex: none;
+  z-index: 30;
   padding-top: max(env(safe-area-inset-top), 0.5rem);
   min-height: calc(3.5rem + env(safe-area-inset-top));
 }
+.app-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.app-bottom {
+  position: relative;
+  flex: none;
+  z-index: 20;
+}
 .app-dock {
+  position: relative;
+  inset: auto;
   padding-bottom: max(0.25rem, env(safe-area-inset-bottom));
+}
+/* Nothing in the shell may change size when an input gains or loses focus:
+   a tap on "save" blurs the field first, and a layout jump at that moment
+   sends the tap to whatever slid under the finger (a lost tap). The
+   keyboard simply covers the nav on iOS; Android resizes after the tap. */
+
+/* User text (notes, names) can hold long unbroken strings — a URL, an id,
+   "------". It must wrap instead of widening a card past a 320px screen;
+   grid/flex children likewise must be allowed to shrink below content. */
+.break-words {
+  overflow-wrap: anywhere;
+}
+.grid > * {
+  min-width: 0;
+}
+/* Narrow phones: scoring tables need every pixel for the note field. */
+@media (max-width: 400px) {
+  .score-table :where(th, td) {
+    padding-inline: 0.3rem;
+  }
+}
+
+/* Taps register at once: no double-tap-zoom wait, and a visible press. */
+a, button, label, summary, select, input, textarea, [role="button"] {
+  touch-action: manipulation;
+}
+.dock > :active {
+  background-color: color-mix(in oklab, var(--color-primary) 14%, transparent);
+}
+.dock > .dock-active {
+  color: var(--color-primary);
+}
+.tap-card {
+  transition: transform .08s ease, box-shadow .15s ease;
+}
+.tap-card:active, a.is-pressed .tap-card, a.tap-card.is-pressed {
+  transform: scale(.985);
+}
+
+/* Navigation / save in progress: a thin animated bar under the top bar. */
+.app-progress {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 3px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .15s ease;
+}
+.app-progress::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  width: 40%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--color-brand-violet), var(--color-brand-blue), var(--color-accent));
+  animation: app-progress 1.05s ease-in-out infinite;
+}
+/* Root flag for the bar only — it must never block taps (a frozen page
+   while the server is slow is exactly the "stuck app" being fixed). */
+html.is-loading .app-progress {
+  opacity: 1;
+}
+@keyframes app-progress {
+  from { inset-inline-start: -40%; }
+  to { inset-inline-start: 100%; }
+}
+/* A control that is already saving ignores further taps (no double save). */
+:is(button, a, .btn).is-busy {
+  pointer-events: none;
+}
+.btn.is-busy {
+  opacity: .8;
+}
+
+/* ---- Quick-note bubble + bottom sheet ------------------------------------- */
+.app-fab {
+  position: absolute;
+  bottom: calc(100% + 0.9rem);
+  inset-inline-end: 1rem;
+  width: 3.75rem;
+  height: 3.75rem;
+  border: 0;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 1.5rem;
+  color: #fff;
+  cursor: pointer;
+  background: linear-gradient(135deg, var(--color-brand-violet), var(--color-brand-blue));
+  box-shadow: 0 12px 26px -10px color-mix(in oklab, var(--color-brand-violet) 80%, transparent), 0 2px 6px rgba(0, 0, 0, .25);
+  transition: transform .15s ease, background .25s ease;
+}
+.app-fab:active {
+  transform: scale(.9);
+}
+.app-fab .fab-done {
+  display: none;
+}
+.app-fab.is-done {
+  background: var(--color-success);
+  animation: fab-pop .45s ease;
+}
+.app-fab.is-done .fab-idle {
+  display: none;
+}
+.app-fab.is-done .fab-done {
+  display: inline;
+}
+@keyframes fab-pop {
+  0% { transform: scale(.6); }
+  60% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+.has-fab {
+  padding-bottom: 6.5rem !important;
+}
+
+.app-sheet {
+  border: 0;
+  padding: 0;
+  margin: auto auto var(--kb-inset, 0px);
+  width: 100%;
+  max-width: 34rem;
+  max-height: calc(min(92dvh, 48rem) - var(--kb-inset, 0px));
+  border-radius: 1.4rem 1.4rem 0 0;
+  background: var(--color-base-100);
+  color: var(--color-base-content);
+  box-shadow: 0 -14px 44px -12px rgba(0, 0, 0, .5);
+  overflow: hidden;
+}
+.app-sheet[open] {
+  display: flex;
+  flex-direction: column;
+  animation: sheet-in .24s cubic-bezier(.2, .8, .2, 1);
+}
+.app-sheet.is-closing {
+  animation: sheet-out .2s ease-in forwards;
+}
+/* After a save the sheet folds back into the bubble in the corner. */
+.app-sheet.is-closing.to-fab {
+  transform-origin: left bottom;
+  animation: sheet-to-fab .3s cubic-bezier(.5, 0, .75, 0) forwards;
+}
+.app-sheet::backdrop {
+  background: rgba(10, 8, 20, .5);
+}
+@keyframes sheet-in {
+  from { transform: translateY(100%); }
+  to { transform: none; }
+}
+@keyframes sheet-out {
+  to { transform: translateY(100%); opacity: .5; }
+}
+@keyframes sheet-to-fab {
+  to { transform: translate(-6%, 30%) scale(.12); opacity: 0; border-radius: 999px; }
+}
+@media (min-width: 640px) {
+  .app-sheet {
+    margin: auto;
+    border-radius: 1.4rem;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-sheet[open], .app-sheet.is-closing, .app-sheet.is-closing.to-fab, .app-fab.is-done {
+    animation-duration: .01s;
+  }
+}
+.sheet-form {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+.sheet-head {
+  flex: none;
+  padding: .55rem 1.1rem .7rem;
+  border-bottom: 1px solid var(--color-base-200);
+}
+.sheet-grabber {
+  width: 2.5rem;
+  height: .3rem;
+  margin: 0 auto .55rem;
+  border-radius: 999px;
+  background: var(--color-base-300);
+}
+.sheet-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: .9rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.sheet-foot {
+  flex: none;
+  padding: .7rem 1.1rem calc(.7rem + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--color-base-200);
+  background: var(--color-base-100);
+}
+.sheet-label {
+  display: block;
+  font-weight: 700;
+  font-size: .85rem;
+  margin-bottom: .4rem;
+  color: color-mix(in oklab, var(--color-base-content) 75%, transparent);
+}
+.qn-chips {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(2.85rem, 1fr));
+  gap: .4rem;
+}
+.qn-chip {
+  height: 2.85rem;
+  border: 2px solid transparent;
+  border-radius: .8rem;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: var(--color-base-content);
+  background: var(--color-base-200);
+  cursor: pointer;
+  transition: transform .08s ease;
+}
+.qn-chip:active {
+  transform: scale(.92);
+}
+.qn-chip[aria-checked="true"] {
+  color: #fff;
+  background: linear-gradient(135deg, var(--color-brand-violet), var(--color-brand-blue));
+  box-shadow: 0 6px 14px -6px color-mix(in oklab, var(--color-brand-violet) 75%, transparent);
+}
+.qn-types {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: .5rem;
+}
+.qn-type {
+  height: 2.8rem;
+  border-radius: .8rem;
+  border: 2px solid var(--color-base-300);
+  background: var(--color-base-100);
+  color: var(--color-base-content);
+  font-weight: 700;
+  cursor: pointer;
+}
+.qn-type[aria-pressed="true"][data-type="טובה"] { background: var(--color-success); border-color: var(--color-success); color: var(--color-success-content); }
+.qn-type[aria-pressed="true"][data-type="ניטרלית"] { background: var(--color-warning); border-color: var(--color-warning); color: var(--color-warning-content); }
+.qn-type[aria-pressed="true"][data-type="רעה"] { background: var(--color-error); border-color: var(--color-error); color: var(--color-error-content); }
+.qn-invalid {
+  animation: qn-shake .3s ease;
+}
+@keyframes qn-shake {
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+/* Small speech-bubble button on list cards (opens the sheet for that row). */
+.note-btn {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 3.25rem;
+  border: 0;
+  border-inline-start: 1px solid var(--color-base-200);
+  background: transparent;
+  color: var(--color-primary);
+  font-size: 1.2rem;
+  cursor: pointer;
+  border-start-end-radius: inherit;
+  border-end-end-radius: inherit;
+}
+.note-btn:active {
+  background: color-mix(in oklab, var(--color-primary) 12%, transparent);
+}
+
+/* ---- Candidate photo in a circle ------------------------------------------ */
+.avatar-photo {
+  display: block;
+  border-radius: 999px;
+  object-fit: cover;
+  background: var(--color-base-200);
+}
+.avatar-hero {
+  width: 4.5rem;
+  height: 4.5rem;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, .4), 0 8px 18px -8px rgba(0, 0, 0, .5);
+}
+.avatar-row {
+  width: 3rem;
+  height: 3rem;
+}
+
+/* Doctor / HR notes beside the candidate number. */
+.staff-note {
+  display: flex;
+  align-items: flex-start;
+  gap: .4rem;
+  font-size: .78rem;
+  line-height: 1.35;
+  padding: .2rem .5rem;
+  border-radius: .5rem;
+}
+.staff-note-med {
+  background: color-mix(in oklab, var(--color-info) 14%, var(--color-base-100));
+  color: color-mix(in oklab, var(--color-info) 78%, var(--color-base-content));
+}
+.staff-note-hr {
+  background: color-mix(in oklab, var(--color-secondary) 12%, var(--color-base-100));
+  color: color-mix(in oklab, var(--color-secondary) 70%, var(--color-base-content));
+}
+.bib-flags {
+  position: absolute;
+  top: -.35rem;
+  inset-inline-start: -.35rem;
+  display: flex;
+  gap: .15rem;
+}
+.bib-flag {
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: .6rem;
+  color: #fff;
+  box-shadow: 0 0 0 2px var(--color-base-100);
+}
+
+/* Already interviewed (the unit's interview form, synced by the admin). */
+.pi-note {
+  display: flex;
+  align-items: flex-start;
+  gap: .4rem;
+  font-size: .78rem;
+  line-height: 1.35;
+  padding: .25rem .5rem;
+  border-radius: .5rem;
+  background: color-mix(in oklab, var(--color-warning) 16%, var(--color-base-100));
+  color: color-mix(in oklab, var(--color-warning) 42%, var(--color-base-content));
+}
+.pi-banner-icon {
+  flex: none;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: .85rem;
+  display: grid;
+  place-items: center;
+  font-size: 1.05rem;
+  color: var(--color-warning-content);
+  background: var(--color-warning);
+}
+.pi-banner {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  width: 100%;
+  padding: .65rem .8rem;
+  border-radius: 1rem;
+  border: 1px solid color-mix(in oklab, var(--color-warning) 45%, transparent);
+  background: color-mix(in oklab, var(--color-warning) 14%, var(--color-base-100));
+  color: var(--color-base-content);
+  cursor: pointer;
+  transition: transform .08s ease;
+}
+.pi-banner:active {
+  transform: scale(.98);
+}
+.pi-row {
+  display: flex;
+  align-items: flex-start;
+  gap: .75rem;
+  padding: .7rem .75rem;
+  border-radius: 1rem;
+  background: var(--color-base-200);
+  color: var(--color-base-content);
+}
+.pi-row:active {
+  background: var(--color-base-300);
+}
+.pi-group {
+  font-size: .8rem;
+  font-weight: 800;
+  color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+  margin-top: .35rem;
+}
+.pi-group:first-child {
+  margin-top: 0;
 }
 
 /* Tappable 1-4 grade circles (replaces the grade dropdown). The radio is

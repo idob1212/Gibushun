@@ -8,7 +8,38 @@
   function isCurrent() { return GEN === window.__mmOfflineGen; }
 
   // Endpoints whose JSON POSTs may be queued and replayed when offline.
-  var JSON_WRITE = ['/circles/finished', '/circles/finished-act', '/update-counter-reviews'];
+  var JSON_WRITE = ['/circles/finished', '/circles/finished-act', '/update-counter-reviews',
+                    '/notes/quick', '/final-summary/save'];
+
+  // A write that has not answered by now is treated like a dead connection
+  // (field "lie-fi"): it is queued with its request id and replayed later —
+  // the server drops the copy if the original did arrive. Before this, a
+  // hung save looked like a missed tap and got tapped again.
+  var WRITE_TIMEOUT_MS = 12000;
+  function fetchWithTimeout(url, opts) {
+    if (typeof AbortController === 'undefined') return nativeFetch(url, opts);
+    var ctrl = new AbortController();
+    var timer = setTimeout(function () { ctrl.abort(); }, WRITE_TIMEOUT_MS);
+    opts = Object.assign({}, opts, { signal: ctrl.signal });
+    return nativeFetch(url, opts).then(
+      function (res) { clearTimeout(timer); return res; },
+      function (err) { clearTimeout(timer); throw err; }
+    );
+  }
+
+  // Full-state writes (a march station's whole table): a newer snapshot makes
+  // older queued ones obsolete — replaying those later would roll it back.
+  function snapshotKey(url, bodyObj) {
+    if (url.indexOf('/update-counter-reviews') !== -1 && bodyObj && bodyObj.station) return 'counter:' + bodyObj.station;
+    return null;
+  }
+  function dropOlder(key, ts) {
+    if (!key) return Promise.resolve();
+    return pendingItems().then(function (items) {
+      return Promise.all(items.filter(function (i) { return i.key === key && i.ts < ts; })
+        .map(function (i) { return remove(i.id); }));
+    });
+  }
 
   function uuid() {
     if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
@@ -178,14 +209,17 @@
     if (toastEl) return toastEl;
     toastEl = document.createElement('div');
     toastEl.id = 'net-toast';
+    toastEl.setAttribute('role', 'status');
+    toastEl.setAttribute('aria-live', 'polite');
     toastEl.style.cssText = BAR_CSS + ';background:#16a34a';
     document.body.appendChild(toastEl);
     return toastEl;
   }
   // Transient "push": always removed after a few seconds, stacked under the
   // navbar and the offline bar (if shown).
-  function toast(text) {
+  function toast(text, kind) {
     var t = ensureToast();
+    t.style.background = kind === 'error' ? '#dc2626' : (kind === 'warning' ? '#b45309' : '#16a34a');
     t.textContent = text;
     t.style.top = (topOffset() + (offlineBarVisible() ? offlineBar.offsetHeight + 6 : 0)) + 'px';
     setVisible(t, true);
@@ -244,7 +278,8 @@
   // one of these is a re-render with errors (bad choice, stale CSRF) — a
   // rejection, not a save. /new-review is absent on purpose: its success path
   // renders 200 directly, so 200 must keep counting as success there.
-  var PRG_FORM_PATHS = ['/add-all', '/interview/', '/final-grade/', '/final-status/', '/new-note'];
+  var PRG_FORM_PATHS = ['/add-all', '/interview/', '/final-grade/', '/final-status/', '/new-note',
+                        '/group-manage/names'];
   function pathOf(u) {
     try { return new URL(u, location.origin).pathname; } catch (e) { return u; }
   }
@@ -329,16 +364,23 @@
 
     if (!isWrite) return nativeFetch(input, init);
 
-    var requestId = uuid();
+    // Callers that retry the same logical write (the quick-note sheet) pass
+    // their own id so a double tap is recognised as one write.
+    var given = init.headers && (init.headers['X-Request-Id'] || init.headers['x-request-id']);
+    var requestId = given || uuid();
     var bodyObj = {};
     try { bodyObj = JSON.parse(init.body || '{}'); } catch (e) {}
     bodyObj.request_id = requestId;
     var body = JSON.stringify(bodyObj);
     init.body = body;
+    var key = snapshotKey(url, bodyObj);
+    var startedAt = Date.now();
     init.headers = Object.assign({}, init.headers, { 'X-Request-Id': requestId, 'Content-Type': 'application/json' });
 
     function queueAndAck() {
-      return queue({ kind: 'json', url: url, body: body, requestId: requestId, ts: Date.now() }).then(function () {
+      return dropOlder(key, startedAt).then(function () {
+        return queue({ kind: 'json', url: url, body: body, requestId: requestId, ts: startedAt, key: key });
+      }).then(function () {
         setOffline(true);  // we couldn't reach the server; show the pending strip
         return new Response(JSON.stringify({ success: true, queued: true, message: 'נשמר במכשיר — יסונכרן ברגע שתהיה רשת ✓' }),
           { status: 200, headers: { 'Content-Type': 'application/json' } });
@@ -346,21 +388,40 @@
     }
 
     if (!navigator.onLine) return queueAndAck();
-    return nativeFetch(url, init).then(function (res) {
+    return fetchWithTimeout(url, init).then(function (res) {
+      // Session expired: the POST bounced to the login page. Keep the write
+      // and ask for a login instead of reporting a confusing failure.
+      if (pathOf(res.url) === '/login') {
+        needLogin = true;
+        return queueAndAck();
+      }
       // A write just reached the server — we're online, whatever the flag
       // said. Clears a stale banner and drains the outbox immediately.
       if (res && res.ok && offline) setOffline(false);
+      if (res && res.ok && key) dropOlder(key, startedAt);
       return res;
     }).catch(function () { return queueAndAck(); });
   };
 
   // --- offline form interception (interview / note / add-candidate) ---------
+  function busy(form, btn, on) {
+    if (window.AppUI) window.AppUI.setFormBusy(form, btn, on);
+    else form.__mmSubmitting = on;
+  }
+
   function bindForms() {
     document.querySelectorAll('form[data-offline]').forEach(function (form) {
       if (form._offlineBound) return;
       form._offlineBound = true;
+      // One id per filled-in form: if the same data is sent twice (double
+      // tap, or a timed-out send replayed from the outbox) the server keeps
+      // one copy. A fresh id is drawn once the save is confirmed.
+      var requestId = uuid();
+      form.addEventListener('input', function () { if (!form.__mmSubmitting) requestId = uuid(); });
       form.addEventListener('submit', function (e) {
         e.preventDefault();
+        // A save is already on its way — this is the second tap.
+        if (form.__mmSubmitting) return;
         // Native validation still works under novalidate when called by hand.
         // Without this, an offline submit with an empty required field is
         // queued, then silently rejected by the server on replay.
@@ -369,25 +430,31 @@
         // existing interview") by setting data-confirm on the form.
         var confirmMsg = form.getAttribute('data-confirm');
         if (confirmMsg && !window.confirm(confirmMsg)) return;
-        var requestId = uuid();
+        var btn = e.submitter || form.querySelector('[type="submit"]');
         var fd = new FormData(form);
         fd.append('request_id', requestId);
         var action = form.getAttribute('action') || location.pathname;
         var fields = [];
-        fd.forEach(function (v, k) { fields.push([k, v]); });
+        fd.forEach(function (v, k) { if (typeof v === 'string') fields.push([k, v]); });
+        busy(form, btn, true);
 
         function queueIt() {
           return queue({ kind: 'form', url: action, fields: fields, requestId: requestId, ts: Date.now() }).then(function () {
             setOffline(true);  // we couldn't reach the server; show the pending strip
             toast('נשמר במכשיר — יסונכרן ברגע שתהיה רשת ✓');
-            form.reset();
-          });
+            // Entry forms start over; editing forms (data-keep) keep what was typed.
+            if (!form.hasAttribute('data-keep')) form.reset();
+            requestId = uuid();
+          }).catch(function () {
+            toast('השמירה נכשלה — נסו שוב', 'error');
+          }).then(function () { busy(form, btn, false); });
         }
 
         if (!navigator.onLine) { queueIt(); return; }
 
-        nativeFetch(action, { method: 'POST', headers: { 'X-Request-Id': requestId }, body: fd })
+        fetchWithTimeout(action, { method: 'POST', headers: { 'X-Request-Id': requestId }, body: fd })
           .then(function (res) {
+            if (pathOf(res.url) === '/login') { needLogin = true; queueIt(); return; }
             if (res.redirected) {
               // PRG success. fetch already followed the redirect and that GET
               // consumed the one-shot flash message — navigating again would
@@ -419,6 +486,7 @@
     if (!offline) return;
     var form = e.target;
     if (!form || form.hasAttribute('data-offline')) return; // queued by bindForms
+    if (form.hasAttribute('data-js-submit')) return;        // page script sends it through the outbox
     e.preventDefault();
     e.stopPropagation();
     toast('אין חיבור לרשת — פעולה זו דורשת אינטרנט');
@@ -460,13 +528,23 @@
     allItems().then(function (all) {
       var pending = all.filter(function (i) { return !i.dead; }).length;
       if (pending && !window.confirm(pending + ' פעולות עדיין לא סונכרנו ויימחקו אם תתנתק. להתנתק בכל זאת?')) return;
-      Promise.all(all.map(function (i) { return remove(i.id); })).then(
+      // Cached pages and photos belong to this account — a shared phone
+      // must not show them to the next login.
+      var wipeCaches = window.caches ? caches.keys().then(function (keys) {
+        return Promise.all(keys.filter(function (k) { return /^meymadion-(pages|photos)-/.test(k); })
+          .map(function (k) { return caches.delete(k); }));
+      }) : Promise.resolve();
+      Promise.all(all.map(function (i) { return remove(i.id); }).concat([wipeCaches])).then(
         function () { location.href = a.href; },
         function () { location.href = a.href; }
       );
     });
   }, true);
 
+  // Bind right away: this script runs at the end of <body>, so the forms
+  // exist already. Waiting for DOMContentLoaded left a gap after a PRG
+  // re-render where a fast second tap submitted the fresh form natively.
+  bindForms();
   document.addEventListener('DOMContentLoaded', function () {
     bindForms();
     refreshStatus();   // paint immediately from the current best guess
@@ -477,7 +555,30 @@
     flush();
   });
 
+  // Ask the service worker to keep the field pages cached for offline use.
+  // The page lists them (group users only), and the worker fetches them one
+  // at a time — never as a burst that competes with the user's own taps.
+  function warmPages() {
+    var el = document.getElementById('warm-pages');
+    if (!el || !navigator.serviceWorker || offline) return;
+    // The worker is stopped when idle, so it cannot remember; the page does.
+    try {
+      var last = +localStorage.getItem('mm-warm-at') || 0;
+      if (Date.now() - last < 5 * 60 * 1000) return;
+      localStorage.setItem('mm-warm-at', String(Date.now()));
+    } catch (e) {}
+    var pages;
+    try { pages = JSON.parse(el.textContent); } catch (e) { return; }
+    navigator.serviceWorker.ready.then(function (reg) {
+      if (reg.active) reg.active.postMessage({ type: 'warm', pages: pages });
+    }).catch(function () {});
+  }
+  window.addEventListener('load', function () {
+    if (!isCurrent()) return;
+    setTimeout(warmPages, 4000); // after the page settled; idle network only
+  });
+
   // Small API for pages that want to reflect the outbox state (e.g. the
   // scores board shows "pending sync"), plus dead-letter inspection.
-  window.MeymadionOffline = { pendingCount: pendingCount, deadItems: deadItems, clearDead: clearDead };
+  window.MeymadionOffline = { pendingCount: pendingCount, deadItems: deadItems, clearDead: clearDead, toast: toast };
 })();

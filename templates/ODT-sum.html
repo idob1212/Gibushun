@@ -31,7 +31,7 @@
           {% if review.note %}<p class="text-sm text-base-content/70 mt-2 whitespace-pre-wrap break-words">{{ review.note }}</p>{% endif %}
           <div class="flex gap-2 mt-2">
             <a href="{{ url_for('edit_odt_review', review_id=review.id) }}" class="btn btn-xs btn-ghost"><i class="fas fa-pen"></i> עריכה</a>
-            <a href="{{ url_for('delete_odt_review', review_id=review.id) }}" class="btn btn-xs btn-ghost text-error"><i class="fas fa-trash"></i> מחק</a>
+            <form method="post" action="{{ url_for('delete_odt_review', review_id=review.id, next=request.full_path) }}" class="inline"><button type="submit" class="btn btn-xs btn-ghost text-error" onclick="return confirm('למחוק את הציון?')"><i class="fas fa-trash"></i> מחק</button></form>
           </div>
         </div>
       </div>

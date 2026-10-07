@@ -1,8 +1,8 @@
 from datetime import date
 from flask_wtf import FlaskForm
-from wtforms import StringField, SubmitField, PasswordField, SelectField, IntegerField, BooleanField, FloatField, TextAreaField
+from wtforms import StringField, SubmitField, PasswordField, SelectField, IntegerField, BooleanField, FloatField, TextAreaField, HiddenField
 from wtforms.fields import RadioField
-from wtforms.validators import DataRequired, URL, NumberRange, InputRequired
+from wtforms.validators import DataRequired, URL, NumberRange, InputRequired, Optional
 from wtforms.fields.html5 import DateField
 
 
@@ -43,15 +43,6 @@ class SelectPhysicalReviewsFormAdmin(FlaskForm):
 
 
 
-class ShowStaionForm(FlaskForm):
-    station = SelectField("תחנה", validators=[DataRequired()])
-    submit = SubmitField("הצג תוצאה")
-
-class ShowStaionFormAdmin(FlaskForm):
-    group = SelectField("קבוצה", validators=[DataRequired()])
-    station = SelectField("תחנה", validators=[DataRequired()])
-    submit = SubmitField("הצג תוצאה")
-
 class EditReviewForm(FlaskForm):
     keep_pts = StringField("נקודות לשימור", validators=[DataRequired()])
     improve_pts = StringField("נקודות לשיפור", validators=[DataRequired()])
@@ -67,6 +58,9 @@ class RegisterForm(FlaskForm):
     name = StringField("שם")
     mitam = IntegerField("מספר מתאם(קבוצת ליבה)", validators=[InputRequired("זהו סעיף חובה")])
     password = PasswordField("סיסמה", validators=[DataRequired("זהו סעיף חובה")])
+    candidates_count = IntegerField("מספר מגובשים שייפתחו מראש (1 עד N)", default=25,
+                                    validators=[InputRequired("זהו סעיף חובה"),
+                                                NumberRange(min=0, max=99, message="בין 0 ל-99")])
     submit = SubmitField("הוסף מגבש")
 
 class AddNameForm(FlaskForm):
@@ -94,9 +88,9 @@ class AddFinalStatusForm(FlaskForm):
     submit = SubmitField("הזן סיכום")
 
 class FinalWeightedGradeForm(FlaskForm):
+    # Category only — the final grade carries no free-text note (field feedback).
     id = SelectField("מספר מגובש", validators=[DataRequired("זהו סעיף חובה")])
     grade = SelectField("ציון סופי משוקלל ראיון וגיבוש", validators=[DataRequired("זהו סעיף חובה")])
-    note = TextAreaField("הערות")
     submit = SubmitField("שמור ציון")
 
 class EditUserForm(FlaskForm):
@@ -105,7 +99,10 @@ class EditUserForm(FlaskForm):
 
 
 class LoginForm(FlaskForm):
-    id = StringField("מספר קבוצה", validators=[DataRequired()])
+    # "group" (group number + password, admin is group 0) or a built-in
+    # staff station key ("doctor" / "hr"), which logs in by password only.
+    role = HiddenField(default="group")
+    id = StringField("מספר קבוצה", validators=[Optional()])
     password = PasswordField("סיסמה", validators=[DataRequired()])
     submit = SubmitField("התחבר")
 

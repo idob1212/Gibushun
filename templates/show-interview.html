@@ -5,8 +5,8 @@
 
 <section class="app-hero px-5 pt-6 pb-6" style="background-image:url('{{ url_for('static', filename='img/interviews-tot.jpg') }}')">
   <h1 class="text-2xl font-extrabold leading-tight">סיכום ראיון</h1>
-  {% if all_candidates|length > 0 %}
-  <p class="text-white/75 text-sm mt-1">ראיונות כל המועמדים</p>
+  {% if show_all %}
+  <p class="text-white/75 text-sm mt-1">כל הראיונות שבוצעו · {{ all_candidates|length }}{% if total is defined %} מתוך {{ total }}{% endif %}</p>
   {% elif candidate %}
   <p class="text-white/75 text-sm mt-1">ראיון מועמד מס' {{ candidate_id }}</p>
   {% endif %}
@@ -15,6 +15,7 @@
 <section class="px-4 mt-4 max-w-md mx-auto">
   <div class="card bg-base-100 shadow-sm">
     <div class="card-body p-4">
+      <p class="text-sm text-base-content/60 -mt-1">מוצגים כל הראיונות. לסינון בחרו מגובש.</p>
       {{ f.render_form(form, submit_label="הצג") }}
     </div>
   </div>
@@ -28,7 +29,10 @@
         <div class="card-body p-4">
           <div class="flex items-center gap-3 mb-2">
             <div class="bib">{{ candidate.id.split("/")[1] }}</div>
-            <h3 class="font-display font-bold text-lg flex-1">מועמד מספר {{ candidate.id.split("/")[1] }}</h3>
+            <div class="flex-1 min-w-0">
+              <h3 class="font-display font-bold text-lg truncate">{{ candidate.name }}</h3>
+              <p class="text-xs text-base-content/60">מגובש {{ candidate.id.split("/")[1] }}{% if every_group %} · קבוצה {{ candidate.group_id }}{% endif %}</p>
+            </div>
             {% if candidate.interview_grade %}<span class="score-chip bg-base-200 text-base-content">ציון <b>{{ candidate.interview_grade }}</b></span>{% endif %}
           </div>
           <dl class="divide-y divide-base-200 text-sm">
@@ -42,7 +46,18 @@
       </div>
     {% endfor %}
   </div>
+{% elif show_all %}
+  <div class="card bg-base-100 shadow-sm">
+    <div class="card-body items-center text-center py-10">
+      <div class="bib bib-ghost bib-lg mb-3"><i class="fas fa-comments text-2xl"></i></div>
+      <h3 class="font-display font-bold text-lg">עדיין לא בוצעו ראיונות</h3>
+      {% if not every_group and group is not defined %}<a href="{{ url_for('Interview') }}" class="btn btn-primary mt-3"><i class="fas fa-plus"></i> הזן ראיון</a>{% endif %}
+    </div>
+  </div>
 {% elif candidate %}
+  {% if not candidate.interview_grade %}
+    <div class="alert alert-info"><i class="fas fa-info-circle"></i><span>למגובש {{ candidate.id.split("/")[1] }} עדיין אין ראיון.</span></div>
+  {% endif %}
   {% if candidate.interview_grade %}
     <div class="card bg-base-100 shadow-sm">
       <div class="card-body p-4">

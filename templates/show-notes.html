@@ -32,15 +32,15 @@
         </div>
         <div class="grid gap-2">
           {% for note in list %}
-            <div class="card bg-base-100 shadow-sm border-r-4 {% if note.type == 'טובה' %}border-success{% elif note.type == 'ניטרלית' %}border-warning{% else %}border-error{% endif %}">
+            <div class="card bg-base-100 shadow-sm border-r-4 {{ {'טובה': 'border-success', 'ניטרלית': 'border-warning', 'רפואה': 'border-info', 'כוח אדם': 'border-secondary'}.get(note.type, 'border-error') }}">
               <div class="card-body p-3">
                 <div class="flex items-center gap-2 flex-wrap">
-                  <span class="badge badge-sm {% if note.type == 'טובה' %}badge-success{% elif note.type == 'ניטרלית' %}badge-warning{% else %}badge-error{% endif %} font-medium">{{ note.type }}</span>
-                  {% if note.location %}<span class="badge badge-ghost badge-sm">{{ note.location }}</span>{% endif %}
+                  <span class="badge badge-sm {{ {'טובה': 'badge-success', 'ניטרלית': 'badge-warning', 'רפואה': 'badge-info', 'כוח אדם': 'badge-secondary'}.get(note.type, 'badge-error') }} font-medium">{{ note.type }}</span>
+                  {% if note.location %}<span class="badge badge-ghost badge-sm max-w-full"><span class="truncate">{{ note.location }}</span></span>{% endif %}
                   <span class="text-xs text-base-content/50 mr-auto">{{ note.date }}</span>
                 </div>
                 <p class="text-sm mt-1.5 whitespace-pre-wrap break-words">{{ note.text }}</p>
-                {% if note.date != "" %}
+                {% if note.date != "" and note.type not in ["רפואה", "כוח אדם"] %}
                 <a href="{{ url_for('edit_note', note_id=note.id) }}" class="btn btn-xs btn-ghost mt-2"><i class="fas fa-pen"></i> ערוך</a>
                 {% endif %}
               </div>
@@ -53,15 +53,15 @@
 {% elif candidate_id %}
   <div class="grid gap-2">
     {% for note in notes %}
-      <div class="card bg-base-100 shadow-sm border-r-4 {% if note.type == 'טובה' %}border-success{% elif note.type == 'ניטרלית' %}border-warning{% else %}border-error{% endif %}">
+      <div class="card bg-base-100 shadow-sm border-r-4 {{ {'טובה': 'border-success', 'ניטרלית': 'border-warning', 'רפואה': 'border-info', 'כוח אדם': 'border-secondary'}.get(note.type, 'border-error') }}">
         <div class="card-body p-3">
           <div class="flex items-center gap-2 flex-wrap">
-            <span class="badge badge-sm {% if note.type == 'טובה' %}badge-success{% elif note.type == 'ניטרלית' %}badge-warning{% else %}badge-error{% endif %} font-medium">{{ note.type }}</span>
-            {% if note.location %}<span class="badge badge-ghost badge-sm">{{ note.location }}</span>{% endif %}
+            <span class="badge badge-sm {{ {'טובה': 'badge-success', 'ניטרלית': 'badge-warning', 'רפואה': 'badge-info', 'כוח אדם': 'badge-secondary'}.get(note.type, 'badge-error') }} font-medium">{{ note.type }}</span>
+            {% if note.location %}<span class="badge badge-ghost badge-sm max-w-full"><span class="truncate">{{ note.location }}</span></span>{% endif %}
             <span class="text-xs text-base-content/50 mr-auto">{{ note.date }}</span>
           </div>
           <p class="text-sm mt-1.5 whitespace-pre-wrap break-words">{{ note.text }}</p>
-          {% if note.date != "" %}
+          {% if note.date != "" and note.type not in ["רפואה", "כוח אדם"] %}
           <a href="{{ url_for('edit_note', note_id=note.id) }}" class="btn btn-xs btn-ghost mt-2"><i class="fas fa-pen"></i> ערוך</a>
           {% endif %}
         </div>

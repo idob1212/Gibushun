@@ -40,10 +40,10 @@
         </div>
         <div class="grid gap-2">
           {% for note in list %}
-            <div class="card bg-base-100 shadow-sm border-r-4 {{ 'border-success' if note.type == 'טובה' else 'border-error' }}">
+            <div class="card bg-base-100 shadow-sm border-r-4 {{ {'טובה': 'border-success', 'ניטרלית': 'border-warning', 'רפואה': 'border-info', 'כוח אדם': 'border-secondary'}.get(note.type, 'border-error') }}">
               <div class="card-body p-3">
                 <div class="flex items-center gap-2">
-                  <span class="badge badge-sm {{ 'badge-success' if note.type == 'טובה' else 'badge-error' }} font-medium">{{ note.type }}</span>
+                  <span class="badge badge-sm {{ {'טובה': 'badge-success', 'ניטרלית': 'badge-warning', 'רפואה': 'badge-info', 'כוח אדם': 'badge-secondary'}.get(note.type, 'badge-error') }} font-medium">{{ note.type }}</span>
                   <span class="text-xs text-base-content/50 mr-auto">{{ note.date }}</span>
                 </div>
                 <p class="text-sm mt-1.5 whitespace-pre-wrap break-words">{{ note.text }}</p>
@@ -57,10 +57,10 @@
 {% elif candidate_id %}
   <div class="grid gap-2">
     {% for note in notes %}
-      <div class="card bg-base-100 shadow-sm border-r-4 {{ 'border-success' if note.type == 'טובה' else 'border-error' }}">
+      <div class="card bg-base-100 shadow-sm border-r-4 {{ {'טובה': 'border-success', 'ניטרלית': 'border-warning', 'רפואה': 'border-info', 'כוח אדם': 'border-secondary'}.get(note.type, 'border-error') }}">
         <div class="card-body p-3">
           <div class="flex items-center gap-2">
-            <span class="badge badge-sm {{ 'badge-success' if note.type == 'טובה' else 'badge-error' }} font-medium">{{ note.type }}</span>
+            <span class="badge badge-sm {{ {'טובה': 'badge-success', 'ניטרלית': 'badge-warning', 'רפואה': 'badge-info', 'כוח אדם': 'badge-secondary'}.get(note.type, 'badge-error') }} font-medium">{{ note.type }}</span>
             <span class="text-xs text-base-content/50 mr-auto">{{ note.date }}</span>
           </div>
           <p class="text-sm mt-1.5 whitespace-pre-wrap break-words">{{ note.text }}</p>

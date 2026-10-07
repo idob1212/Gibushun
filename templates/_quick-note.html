@@ -1,0 +1,71 @@
+{# Quick note without leaving the page (field feedback "הערות ללא מעבר מסך").
+   Opened by the floating bubble or by any [data-qn-open] button, which may
+   preselect data-qn-candidate / data-qn-group. Saved notes go to the regular
+   notes pool; offline they are queued by offline.js like any other write.
+   Behaviour lives in static/js/app.js. #}
+{% set qn = quick_note_data() %}
+<dialog id="qn-sheet" class="app-sheet" aria-labelledby="qn-title">
+  <form id="qn-form" class="sheet-form" novalidate data-js-submit>
+    <header class="sheet-head">
+      <div class="sheet-grabber" aria-hidden="true"></div>
+      <div class="flex items-center justify-between gap-3">
+        <h2 id="qn-title" class="font-display text-xl font-extrabold flex items-center gap-2">
+          <i class="fas fa-comment-dots text-primary"></i>
+          {% if qn.fixedType %}הערת {{ qn.fixedType }}{% else %}הערה מהירה{% endif %}
+        </h2>
+        <button type="button" class="btn btn-ghost btn-circle btn-sm text-lg" data-qn-close aria-label="סגור" autofocus>✕</button>
+      </div>
+    </header>
+
+    <div class="sheet-body">
+      {% if qn.chooseGroup %}
+      <div>
+        <label class="sheet-label" for="qn-group">קבוצה</label>
+        <select id="qn-group" class="select select-bordered w-full">
+          {% for g in qn.groups %}
+            <option value="{{ g.id }}">קבוצה {{ g.id }}{% if g.name %} · {{ g.name }}{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+
+      <div id="qn-candidate-field">
+        <div class="flex items-baseline justify-between gap-2">
+          <span class="sheet-label" id="qn-candidates-label">מגובש</span>
+          <span id="qn-picked" class="text-sm font-semibold text-primary truncate" aria-live="polite"></span>
+        </div>
+        <div id="qn-candidates" class="qn-chips" role="radiogroup" aria-labelledby="qn-candidates-label"></div>
+      </div>
+
+      {% if qn.types %}
+      <div id="qn-type-field">
+        <span class="sheet-label" id="qn-types-label">סוג הערה</span>
+        <div class="qn-types" role="group" aria-labelledby="qn-types-label">
+          {% for t in qn.types %}
+            <button type="button" class="qn-type" data-type="{{ t }}" aria-pressed="false">{{ t }}</button>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <div>
+        <label class="sheet-label" for="qn-text">הערה</label>
+        <textarea id="qn-text" class="textarea textarea-bordered w-full text-base" rows="3" maxlength="4000" placeholder="מה ראית?" required></textarea>
+      </div>
+
+      <div>
+        <label class="sheet-label" for="qn-location">מיקום / תחנה <span class="font-normal opacity-60">(לא חובה)</span></label>
+        <input id="qn-location" class="input input-bordered w-full" maxlength="200" autocomplete="off">
+      </div>
+
+      <p id="qn-error" class="alert alert-error py-2 text-sm hidden" role="alert"></p>
+    </div>
+
+    <footer class="sheet-foot">
+      <button type="submit" id="qn-submit" class="btn btn-primary btn-lg w-full">
+        <i class="fas fa-paper-plane"></i> שמור הערה
+      </button>
+    </footer>
+  </form>
+  <script type="application/json" id="qn-config">{{ qn | tojson }}</script>
+</dialog>

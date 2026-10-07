@@ -47,10 +47,20 @@ The database is created automatically when the app starts. Tables are created us
 ### Core Application Structure
 
 **Single-File Architecture:**
-- `main.py` (28k+ lines) - Contains all application logic, routes, and database models
+- `main.py` (~3k lines) - Contains all application logic, routes, and database models
 - `forms.py` - All WTForms form definitions
-- `templates/` - HTML templates (Hebrew UI)
+- `templates/` - HTML templates (Hebrew UI); `header.html`/`footer.html` wrap every page
 - `static/` - CSS, JavaScript, and images
+- `static/js/offline.js` - IndexedDB outbox: queues writes offline/on timeout and replays them with their request id
+- `static/js/app.js` - UI behaviour: scroll shell, tap/busy feedback, double-submit guard, quick-note sheet
+- `static/sw.js` - Service worker (bump `VERSION` when cached assets change)
+- `static/src/input.css` → `static/css/app.css` (Tailwind v4 + DaisyUI; run `npm run build` and commit the output)
+
+**Mobile app shell (installed PWA):** the document never scrolls. `.app-shell` is
+fixed to the viewport, only `<main id="app-main">` scrolls, and the bottom dock is a
+flex row, not `position: fixed` (iOS left the dock stranded mid-screen otherwise).
+Never toggle layout on input focus/blur — a tap on "save" blurs first and a layout
+jump sends the tap elsewhere.
 
 ### Database Models
 
@@ -74,11 +84,22 @@ The database is created automatically when the app starts. Tables are created us
 - Behavioral observations and notes
 - Categorized as positive, neutral, or negative
 
+**PriorInterview Model (`prior_interviews` table):**
+- Rows of the unit's interview form (Google Forms "תגובות" export), synced by the admin
+- Matched to candidates by `name_key()` (no niqqud/quotes/dashes, final letters folded,
+  word order ignored; a middle name added/left out is a "possible" match)
+- Keeps name, time, interviewer, gibush, rating, impression only — no ID numbers,
+  no medical / ת"ש answers
+
 ### Authentication System
 
 **User Roles:**
 - **Admin** (`id=0`): Full system access, can manage all groups and candidates
 - **Group Users** (`id>0`): Can only access their assigned candidates
+- **Staff stations** (`id<0`): doctor (`-1`) and HR officer (`-2`). Log in by role +
+  password (set by the admin in `/admin-panel`), reach only `STAFF_ENDPOINTS`, and
+  write notes of type `רפואה` / `כוח אדם` on any group's candidates (shown on the
+  group's home page next to the candidate number)
 
 **Security Notes:**
 - Passwords are stored in plain text (security concern)
@@ -88,24 +109,33 @@ The database is created automatically when the app starts. Tables are created us
 ### Key Routes and Functionality
 
 **Authentication:**
-- `/login` - Group login
-- `/register` - New group registration (admin only)
+- `/login` - Group / admin / staff-station login
+- `/register` - New group registration (admin only); creates placeholder candidates 1–N ("מגובש N")
+- `/staff` - Doctor / HR station home
 
 **Candidate Management:**
-- `/add-candidate` - Add individual candidates
-- `/add-candidate-batch` - Bulk candidate addition
-- `/candidate/<id>` - View candidate details
+- `/add-candidate`, `/add-candidate-batch` - Add candidates (fills a placeholder's name if the number exists)
+- `/group-manage` - Bulk naming, photos (`/candidate-photo/...`), retire, remove unused numbers
+- `/candidate/<group>/<number>` - Candidate page: scores, notes, edit/delete saved grades
 
 **Evaluation System:**
-- `/new-review` - Create station evaluations
-- `/counter-review` - Physical activity evaluations
-- `/interview` - Interview management
-- `/physical-reviews/` - Physical performance reviews
+- `/circles` - Arrival order (circle mode); `/acts` - saved heats (move/delete)
+- `/counter-review` - March counters; `/new-review`, `/new-group-review` - station grades
+- `/notes/quick` - JSON endpoint behind the floating quick-note sheet
+- `/interview/`, `/show-interview/` - Interviews (summary lists all by default)
+- `/final-grade/`, `/final-summary/` - Final category and ranking inside each category
+
+**Interview check:**
+- `/interviews/sync` (admin, POST, .xlsx/.csv) - merge the interview form export; re-uploads update in place
+- `/interviews/clear` (admin, POST) - delete the synced list
+- Matches pop up on the admin home (every group) and the group home (own candidates),
+  once per new match per phone (localStorage); rating and impression are admin-only
 
 **Reporting:**
-- `/rankings` - Candidate rankings
 - `/download-sheet/` - Excel export functionality
 - `/reviews-finder` - Search and filter evaluations
+
+**Tests:** `tests/*.py` are plain scripts (`python tests/<file>.py` with the pinned deps).
 
 ### Evaluation Stations
 
@@ -181,7 +211,7 @@ The database is created automatically when the app starts. Tables are created us
 - Python 3.9+
 - Flask 1.1.2
 - SQLAlchemy for ORM
-- pandas for Excel exports
+- pandas for Excel exports; openpyxl (+ defusedxml) reads the interview-form upload
 - Bootstrap for UI
 - All dependencies listed in `requirements.txt`
 

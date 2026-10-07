@@ -1,4 +1,5 @@
 {% block content %}
+{% set quick_note = "fab" %}
 {% include "header.html" %}
 
 <section class="app-hero px-5 pt-6 pb-6" style="background-image:url('{{ url_for('static', filename='img/physical.jpg') }}')">
@@ -13,12 +14,13 @@
 </section>
 
 <div class="px-4 mt-4">
-  <div id="flash-messages-container"></div>
+  {% include "flash-messages.html" %}
+  <div id="flash-messages-container" aria-live="polite"></div>
 </div>
 
-<section class="px-4 mt-2">
+<section class="px-2 sm:px-4 mt-2">
   <div class="card bg-base-100 shadow-sm">
-    <div class="card-body p-4 gap-4">
+    <div class="card-body p-2.5 sm:p-4 gap-4">
       <div>
         <div class="flex items-center justify-between">
           <label for="station" class="label"><span class="label-text font-semibold">בחר תחנה</span></label>
@@ -26,7 +28,7 @@
         </div>
         <select class="select select-bordered w-full" id="station" name="station">
           {% for station in form.station.choices %}
-          <option value="{{ station }}">{{ station }}</option>
+          <option value="{{ station }}"{% if station == selected_station %} selected{% endif %}>{{ station }}</option>
           {% endfor %}
         </select>
       </div>
@@ -42,14 +44,14 @@
           </thead>
           <tbody>
             {% for candidate in form.subject.choices %}
-            {% set review = get_existing_review(candidate, form.station.choices[0]) %}
+            {% set review = existing.get(candidate) %}
             <tr>
               <td class="font-semibold w-px whitespace-nowrap">{{ candidate }}</td>
               <td class="w-px whitespace-nowrap">
-                <div class="flex items-center justify-center gap-2">
-                  <button type="button" class="btn btn-error btn-circle btn-sm minus-btn" data-candidate="{{ candidate }}">-</button>
-                  <span class="grade-value font-display text-xl font-bold w-6 text-center" id="grade-{{ candidate }}">{{ review.counter_value if review else 0 }}</span>
-                  <button type="button" class="btn btn-success btn-circle btn-sm plus-btn" data-candidate="{{ candidate }}">+</button>
+                <div class="flex items-center justify-center gap-1.5">
+                  <button type="button" class="btn btn-error btn-circle btn-sm minus-btn" data-candidate="{{ candidate }}" aria-label="הורד אחד למגובש {{ candidate }}">-</button>
+                  <span class="grade-value font-display text-xl font-bold w-6 text-center" id="grade-{{ candidate }}" aria-live="polite">{{ (review.counter_value or 0) if review else 0 }}</span>
+                  <button type="button" class="btn btn-success btn-circle btn-sm plus-btn" data-candidate="{{ candidate }}" aria-label="הוסף אחד למגובש {{ candidate }}">+</button>
                 </div>
               </td>
               <td class="w-full">
@@ -61,7 +63,7 @@
         </table>
       </div>
 
-      <button id="submitAll" class="btn btn-primary btn-lg w-full">סיים מסע</button>
+      <button id="submitAll" type="button" class="btn btn-primary btn-lg w-full">סיים מסע</button>
     </div>
   </div>
 </section>
@@ -70,6 +72,29 @@
 document.addEventListener('DOMContentLoaded', function() {
     const stationSelect = document.getElementById('station');
     var currentStation = stationSelect.value;
+    // The quick-note bubble fills in the march being run.
+    window.quickNoteLocation = function () { return stationSelect.value; };
+    const submitAll = document.getElementById('submitAll');
+
+    function showMessage(kind, message) {
+        const flashContainer = document.getElementById('flash-messages-container');
+        flashContainer.innerHTML = '';
+        const box = document.createElement('div');
+        box.className = 'alert alert-' + kind + ' shadow-sm';
+        box.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+        box.innerHTML = '<i class="fas ' + (kind === 'success' ? 'fa-check-circle' : 'fa-exclamation-triangle') + '"></i><span class="font-medium"></span>' +
+            '<button type="button" class="btn btn-ghost btn-xs btn-circle" aria-label="סגור">✕</button>';
+        box.querySelector('span').textContent = message;
+        box.querySelector('button').addEventListener('click', function () { box.remove(); });
+        flashContainer.appendChild(box);
+        if (kind === 'success') {
+            setTimeout(() => {
+                box.style.transition = 'opacity .4s';
+                box.style.opacity = '0';
+                setTimeout(() => box.remove(), 400);
+            }, 3000);
+        }
+    }
     // Per-station in-page cache: station -> { candidateId: {counter, note} }.
     // Keeps this session's entries when switching stations offline.
     var stationData = {};
@@ -82,7 +107,7 @@ document.addEventListener('DOMContentLoaded', function() {
         };
     }
 
-    function updateAllReviews(showMessage = false) {
+    function updateAllReviews(explicit = false) {
         const data = {
             station: currentStation,
             reviews: []
@@ -101,39 +126,27 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
 
+        if (explicit && window.AppUI) AppUI.markButton(submitAll, true);
         // Submit all reviews for normalization and saving
-        fetch('/update-counter-reviews', {
+        return fetch('/update-counter-reviews', {
             method: 'POST',
+            credentials: 'same-origin',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify(data)
         })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success && showMessage) {
-                // Show success message only when explicitly requested
-                const flashContainer = document.getElementById('flash-messages-container');
-                flashContainer.innerHTML = `
-                    <div class="alert alert-success shadow-sm" role="alert">
-                        <i class="fas fa-check-circle"></i>
-                        <span class="font-medium">${data.message}</span>
-                        <button type="button" class="btn btn-ghost btn-xs btn-circle" aria-label="סגור" onclick="this.parentElement.remove()">✕</button>
-                    </div>
-                `;
-
-                // Auto-hide success message after 3 seconds
-                setTimeout(() => {
-                    const alert = flashContainer.querySelector('.alert');
-                    if (alert) {
-                        alert.style.transition = 'opacity .4s';
-                        alert.style.opacity = '0';
-                        setTimeout(() => alert.remove(), 400);
-                    }
-                }, 3000);
-            }
+        .then(response => response.json().then(body => ({ ok: response.ok, body: body })))
+        .then(r => {
+            if (!r.ok || !r.body.success) throw new Error(r.body.message || '');
+            // Show the confirmation only when "סיים מסע" was tapped
+            if (explicit) showMessage('success', r.body.message);
         })
-        .catch(error => console.error('Error:', error));
+        .catch(error => {
+            console.error('Error:', error);
+            showMessage('error', 'השמירה נכשלה — הנתונים נשארו במסך, נסו שוב "סיים מסע"');
+        })
+        .then(() => { if (explicit && window.AppUI) AppUI.markButton(submitAll, false); });
     }
 
     // ponytail: 400ms trailing debounce on +/- POSTs — every tap used to fire one,
@@ -184,7 +197,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Handle submit all button (finish march)
-    document.getElementById('submitAll').addEventListener('click', function() {
+    submitAll.addEventListener('click', function() {
         clearTimeout(debounceTimer);
         debounceTimer = null;
         updateAllReviews(true);  // Show success message when explicitly finishing march
@@ -192,7 +205,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Function to load station reviews
     function loadStationReviews(station) {
-        fetch(`/get-station-reviews/${station}`)
+        fetch(`/get-station-reviews/${encodeURIComponent(station)}`)
             .then(response => response.json())
             .then(data => {
                 if (station !== currentStation) return; // stale response, user switched again

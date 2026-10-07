@@ -1,24 +1,40 @@
+    </div><!-- /app-page -->
     </main>
 
     {# `set` inside an include doesn't escape its scope, so header.html's
        is_admin never reaches this file — recompute it here. #}
     {% set is_admin = current_user.is_authenticated and current_user.id == 0 %}
+    {% set is_staff = current_user.is_authenticated and current_user.id < 0 %}
+    {% macro dock_item(endpoints, href, icon, label) -%}
+      {%- set on = request.endpoint in endpoints -%}
+      <a href="{{ href }}" class="{{ 'dock-active' if on else '' }}"{% if on %} aria-current="page"{% endif %}><i class="fas {{ icon }}"></i><span class="dock-label">{{ label }}</span></a>
+    {%- endmacro %}
 
     {% if current_user.is_authenticated %}
-    <!-- Bottom navigation (mobile) -->
-    <div class="dock bg-base-100 border-t border-base-300 md:hidden app-dock">
-      {% if is_admin %}
-        <a href="{{ url_for('admin_home') }}"><i class="fas fa-home"></i><span class="dock-label">בית</span></a>
-        <a href="{{ url_for('showCandidateAdmin') }}"><i class="fas fa-user"></i><span class="dock-label">מגובש</span></a>
-        <a href="{{ url_for('showStationReviewsAdmin') }}"><i class="fas fa-list-ol"></i><span class="dock-label">דירוג</span></a>
-        <a href="{{ url_for('manageGroups') }}"><i class="fas fa-users"></i><span class="dock-label">קבוצות</span></a>
-      {% else %}
-        <a href="{{ url_for('home') }}"><i class="fas fa-home"></i><span class="dock-label">בית</span></a>
-        <a href="{{ url_for('circles') }}"><i class="fas fa-edit"></i><span class="dock-label">ציונים</span></a>
-        <a href="{{ url_for('showCandidate') }}"><i class="fas fa-users"></i><span class="dock-label">הקבוצה</span></a>
-        <a href="{{ url_for('showStationReviews') }}"><i class="fas fa-list-ol"></i><span class="dock-label">דירוג</span></a>
+    <div class="app-bottom">
+      {% if quick_note == 'fab' %}
+      <button type="button" class="app-fab" data-qn-open{% if quick_note_group %} data-qn-group="{{ quick_note_group }}"{% endif %} aria-label="הערה מהירה" title="הערה מהירה">
+        <i class="fas fa-comment-dots fab-idle" aria-hidden="true"></i>
+        <i class="fas fa-check fab-done" aria-hidden="true"></i>
+      </button>
       {% endif %}
-      <label for="nav-drawer"><i class="fas fa-bars"></i><span class="dock-label">עוד</span></label>
+      <!-- Bottom navigation (mobile) -->
+      <nav class="dock bg-base-100 border-t border-base-300 md:hidden app-dock" aria-label="ניווט ראשי">
+        {% if is_admin %}
+          {{ dock_item(['admin_home', 'homeAdmin'], url_for('admin_home'), 'fa-home', 'בית') }}
+          {{ dock_item(['showCandidateAdmin'], url_for('showCandidateAdmin'), 'fa-user', 'מגובש') }}
+          {{ dock_item(['showInterviewAdmin'], url_for('showInterviewAdmin'), 'fa-comments', 'ראיונות') }}
+          {{ dock_item(['manageGroups'], url_for('manageGroups'), 'fa-users', 'קבוצות') }}
+        {% elif is_staff %}
+          {{ dock_item(['staff_home'], url_for('staff_home'), 'fa-home', 'בית') }}
+        {% else %}
+          {{ dock_item(['home', 'candidate_profile'], url_for('home'), 'fa-home', 'בית') }}
+          {{ dock_item(['circles', 'counter_review', 'add_new_review', 'add_new_group_review', 'acts_page'], url_for('circles'), 'fa-edit', 'ציונים') }}
+          {{ dock_item(['show_notes', 'add_new_note', 'edit_note'], url_for('show_notes'), 'fa-comment', 'הערות') }}
+          {{ dock_item(['Interview', 'showInterview', 'edit_interview'], url_for('Interview'), 'fa-comment-dots', 'ראיון') }}
+        {% endif %}
+        <label for="nav-drawer" role="button" tabindex="0"><i class="fas fa-bars"></i><span class="dock-label">עוד</span></label>
+      </nav>
     </div>
     {% endif %}
 
@@ -28,30 +44,32 @@
   <div class="drawer-side z-40">
     <label for="nav-drawer" class="drawer-overlay" aria-label="סגור תפריט"></label>
     <div class="bg-base-100 min-h-full w-72 flex flex-col">
-    <div class="flex justify-center py-5 border-b border-base-200">
+    <div class="flex justify-center py-5 border-b border-base-200" style="padding-top:max(1.25rem, env(safe-area-inset-top))">
       <img src="{{ url_for('static', filename='img/logo-meymadion.png') }}" style="height:32px;width:auto" alt="מימדיון" />
     </div>
-    <ul class="menu p-4 gap-1 text-base">
+    <ul class="menu p-4 gap-1 text-base w-full">
       {% if is_admin %}
         <li><a href="{{ url_for('admin_home') }}"><i class="fas fa-home w-5"></i>בית</a></li>
         <li><a href="{{ url_for('register') }}"><i class="fas fa-user-plus w-5"></i>הוסף מגבש</a></li>
         <li><a href="{{ url_for('showCandidateAdmin') }}"><i class="fas fa-user w-5"></i>צפייה במגובש</a></li>
         <li><a href="{{ url_for('showNotesAdmin') }}"><i class="fas fa-comment w-5"></i>הערות</a></li>
-        <li><a href="{{ url_for('showStationReviewsAdmin') }}"><i class="fas fa-list-ol w-5"></i>דירוג לפי תחנה</a></li>
-        <li><a href="{{ url_for('manageGroups') }}"><i class="fas fa-users w-5"></i>ניהול קבוצות</a></li>
         <li><a href="{{ url_for('showInterviewAdmin') }}"><i class="fas fa-comments w-5"></i>ראיונות</a></li>
+        <li><a href="{{ url_for('final_summary') }}"><i class="fas fa-medal w-5"></i>סיכום ציונים סופיים</a></li>
+        <li><a href="{{ url_for('manageGroups') }}"><i class="fas fa-users w-5"></i>ניהול קבוצות ועמדות</a></li>
+      {% elif is_staff %}
+        <li><a href="{{ url_for('staff_home') }}"><i class="fas fa-home w-5"></i>בית</a></li>
       {% else %}
         <li><a href="{{ url_for('home') }}"><i class="fas fa-home w-5"></i>בית</a></li>
         <li><a href="{{ url_for('circles') }}"><i class="fas fa-edit w-5"></i>הזן ציונים</a></li>
-        <li><a href="{{ url_for('add_new_note') }}"><i class="fas fa-comment w-5"></i>הערות</a></li>
-        <li><a href="{{ url_for('addCandidate') }}"><i class="fas fa-user-plus w-5"></i>הוסף מגובש</a></li>
-        <li><a href="{{ url_for('showCandidate') }}"><i class="fas fa-users w-5"></i>הקבוצה שלי</a></li>
-        <li><a href="{{ url_for('showStationReviews') }}"><i class="fas fa-list-ol w-5"></i>דירוג לפי תחנה</a></li>
-        <li><a href="{{ url_for('manageCandidates') }}"><i class="fas fa-sliders-h w-5"></i>ניהול קבוצה</a></li>
-        <li><a href="{{ url_for('AddStatus') }}"><i class="fas fa-clipboard-check w-5"></i>הזן חוות דעת</a></li>
+        <li><a href="{{ url_for('acts_page') }}"><i class="fas fa-history w-5"></i>אקטים שנשמרו</a></li>
+        <li><a href="{{ url_for('show_notes') }}"><i class="fas fa-comment w-5"></i>הערות</a></li>
         <li><a href="{{ url_for('Interview') }}"><i class="fas fa-comment-dots w-5"></i>הזן ראיון</a></li>
-        <li><a href="{{ url_for('final_weighted_grade') }}"><i class="fas fa-medal w-5"></i>הזן ציון סופי משוקלל</a></li>
         <li><a href="{{ url_for('showInterview') }}"><i class="fas fa-comments w-5"></i>סיכומי ראיונות</a></li>
+        <li><a href="{{ url_for('AddStatus') }}"><i class="fas fa-clipboard-check w-5"></i>הזן חוות דעת</a></li>
+        <li><a href="{{ url_for('final_weighted_grade') }}"><i class="fas fa-medal w-5"></i>הזן ציון סופי</a></li>
+        <li><a href="{{ url_for('final_summary') }}"><i class="fas fa-sort-amount-down w-5"></i>סיכום ציונים סופיים</a></li>
+        <li><a href="{{ url_for('manageCandidates') }}"><i class="fas fa-sliders-h w-5"></i>ניהול קבוצה</a></li>
+        <li><a href="{{ url_for('addCandidate') }}"><i class="fas fa-user-plus w-5"></i>הוסף מגובש</a></li>
         <li><a href="{{ url_for('addName') }}"><i class="fas fa-cog w-5"></i>ערוך פרטים</a></li>
       {% endif %}
       <li class="mt-2 border-t border-base-200 pt-2"><a href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt w-5"></i>התנתק</a></li>
@@ -61,6 +79,10 @@
   {% endif %}
 
 </div><!-- /drawer -->
+
+{% if current_user.is_authenticated and quick_note %}
+  {% include "_quick-note.html" %}
+{% endif %}
 
 <script>
   (function () {
@@ -81,7 +103,13 @@
   })();
 </script>
 
+{# Group users: pages the service worker keeps warm for offline use. #}
+{% if current_user.is_authenticated and current_user.id > 0 %}
+<script type="application/json" id="warm-pages">{{ ['/', '/circles', '/counter-review', '/new-review', '/new-group-review', '/acts', '/interview/', '/show-interview/', '/new-note', '/show-notes', '/group-manage', '/final-status/', '/final-grade/', '/final-summary/'] | tojson }}</script>
+{% endif %}
+
 <script src="{{ url_for('static', filename='js/offline.js') }}"></script>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
 
 </body>
 

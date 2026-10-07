@@ -1,12 +1,9 @@
 {% block content %}
+{% set quick_note = "fab" %}
 {% include "header.html" %}
 
 <section class="app-hero px-5 pt-6 pb-6" style="background-image:url('{{ url_for('static', filename='img/physical.jpg') }}')">
-  {% if is_edit %}
-  <h1 class="text-2xl font-extrabold leading-tight">ערוך חוות דעת</h1>
-  {% else %}
   <h1 class="text-2xl font-extrabold leading-tight">הזן ציון</h1>
-  {% endif %}
   <p class="text-white/75 text-sm mt-1">סדרי הגעה — תחנה פיזית</p>
 </section>
 
@@ -18,7 +15,7 @@
 
 <div class="px-4 mt-4">
   {% include "flash-messages.html" %}
-  <div id="flash-messages-target"></div>
+  <div id="flash-messages-target" aria-live="polite"></div>
 </div>
 
 <section class="px-4 mt-4">
@@ -33,357 +30,256 @@
           {% for station in MODE_STATIONS["circles"] %}
           <option value="{{ station }}">{{ station }}</option>
           {% endfor %}
+          {% for station in physical_stations %}
+          <option value="{{ station }}">{{ station }}</option>
+          {% endfor %}
           <option value="אחר">אחר</option>
         </select>
-        <div id="additionalField" style="display: none" class="mt-3">
+        <div id="additionalField" hidden class="mt-3">
           <label for="additionalFieldText" class="label"><span class="label-text font-semibold">הזן שם תחנה</span></label>
-          <input class="input input-bordered w-full" type="text" id="additionalFieldText">
+          <input class="input input-bordered w-full" type="text" id="additionalFieldText" maxlength="100" autocomplete="off">
         </div>
       </div>
 
-      <div id="row1" class="text-right"></div>
-      <h2 id="redHeader" class="font-display text-lg font-bold" style="margin-top: 40px; display: none; text-align: right;">סיימו</h2>
-      <div id="row2" class="text-right"></div>
+      <p class="text-sm text-base-content/60 -mb-2">הקישו על המספרים לפי סדר ההגעה. הקשה נוספת מחזירה מספר למקומו.</p>
+      <div id="row1" class="text-right" aria-label="ממתינים"></div>
+      <h2 id="redHeader" class="font-display text-lg font-bold mt-4" hidden>סיימו</h2>
+      <div id="row2" class="text-right" aria-label="סדר ההגעה"></div>
 
-      <button id="finishActButton" class="btn btn-accent btn-lg w-full" style="display: none;">סיום אקט</button>
+      <button id="finishActButton" type="button" class="btn btn-accent btn-lg w-full" hidden>
+        <i class="fas fa-flag-checkered"></i> <span id="finishLabel">סיום אקט</span>
+      </button>
 
       <label class="label cursor-pointer justify-start gap-3">
         <input class="checkbox" type="checkbox" id="reverseMode">
         <span class="label-text">מצב הפוך</span>
       </label>
+
+      <a href="{{ url_for('acts_page') }}" class="btn btn-ghost btn-sm self-start"><i class="fas fa-history"></i> אקטים שנשמרו — עריכה ומחיקה</a>
     </div>
   </div>
 </section>
 
 <script>
-  const movementTypeSelect = document.getElementById('movementType');
-  const additionalField = document.getElementById('additionalField');
-  const additionalFieldText = document.getElementById('additionalFieldText');
-  const row1 = document.getElementById('row1');
-  const redHeader = document.getElementById('redHeader');
-  // const finishButton = document.getElementById('finishButton');
-  const finishActButton = document.getElementById('finishActButton');
+(function () {
+  var NUMBERS = {{ circles | map(attribute='id') | list | tojson }};
+  var select = document.getElementById('movementType');
+  var otherBox = document.getElementById('additionalField');
+  var otherText = document.getElementById('additionalFieldText');
+  var row1 = document.getElementById('row1');
+  var row2 = document.getElementById('row2');
+  var finishedHeader = document.getElementById('redHeader');
+  var finishBtn = document.getElementById('finishActButton');
+  var finishLabel = document.getElementById('finishLabel');
+  var reverse = document.getElementById('reverseMode');
+  var flashTarget = document.getElementById('flash-messages-target');
 
-  let circles = [];
-  let finishedCircles = [];
+  var finished = [];  // candidate numbers in arrival order
+  var circleOf = {};
+  var sending = false;
 
-  // Generate circles
-  for (let i = 1; i <= {{ circles|length }}; i++) {
-    const circle = document.createElement('div');
-    circle.classList.add('circle');
-    circle.textContent = {{ circles|tojson }}[i - 1].id;
-    circle.addEventListener('click', toggleCircle);
-    row1.appendChild(circle);
-    circles.push(circle);
-  }
+  NUMBERS.forEach(function (n) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'circle';
+    b.textContent = n;
+    b.dataset.number = n;
+    b.setAttribute('aria-pressed', 'false');
+    b.setAttribute('aria-label', 'מגובש ' + n);
+    row1.appendChild(b);
+    circleOf[n] = b;
+  });
 
-  function toggleCircle() {
-    const circleId = parseInt(this.textContent);
-    if (this.classList.contains('finished')) {
-      this.classList.remove('finished');
-      finishedCircles = finishedCircles.filter(id => id !== circleId);
-      row1.appendChild(this);
-      this.style.backgroundColor = 'blue';
-    } else {
-      this.classList.add('finished');
-      finishedCircles.push(circleId);
-      document.getElementById('row2').appendChild(this);
+  // The waiting row always stays in number order — however the numbers were
+  // tapped or untapped (field feedback: the list got scrambled).
+  function placeWaiting(el) {
+    var n = +el.dataset.number;
+    var next = null;
+    for (var i = 0; i < row1.children.length; i++) {
+      if (+row1.children[i].dataset.number > n) { next = row1.children[i]; break; }
     }
-    updateCircleColors();
-    updateFinishButtonVisibility();
+    row1.insertBefore(el, next);
   }
 
-  function updateCircleColors() {
-    const greenCircles = document.querySelectorAll('.circle.finished');
-    const reverseMode = document.getElementById('reverseMode').checked;
+  function paint() {
+    var els = row2.children;
+    for (var i = 0; i < els.length; i++) {
+      var idx = reverse.checked ? (els.length - 1 - i) : i;
+      var shade = Math.max(60, 255 - idx * 25);
+      els[i].style.backgroundColor = 'rgb(0,' + shade + ',0)';
+    }
+  }
 
-    greenCircles.forEach((circle, index) => {
-      // If reverse mode is on, invert the index to reverse the color gradient
-      const effectiveIndex = reverseMode ? (greenCircles.length - 1 - index) : index;
-      const shade = 255 - (effectiveIndex * 25);
-      const color = `rgb(0, ${shade}, 0)`;
-      circle.style.backgroundColor = color;
+  function refresh() {
+    var any = finished.length > 0;
+    finishedHeader.hidden = !any;
+    finishBtn.hidden = !any;
+    finishLabel.textContent = any ? 'סיום אקט (' + finished.length + ' סיימו)' : 'סיום אקט';
+    paint();
+  }
+
+  function setFinished(el, on) {
+    el.classList.toggle('finished', on);
+    el.setAttribute('aria-pressed', on ? 'true' : 'false');
+    if (!on) el.style.backgroundColor = '';
+  }
+
+  function toggle(el) {
+    if (sending) return;
+    var n = +el.dataset.number;
+    var at = finished.indexOf(n);
+    if (at === -1) {
+      finished.push(n);
+      setFinished(el, true);
+      row2.appendChild(el);
+    } else {
+      finished.splice(at, 1);
+      setFinished(el, false);
+      placeWaiting(el);
+    }
+    refresh();
+  }
+
+  [row1, row2].forEach(function (row) {
+    row.addEventListener('click', function (e) {
+      var el = e.target.closest('.circle');
+      if (el) toggle(el);
     });
+  });
+
+  function resetAll() {
+    finished = [];
+    NUMBERS.forEach(function (n) { setFinished(circleOf[n], false); row1.appendChild(circleOf[n]); });
+    refresh();
   }
 
-  function updateFinishButtonVisibility() {
-    if (finishedCircles.length > 0) {
-      redHeader.style.display = 'block';
-      // finishButton.style.display = 'block';
-      finishActButton.style.display = 'block';
-    } else {
-      redHeader.style.display = 'none';
-      // finishButton.style.display = 'none';
-      finishActButton.style.display = 'none';
-    }
+  function restore(order) {
+    resetAll();
+    order.forEach(function (n) {
+      if (!circleOf[n]) return;
+      finished.push(n);
+      setFinished(circleOf[n], true);
+      row2.appendChild(circleOf[n]);
+    });
+    refresh();
   }
 
-  movementTypeSelect.addEventListener('change', () => {
-    if (movementTypeSelect.value === 'ODT' || movementTypeSelect.value === 'אחר') {
-      additionalField.style.display = 'block';
-    } else {
-      additionalField.style.display = 'none';
+  function flash(kind, message, link) {
+    var box = document.createElement('div');
+    box.className = 'alert alert-' + kind + ' shadow-sm mb-2';
+    box.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+    var icon = document.createElement('i');
+    icon.className = 'fas ' + (kind === 'success' ? 'fa-check-circle' : 'fa-exclamation-triangle');
+    var text = document.createElement('span');
+    text.className = 'font-medium';
+    text.textContent = message;
+    box.appendChild(icon);
+    box.appendChild(text);
+    if (link) {
+      var a = document.createElement('a');
+      a.href = link.href;
+      a.className = 'btn btn-xs btn-ghost underline';
+      a.textContent = link.label;
+      box.appendChild(a);
     }
+    var close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'btn btn-ghost btn-xs btn-circle';
+    close.setAttribute('aria-label', 'סגור');
+    close.textContent = '✕';
+    close.addEventListener('click', function () { box.remove(); });
+    box.appendChild(close);
+    flashTarget.innerHTML = '';
+    flashTarget.appendChild(box);
+    if (kind === 'success') setTimeout(function () { box.remove(); }, 8000);
+  }
+
+  function stationName() {
+    return select.value === 'אחר' ? otherText.value.trim() : select.value;
+  }
+  // The quick-note bubble fills in the station being run.
+  window.quickNoteLocation = stationName;
+
+  function addStation(name) {
+    var exists = Array.prototype.some.call(select.options, function (o) { return o.value === name; });
+    if (!exists) {
+      var opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      select.insertBefore(opt, select.querySelector('option[value="אחר"]'));
+    }
+    select.value = name;
+    otherBox.hidden = true;
+    otherText.value = '';
+  }
+
+  finishBtn.addEventListener('click', function () {
+    if (sending || !finished.length) return;
+    var station = select.value;
+    var custom = otherText.value.trim();
+    if (station === 'אחר' && !custom) {
+      flash('error', 'יש להזין שם תחנה לפני סיום האקט');
+      otherText.focus();
+      return;
+    }
+    var order = finished.slice();
+    sending = true;
+    window.AppUI && AppUI.markButton(finishBtn, true);
+    fetch('/circles/finished-act', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ finished: order, movement_type: station, other: custom, reverse_mode: reverse.checked })
+    }).then(function (res) {
+      return res.json().then(function (data) { return { ok: res.ok, data: data }; });
+    }).then(function (r) {
+      if (!r.ok || !r.data.success) throw new Error(r.data.message || '');
+      if (station === 'אחר' && custom) addStation(custom);
+      resetAll();
+      flash('success', r.data.message, r.data.queued ? null : { href: '{{ url_for("acts_page") }}', label: 'עריכה / מחיקה' });
+    }).catch(function (err) {
+      // Nothing is lost: the arrival order stays on screen to resend.
+      var msg = err && err.message && !/JSON|fetch|network/i.test(err.message) ? err.message : '';
+      flash('error', (msg || 'השמירה נכשלה') + ' — הסדר נשאר במסך, נסו שוב');
+    }).then(function () {
+      sending = false;
+      window.AppUI && AppUI.markButton(finishBtn, false);
+    });
+  });
+
+  select.addEventListener('change', function () {
+    otherBox.hidden = select.value !== 'אחר';
     // מתלה שזיפים is scored in reverse finishing order — default the reverse
     // toggle on when it's picked (the מגבש can still turn it off).
-    if (movementTypeSelect.value === 'מתלה שזיפים') {
-      const rev = document.getElementById('reverseMode');
-      if (rev && !rev.checked) { rev.checked = true; updateCircleColors(); }
-    }
+    if (select.value === 'מתלה שזיפים' && !reverse.checked) { reverse.checked = true; paint(); }
   });
-
-  // Update colors when reverse mode is toggled
-  document.getElementById('reverseMode').addEventListener('change', updateCircleColors);
-
-  // finishButton.addEventListener('click', sendCircleNumbers);
-  finishActButton.addEventListener('click', sendCircleNumbersAct);
-
-  function addNewStationToDropdown(stationName) {
-    // Check if station already exists in dropdown
-    const existingOptions = Array.from(movementTypeSelect.options);
-    const stationExists = existingOptions.some(option => option.value === stationName);
-
-    if (!stationExists && stationName && stationName.trim() !== '') {
-      // Find the "אחר" option
-      const otherOption = Array.from(movementTypeSelect.options).find(option => option.value === 'אחר');
-
-      if (otherOption) {
-        // Create new option element
-        const newOption = document.createElement('option');
-        newOption.value = stationName;
-        newOption.textContent = stationName;
-
-        // Insert before the "אחר" option
-        movementTypeSelect.insertBefore(newOption, otherOption);
-
-        // Select the newly added station and hide the additional field
-        movementTypeSelect.value = stationName;
-        additionalField.style.display = 'none';
-        additionalFieldText.value = '';
-      }
-    }
-  }
-
-  function sendCircleNumbers() {
-    const movementType = movementTypeSelect.value;
-    const other = additionalFieldText.value;
-    const remainingCircles = circles.filter(circle => !circle.classList.contains('finished'));
-    const data = {
-      circle_numbers: [...finishedCircles, 0, ...remainingCircles.map(circle => parseInt(circle.textContent))],
-      movement_type: movementType,
-      other: other
-    };
-
-    // Reset circles without waiting for response
-    resetCircles();
-
-    // Example of posting data, you'll need to handle the response accordingly
-    fetch('/circles/finished', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(data)
-    })
-    .then(response => response.json())
-    .then(data => {
-      if (data.success) {
-        // If this was a new custom station, add it to the dropdown
-        if (movementType === 'אחר' && other) {
-          addNewStationToDropdown(other);
-        }
-
-        // Show success message
-        const flashContainer = document.querySelector('.flash-messages-container') || document.createElement('div');
-        flashContainer.className = 'flash-messages-container';
-        flashContainer.innerHTML = `
-          <div class="alert alert-success shadow-sm" role="alert">
-            <i class="fas fa-check-circle"></i>
-            <span class="font-medium">${data.message}</span>
-            <button type="button" class="btn btn-ghost btn-xs btn-circle" aria-label="סגור" onclick="this.parentElement.remove()">✕</button>
-          </div>
-        `;
-
-        // Insert flash message at the correct location (same as regular flash messages)
-        const targetElement = document.querySelector('#flash-messages-target');
-        if (targetElement) {
-          targetElement.innerHTML = '';
-          targetElement.appendChild(flashContainer);
-        }
-
-        // Auto-hide success message after 5 seconds
-        setTimeout(() => {
-          const alert = flashContainer.querySelector('.alert');
-          if (alert) {
-            alert.remove();
-          }
-        }, 5000);
-      }
-    })
-    .catch(error => console.error('Error:', error));
-  }
-
-  function sendCircleNumbersAct() {
-    const movementType = movementTypeSelect.value;
-    const other = additionalFieldText.value;
-    const remainingCircles = circles.filter(circle => !circle.classList.contains('finished'));
-    const reverseMode = document.getElementById('reverseMode').checked;
-    const data = {
-      circle_numbers: [...finishedCircles, 0, ...remainingCircles.map(circle => parseInt(circle.textContent))],
-      movement_type: movementType,
-      other: other,
-      reverse_mode: reverseMode
-    };
-
-    // Reset circles without waiting for response
-    resetCircles();
-
-    // Example of posting data, you'll need to handle the response accordingly
-    fetch('/circles/finished-act', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(data)
-    })
-    .then(response => response.json())
-    .then(data => {
-      if (data.success) {
-        // If this was a new custom station, add it to the dropdown
-        if (movementType === 'אחר' && other) {
-          addNewStationToDropdown(other);
-        }
-
-        // Show success message
-        const flashContainer = document.querySelector('.flash-messages-container') || document.createElement('div');
-        flashContainer.className = 'flash-messages-container';
-        flashContainer.innerHTML = `
-          <div class="alert alert-success shadow-sm" role="alert">
-            <i class="fas fa-check-circle"></i>
-            <span class="font-medium">${data.message}</span>
-            <button type="button" class="btn btn-ghost btn-xs btn-circle" aria-label="סגור" onclick="this.parentElement.remove()">✕</button>
-          </div>
-        `;
-
-        // Insert flash message at the correct location (same as regular flash messages)
-        const targetElement = document.querySelector('#flash-messages-target');
-        if (targetElement) {
-          targetElement.innerHTML = '';
-          targetElement.appendChild(flashContainer);
-        }
-
-        // Auto-hide success message after 5 seconds
-        setTimeout(() => {
-          const alert = flashContainer.querySelector('.alert');
-          if (alert) {
-            alert.remove();
-          }
-        }, 5000);
-      }
-    })
-    .catch(error => console.error('Error:', error));
-  }
-
-  function resetCircles() {
-    // Remove finished circles from the DOM
-    const finishedCirclesElements = document.querySelectorAll('.circle.finished');
-    finishedCirclesElements.forEach(circle => circle.remove());
-    // Reset finishedCircles array
-    finishedCircles = [];
-    // Reset circle colors
-    circles.forEach(circle => {
-      circle.classList.remove('finished');
-      circle.style.backgroundColor = 'blue';
-    });
-    // Move circles back to row1
-    circles.forEach(circle => row1.appendChild(circle));
-    // Hide finish buttons
-    redHeader.style.display = 'none';
-    // finishButton.style.display = 'none';
-    finishActButton.style.display = 'none';
-  }
-
-  window.addEventListener('load', () => {
-    const storedValue = sessionStorage.getItem('selectedMovementType');
-    if (storedValue) {
-      movementTypeSelect.value = storedValue;
-      additionalFieldText.value = sessionStorage.getItem('selectedOther');
-
-      if (movementTypeSelect.value === 'אחר') {
-        additionalField.style.display = 'none';
-        const val = sessionStorage.getItem('selectedOther');
-        const option = document.createElement("option");
-        option.value = val;
-        option.text = val;
-        movementTypeSelect.appendChild(option);
-        movementTypeSelect.value = sessionStorage.getItem('selectedOther');
-      }
-    }
-  });
-
-  function finishCircles() {
-    const movementType = document.getElementById('movementType').value;
-    const otherInput = document.getElementById('otherInput');
-    const reverseMode = document.getElementById('reverseMode').checked;
-
-    const data = {
-      circle_numbers: finishedCircles,
-      movement_type: movementType,
-      other: otherInput ? otherInput.value : '',
-      reverse_mode: reverseMode
-    };
-
-    fetch('/circles/finished', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data)
-    }).then(response => {
-      window.location.href = '/circles/reset';
-    });
-  }
-
-  function finishActCircles() {
-    const movementType = document.getElementById('movementType').value;
-    const otherInput = document.getElementById('otherInput');
-    const reverseMode = document.getElementById('reverseMode').checked;
-
-    const data = {
-      circle_numbers: finishedCircles,
-      movement_type: movementType,
-      other: otherInput ? otherInput.value : '',
-      reverse_mode: reverseMode
-    };
-
-    fetch('/circles/finished-act', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data)
-    }).then(response => {
-      window.location.href = '/circles/reset';
-    });
-  }
+  reverse.addEventListener('change', paint);
+  refresh();
+})();
 </script>
 <style>
   .circle {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 44px;
-    height: 44px;
+    width: 48px;
+    height: 48px;
+    border: 0;
     border-radius: 9999px;
     background-color: blue;
     color: white;
     font-weight: 700;
+    font-size: 1rem;
     margin: 5px;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: transform 0.12s ease, background-color 0.2s ease;
     box-shadow: 0px 3px 6px rgba(0, 0, 0, 0.16);
+    -webkit-user-select: none;
+    user-select: none;
   }
-
+  .circle:active {
+    transform: scale(.88);
+  }
   .circle.finished {
     background-color: green;
   }

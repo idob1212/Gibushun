@@ -2,51 +2,90 @@
 {% include "header.html" %}
 
 <section class="app-hero px-5 pt-6 pb-6" style="background-image:url('{{ url_for('static', filename='img/admin-panel.jpg') }}')">
-  <h1 class="text-2xl font-extrabold leading-tight">פאנל ניהול</h1>
-  <p class="text-white/75 text-sm mt-1">ניהול מגובשים בקבוצה</p>
+  <h1 class="text-2xl font-extrabold leading-tight">ניהול קבוצה</h1>
+  <p class="text-white/75 text-sm mt-1">שמות, תמונות ופרישות</p>
 </section>
 
 <div class="px-4 mt-4">
   {% include "flash-messages.html" %}
+  <div id="panel-messages" aria-live="polite"></div>
 </div>
 
-<section class="px-4 mt-4">
-  <h2 class="font-display text-lg font-bold mb-3">מגובשים</h2>
-  <div class="grid gap-2.5">
-    {% for candidate in candidates %}
-      <div class="card bg-base-100 shadow-sm">
-        <div class="card-body p-3">
-          <div class="flex items-center gap-3">
-            {% if candidate.status != "פרש" %}
-              <div class="bib">{{ candidate.id.split("/")[1] }}</div>
-            {% else %}
-              <div class="bib ring-2 ring-error">{{ candidate.id.split("/")[1] }}</div>
-            {% endif %}
-            <div class="flex-1 min-w-0 font-semibold truncate">{{ candidate.name }}</div>
-            <a href="{{ url_for('edit_candidate', candidate_id=candidate.id.replace('/', '-')) }}" class="btn btn-ghost btn-sm">
-              <i class="fas fa-pen"></i> עריכה
-            </a>
-          </div>
-          <div class="flex flex-wrap gap-2 mt-3 pt-3 border-t border-base-200">
-            {% if candidate.status != "פרש" %}
-              <form method="POST" class="inline" action="{{ url_for('delete_candidate', candidate_id=candidate.id.split('/')[1]) }}">
-                <button type="submit" class="btn btn-sm btn-outline btn-warning" onclick="return confirm('האם אתה בטוח שברצונך לסמן מועמד זה כפורש?')">פרש</button>
-              </form>
-              <form method="POST" class="inline" action="{{ url_for('delete_candidate', candidate_id=candidate.id.split('/')[1], reason='medical') }}">
-                <button type="submit" class="btn btn-sm btn-outline btn-error" onclick="return confirm('האם אתה בטוח שברצונך לסמן מועמד זה כפורש בעקבות החלטת רופא?')">הופרש על ידי הרופא</button>
-              </form>
-            {% else %}
-              <form method="POST" class="inline" action="{{ url_for('return_candidate', candidate_id=candidate.id.split('**')[0].split('/')[1]) }}">
-                <button type="submit" class="btn btn-sm btn-outline btn-success">הפוך לפעיל</button>
-              </form>
-            {% endif %}
+<section class="px-4 mt-2">
+  {% if placeholders %}
+    <div class="alert alert-info mb-3">
+      <i class="fas fa-info-circle"></i>
+      <span>ל-{{ placeholders }} מגובשים יש עדיין שם זמני. הקלידו את השמות ולחצו "שמור שמות" — המספרים כבר מוכנים.</span>
+    </div>
+  {% endif %}
+
+  <form method="POST" action="{{ url_for('save_candidate_names') }}" data-offline data-keep novalidate id="names-form">
+    <h2 class="font-display text-lg font-bold mb-3">מגובשים פעילים <span class="text-base-content/50 text-base">({{ candidates|length }})</span></h2>
+    <div class="grid gap-2.5">
+      {% for candidate in candidates %}
+        {% set n = candidate.number %}
+        {% set placeholder = is_placeholder(candidate.name) %}
+        <div class="card bg-base-100 shadow-sm" data-candidate="{{ n }}">
+          <div class="card-body p-3 gap-2">
+            <div class="flex items-center gap-3">
+              <button type="button" class="relative shrink-0 rounded-full" data-photo-pick="{{ n }}" aria-label="צלם תמונה למגובש {{ n }}" title="צלם תמונה">
+                {% if candidate.id in photos %}
+                  <img src="{{ url_for('candidate_photo', group_id=current_user.id, number=n, v=photos[candidate.id]) }}" class="avatar-photo avatar-row" width="48" height="48" alt="" loading="lazy" decoding="async">
+                {% else %}
+                  <span class="bib">{{ n }}</span>
+                {% endif %}
+                <span class="absolute -bottom-1 -left-1 grid place-items-center w-6 h-6 rounded-full bg-primary text-primary-content text-[11px] shadow" aria-hidden="true"><i class="fas fa-camera"></i></span>
+              </button>
+              <div class="flex-1 min-w-0">
+                <label class="sr-only" for="name-{{ n }}">שם מגובש {{ n }}</label>
+                <div class="flex items-center gap-2">
+                  {% if candidate.id in photos %}<span class="badge badge-ghost badge-sm shrink-0">{{ n }}</span>{% endif %}
+                  <input type="hidden" name="orig-{{ n }}" value="{{ candidate.name }}" data-orig-for="name-{{ n }}">
+                  <input id="name-{{ n }}" name="name-{{ n }}" class="input input-bordered input-sm w-full {{ 'input-warning' if placeholder else '' }}"
+                         value="{{ '' if placeholder else candidate.name }}" placeholder="{{ candidate.name if placeholder else 'שם' }}"
+                         autocomplete="off" enterkeyhint="next" maxlength="200">
+                </div>
+              </div>
+            </div>
+            <input type="file" accept="image/*" capture="environment" hidden data-photo-input="{{ n }}">
+            <div class="flex flex-wrap gap-2 pt-2 border-t border-base-200">
+              <button type="submit" form="retire-{{ n }}" class="btn btn-xs btn-outline btn-warning" onclick="return confirm('האם אתה בטוח שברצונך לסמן מועמד זה כפורש?')">פרש</button>
+              <button type="submit" form="retire-med-{{ n }}" class="btn btn-xs btn-outline btn-error" onclick="return confirm('האם אתה בטוח שברצונך לסמן מועמד זה כפורש בעקבות החלטת רופא?')">הופרש על ידי הרופא</button>
+              {% if candidate.id in photos %}
+                <button type="submit" form="photo-del-{{ n }}" class="btn btn-xs btn-ghost" onclick="return confirm('להסיר את התמונה?')"><i class="fas fa-image"></i> הסר תמונה</button>
+              {% endif %}
+              {% if candidate.id not in with_data %}
+                <button type="submit" form="remove-{{ n }}" class="btn btn-xs btn-ghost text-error mr-auto" onclick="return confirm('להסיר את מספר {{ n }} מהקבוצה? (אין לו נתונים)')"><i class="fas fa-times"></i> הסר מספר</button>
+              {% endif %}
+            </div>
           </div>
         </div>
-      </div>
-    {% endfor %}
-  </div>
+      {% else %}
+        <p class="text-base-content/60">אין מגובשים פעילים. <a class="link link-primary" href="{{ url_for('addCandidate') }}">הוסף מגובש</a></p>
+      {% endfor %}
+    </div>
+    {% if candidates %}
+    <div class="sticky bottom-0 py-3 bg-base-200/90 backdrop-blur mt-2">
+      <button type="submit" class="btn btn-primary btn-lg w-full"><i class="fas fa-save"></i> שמור שמות</button>
+    </div>
+    {% endif %}
+  </form>
+
+  {# Row actions post their own small forms (forms cannot nest). #}
+  {% for candidate in candidates %}
+    {% set n = candidate.number %}
+    <form method="POST" id="retire-{{ n }}" action="{{ url_for('delete_candidate', candidate_id=n) }}" hidden></form>
+    <form method="POST" id="retire-med-{{ n }}" action="{{ url_for('delete_candidate', candidate_id=n, reason='medical') }}" hidden></form>
+    {% if candidate.id in photos %}
+      <form method="POST" id="photo-del-{{ n }}" action="{{ url_for('delete_candidate_photo', group_id=current_user.id, number=n) }}" hidden></form>
+    {% endif %}
+    {% if candidate.id not in with_data %}
+      <form method="POST" id="remove-{{ n }}" action="{{ url_for('remove_empty_candidate', number=n) }}" hidden></form>
+    {% endif %}
+  {% endfor %}
 </section>
 
+{% if retired %}
 <section class="px-4 mt-4">
   <h2 class="font-display text-lg font-bold mb-3">מגובשים שפרשו</h2>
   <div class="grid gap-2.5">
@@ -54,32 +93,124 @@
       <div class="card bg-base-100 shadow-sm">
         <div class="card-body p-3">
           <div class="flex items-center gap-3">
-            {% if candidate.status != "פרש" %}
-              <div class="bib">{{ candidate.id.split("/")[1] }}</div>
-            {% else %}
-              <div class="bib ring-2 ring-error">{{ candidate.id.split("/")[1] }}**</div>
-            {% endif %}
+            <div class="bib ring-2 ring-error">{{ candidate.number }}</div>
             <div class="flex-1 min-w-0 flex items-center gap-2">
               <span class="font-semibold truncate">{{ candidate.name }}</span>
               {% if candidate.withdraw_reason == "רפואי" %}
                 <span class="badge badge-error badge-sm font-medium">הופרש ע"י הרופא</span>
               {% endif %}
             </div>
-            {% if candidate.status != "פרש" %}
-              <form method="POST" class="inline" action="{{ url_for('delete_candidate', candidate_id=candidate.id.split('/')[1]) }}">
-                <button type="submit" class="btn btn-sm btn-outline btn-warning" onclick="return confirm('האם אתה בטוח שברצונך לסמן מועמד זה כפורש?')">פרש</button>
-              </form>
-            {% else %}
-              <form method="POST" class="inline" action="{{ url_for('return_candidate', candidate_id=candidate.id.split('**')[0].split('/')[1]) }}">
-                <button type="submit" class="btn btn-sm btn-outline btn-success">הפוך לפעיל</button>
-              </form>
-            {% endif %}
+            <form method="POST" class="inline" action="{{ url_for('return_candidate', candidate_id=candidate.number) }}">
+              <button type="submit" class="btn btn-sm btn-outline btn-success">הפוך לפעיל</button>
+            </form>
           </div>
         </div>
       </div>
     {% endfor %}
   </div>
 </section>
+{% endif %}
+
+<script>
+(function () {
+  var GROUP = {{ current_user.id | tojson }};
+  var messages = document.getElementById('panel-messages');
+
+  function say(kind, text) {
+    var box = document.createElement('div');
+    box.className = 'alert alert-' + kind + ' shadow-sm mb-2';
+    box.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+    box.textContent = text;
+    messages.innerHTML = '';
+    messages.appendChild(box);
+    if (kind === 'success') setTimeout(function () { box.remove(); }, 4000);
+  }
+
+  // Phone photos are several MB; shrink to a 640px JPEG (~50 KB) before the
+  // upload so it is fast on a field connection. Drawing through an <img>
+  // applies the EXIF rotation.
+  function shrink(file) {
+    return new Promise(function (resolve, reject) {
+      var url = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload = function () {
+        var max = 640;
+        var scale = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+        var canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        canvas.toBlob(function (blob) { blob ? resolve(blob) : reject(new Error('encode')); }, 'image/jpeg', 0.82);
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('decode')); };
+      img.src = url;
+    });
+  }
+
+  document.querySelectorAll('[data-photo-pick]').forEach(function (btn) {
+    var n = btn.getAttribute('data-photo-pick');
+    var input = document.querySelector('[data-photo-input="' + n + '"]');
+    btn.addEventListener('click', function () { input.click(); });
+    input.addEventListener('change', function () {
+      var file = input.files && input.files[0];
+      if (!file) return;
+      window.AppUI && AppUI.markButton(btn, true);
+      shrink(file).then(function (blob) {
+        var fd = new FormData();
+        fd.append('photo', blob, 'photo.jpg');
+        return fetch('/candidate-photo/' + GROUP + '/' + n, { method: 'POST', credentials: 'same-origin', body: fd });
+      }).then(function (res) {
+        return res.json().then(function (d) { return { ok: res.ok, d: d }; });
+      }).then(function (r) {
+        if (!r.ok || !r.d.success) throw new Error(r.d.message || '');
+        var img = btn.querySelector('img');
+        if (!img) {
+          img = document.createElement('img');
+          img.className = 'avatar-photo avatar-row';
+          img.width = 48; img.height = 48; img.alt = '';
+          var bib = btn.querySelector('.bib');
+          if (bib) bib.replaceWith(img); else btn.insertBefore(img, btn.firstChild);
+        }
+        img.src = r.d.url;
+        say('success', r.d.message);
+      }).catch(function (err) {
+        say('error', (err && err.message && !/JSON|fetch|network|decode|encode/i.test(err.message) ? err.message : 'שמירת התמונה נכשלה — בדקו חיבור ונסו שוב'));
+      }).then(function () {
+        window.AppUI && AppUI.markButton(btn, false);
+        input.value = '';
+      });
+    });
+  });
+
+  // Send only the names that were edited (with the name shown), so a page
+  // left open — or a save replayed later from the offline queue — cannot
+  // roll back renames made elsewhere. Registered before offline.js binds the
+  // form, so it runs first; fields come back on the next tick.
+  var namesForm = document.getElementById('names-form');
+  if (namesForm) {
+    namesForm.addEventListener('submit', function () {
+      var off = [];
+      namesForm.querySelectorAll('input[name^="name-"]').forEach(function (input) {
+        if (input.value.trim() !== input.defaultValue.trim()) return;
+        var orig = namesForm.querySelector('[data-orig-for="' + input.id + '"]');
+        [input, orig].forEach(function (el) { if (el && !el.disabled) { el.disabled = true; off.push(el); } });
+      });
+      setTimeout(function () { off.forEach(function (el) { el.disabled = false; }); }, 0);
+    });
+  }
+
+  // Enter moves to the next name, so a whole group is typed in one go.
+  var names = Array.prototype.slice.call(document.querySelectorAll('#names-form input[name^="name-"]'));
+  names.forEach(function (input, i) {
+    input.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      if (names[i + 1]) names[i + 1].focus(); else input.blur();
+    });
+  });
+})();
+</script>
 
 {% include "footer.html" %}
 {% endblock %}

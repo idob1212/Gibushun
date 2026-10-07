@@ -1,4 +1,7 @@
+{% import "_prior-interviews.html" as pi with context %}
+
 {% block content %}
+{% set quick_note = "sheet" %}
 {% include "header.html" %}
 
 {% macro grade_chip(val) %}
@@ -18,10 +21,20 @@
   </div>
 {% endmacro %}
 
+{% set profile_url = url_for('candidate_profile', candidate_id=candidate.id) %}
+
 <section class="app-hero px-5 pt-6 pb-6" style="background-image:url('{{ url_for('static', filename='img/my-group.jpg') }}')">
   <a href="{{ url_for('home') }}" class="inline-flex items-center gap-1 text-sm text-white/80 mb-3"><i class="fas fa-chevron-right text-xs"></i> חזרה לבית</a>
   <div class="flex items-center gap-4">
-    <div class="bib bib-lg ring-2 ring-white/30">{{ number }}</div>
+    {% if photo_version %}
+      <div class="relative shrink-0">
+        <img src="{{ url_for('candidate_photo', group_id=candidate.group_id, number=number, v=photo_version) }}"
+             class="avatar-photo avatar-hero" width="72" height="72" alt="תמונה של {{ candidate.name }}" decoding="async">
+        <span class="bib absolute -bottom-1 -left-1 !min-w-7 !min-h-7 !text-sm !rounded-lg">{{ number }}</span>
+      </div>
+    {% else %}
+      <div class="bib bib-lg ring-2 ring-white/30">{{ number }}</div>
+    {% endif %}
     <div class="min-w-0">
       <h1 class="text-2xl font-extrabold leading-tight truncate">{{ candidate.name }}</h1>
       <p class="text-white/75 text-sm">מגובש מספר {{ number }} · קבוצה {{ candidate.group_id }}</p>
@@ -39,6 +52,9 @@
     {% if candidate.final_status %}
       <span class="badge {% if 'אדום' in candidate.final_status %}badge-error{% elif 'ברירה' in candidate.final_status %}badge-warning{% else %}badge-success{% endif %} font-medium">{{ candidate.final_status }}</span>
     {% endif %}
+    {% if candidate.final_weighted_grade %}
+      <span class="badge badge-accent font-medium"><i class="fas fa-medal"></i>&nbsp;{{ candidate.final_weighted_grade }}</span>
+    {% endif %}
   </div>
 
   <div class="grid grid-cols-2 gap-2 mt-4">
@@ -53,7 +69,53 @@
   </div>
 </section>
 
-<div class="px-4 mt-4 max-w-2xl mx-auto grid gap-3">
+<div class="px-4 mt-4 max-w-2xl mx-auto">
+  {% include "flash-messages.html" %}
+</div>
+
+<div class="px-4 mt-1 max-w-2xl mx-auto grid gap-3">
+
+  {% if staff_notes %}
+  <div class="card bg-base-100 shadow-sm">
+    <div class="card-body p-4">
+      <h2 class="font-display font-bold text-lg mb-1"><i class="fas fa-user-md text-info"></i> רפואה וכוח אדם</h2>
+      <div class="grid gap-2">
+        {% for note in staff_notes %}
+          <div class="staff-note {{ 'staff-note-med' if note.type == 'רפואה' else 'staff-note-hr' }} !text-sm !p-2.5 flex-col !gap-1">
+            <div class="flex items-center gap-2 w-full text-xs font-semibold">
+              <span>{{ note.type }}</span>
+              <span class="opacity-70 mr-auto">{{ note.date }}</span>
+            </div>
+            <p class="whitespace-pre-wrap break-words">{{ note.text }}</p>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if prior %}
+  {% set viewer_is_admin = current_user.id == 0 %}
+  <div class="card bg-base-100 shadow-sm border-r-4 border-warning" id="prior-interview">
+    <div class="card-body p-4">
+      <div class="flex items-center justify-between gap-2 mb-1">
+        <h2 class="font-display font-bold text-lg"><i class="fas fa-user-check text-warning"></i> {{ 'רואיין ביחידה' if prior.exact else 'ייתכן שרואיין ביחידה' }}</h2>
+        {% if prior.interviews|length > 1 %}<span class="badge badge-ghost badge-sm">{{ prior.interviews|length }} ראיונות</span>{% endif %}
+      </div>
+      {% if not prior.exact %}<p class="text-xs text-base-content/70">השם בטופס הראיונות דומה אך לא זהה — ודאו שזה אותו אדם.</p>{% endif %}
+      {% for interview in prior.interviews %}
+      <dl class="divide-y divide-base-200 text-sm {{ 'border-t-2 border-base-200 mt-2' if not loop.first }}">
+        {% if not prior.exact %}<div class="flex gap-3 py-2"><dt class="font-semibold w-28 shrink-0 text-base-content/70">שם בטופס</dt><dd class="flex-1 break-words">{{ interview.name }}</dd></div>{% endif %}
+        {% if interview.interviewed_at %}<div class="flex gap-3 py-2"><dt class="font-semibold w-28 shrink-0 text-base-content/70">תאריך</dt><dd class="flex-1">{{ pi.when(interview) }}</dd></div>{% endif %}
+        {% if interview.interviewer %}<div class="flex gap-3 py-2"><dt class="font-semibold w-28 shrink-0 text-base-content/70">מראיין</dt><dd class="flex-1 break-words">{{ interview.interviewer }}</dd></div>{% endif %}
+        {% if interview.gibush %}<div class="flex gap-3 py-2"><dt class="font-semibold w-28 shrink-0 text-base-content/70">גיבוש שביצע</dt><dd class="flex-1 break-words">{{ interview.gibush }}</dd></div>{% endif %}
+        {% if viewer_is_admin and interview.rating %}<div class="flex gap-3 py-2"><dt class="font-semibold w-28 shrink-0 text-base-content/70">דירוג</dt><dd class="flex-1">{{ pi.rating_badge(interview.rating) }}</dd></div>{% endif %}
+        {% if viewer_is_admin and interview.impression %}<div class="flex gap-3 py-2"><dt class="font-semibold w-28 shrink-0 text-base-content/70">התרשמות</dt><dd class="flex-1 whitespace-pre-wrap break-words">{{ interview.impression }}</dd></div>{% endif %}
+      </dl>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
 
   {% if candidate.interview_grade or candidate.interviewer or candidate.interview_note %}
   <div class="card bg-base-100 shadow-sm">
@@ -112,7 +174,7 @@
     <div class="card-body p-4">
       <div class="flex items-center justify-between mb-2">
         <h2 class="font-display font-bold text-lg"><i class="fas fa-comment-dots text-primary"></i> הערות</h2>
-        <a href="{{ url_for('add_new_note') }}" class="btn btn-xs btn-accent"><i class="fas fa-pen"></i> כתוב הערה</a>
+        <button type="button" class="btn btn-sm btn-accent" data-qn-open data-qn-candidate="{{ number }}" data-qn-group="{{ candidate.group_id }}" data-qn-reload><i class="fas fa-pen"></i> כתוב הערה</button>
       </div>
       {% if notes %}
         <div class="grid gap-2">
@@ -121,11 +183,19 @@
             <div class="card-body p-3">
               <div class="flex items-center gap-2 flex-wrap">
                 <span class="badge badge-sm {% if note.type == 'טובה' %}badge-success{% elif note.type == 'ניטרלית' %}badge-warning{% else %}badge-error{% endif %} font-medium">{{ note.type }}</span>
-                {% if note.location %}<span class="badge badge-ghost badge-sm">{{ note.location }}</span>{% endif %}
+                {% if note.location %}<span class="badge badge-ghost badge-sm max-w-full"><span class="truncate">{{ note.location }}</span></span>{% endif %}
+                {% if note.author_id == 0 %}<span class="badge badge-ghost badge-sm">מנהל</span>{% endif %}
                 <span class="text-xs text-base-content/50 mr-auto">{{ note.date }}</span>
               </div>
               <p class="text-sm mt-1.5 whitespace-pre-wrap break-words">{{ note.text }}</p>
-              <a href="{{ url_for('edit_note', note_id=note.id) }}" class="btn btn-xs btn-ghost mt-2 self-start"><i class="fas fa-pen"></i> ערוך</a>
+              <div class="flex gap-1 mt-2">
+                {% if current_user.id != 0 %}
+                <a href="{{ url_for('edit_note', note_id=note.id, next=profile_url) }}" class="btn btn-xs btn-ghost"><i class="fas fa-pen"></i> ערוך</a>
+                {% endif %}
+                <form method="post" action="{{ url_for('delete_note', note_id=note.id, next=profile_url) }}">
+                  <button type="submit" class="btn btn-xs btn-ghost text-error" onclick="return confirm('למחוק את ההערה?')"><i class="fas fa-trash"></i> מחק</button>
+                </form>
+              </div>
             </div>
           </div>
           {% endfor %}
@@ -136,7 +206,123 @@
     </div>
   </div>
 
+  {# Every saved entry, newest first — fix a wrong grade, a mistaken heat or
+     a note right here (field feedback "עריכת פעולות אחרונות"). #}
+  <div class="card bg-base-100 shadow-sm" id="history">
+    <div class="card-body p-4">
+      <h2 class="font-display font-bold text-lg mb-1"><i class="fas fa-history text-primary"></i> עריכת ציונים</h2>
+      <p class="text-xs text-base-content/60 mb-1">כל מה שנשמר למגובש, מהחדש לישן. אקט שלם (לכל המגובשים) נערך ב<a class="link link-primary" href="{{ url_for('acts_page') }}">אקטים שנשמרו</a>.</p>
+      {% if history %}
+        <ul class="divide-y divide-base-200" id="history-list">
+          {% for item in history %}
+            {% set r = item.review %}
+            <li class="flex items-center gap-2 py-2.5 {% if loop.index > 8 %}hidden history-more{% endif %}">
+              <div class="flex-1 min-w-0">
+                <div class="font-semibold text-sm truncate">{{ r.station }}</div>
+                <div class="text-xs text-base-content/60">
+                  {% if item.kind == 'act' %}סדרי הגעה{% elif item.kind == 'counter' %}מסע · ספירה {{ r.counter_value if r.counter_value is not none else 0 }}{% else %}תחנה{% endif %}
+                  {% if r.note and r.note != 'אקט' %} · <span class="break-words">{{ r.note }}</span>{% endif %}
+                </div>
+              </div>
+              {{ grade_chip(r.grade) }}
+              {% if item.kind == 'counter' %}
+                <a href="{{ url_for('counter_review', station=r.station) }}" class="btn btn-ghost btn-sm btn-square" aria-label="ערוך במצב מסע"><i class="fas fa-pen"></i></a>
+              {% else %}
+                <button type="button" class="btn btn-ghost btn-sm btn-square" aria-label="ערוך או מחק את {{ r.station }}"
+                        data-edit-review data-kind="{{ item.kind }}" data-station="{{ r.station }}"
+                        data-grade="{{ r.grade }}" data-note="{{ r.note or '' }}"
+                        data-update="{{ url_for('review_update', review_id=r.id) }}"
+                        data-delete="{{ url_for('review_delete', review_id=r.id) }}">
+                  <i class="fas fa-pen"></i>
+                </button>
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+        {% if history|length > 8 %}
+          <button type="button" class="btn btn-ghost btn-sm mt-1" id="history-toggle">הצג הכל ({{ history|length }})</button>
+        {% endif %}
+      {% else %}
+        <p class="text-sm text-base-content/50 py-2">עדיין לא נשמרו ציונים</p>
+      {% endif %}
+    </div>
+  </div>
+
 </div>
+
+<dialog id="review-edit" class="app-sheet" aria-labelledby="review-edit-title">
+  <form method="post" id="review-edit-form" class="sheet-form">
+    <header class="sheet-head">
+      <div class="sheet-grabber" aria-hidden="true"></div>
+      <div class="flex items-center justify-between gap-3">
+        <div class="min-w-0">
+          <h2 id="review-edit-title" class="font-display text-xl font-extrabold">עריכת ציון</h2>
+          <p id="review-edit-station" class="text-sm text-base-content/70 truncate"></p>
+        </div>
+        <button type="button" class="btn btn-ghost btn-circle btn-sm text-lg" data-close-edit aria-label="סגור" autofocus>✕</button>
+      </div>
+    </header>
+    <div class="sheet-body">
+      <div>
+        <label class="sheet-label" for="review-edit-grade">ציון (1–4)</label>
+        <div class="grid grid-cols-4 gap-2 mb-2">
+          {% for g in [1, 2, 3, 4] %}<button type="button" class="btn btn-outline" data-set-grade="{{ g }}">{{ g }}</button>{% endfor %}
+        </div>
+        <input type="number" id="review-edit-grade" name="grade" step="0.01" min="1" max="4" inputmode="decimal" required class="input input-bordered w-full">
+      </div>
+      <div id="review-edit-note-field">
+        <label class="sheet-label" for="review-edit-note">הערה</label>
+        <textarea id="review-edit-note" name="note" rows="2" class="textarea textarea-bordered w-full"></textarea>
+      </div>
+      <p id="review-edit-act-hint" class="text-xs text-base-content/60">שינוי הציון באקט משפיע רק על המגובש הזה. הממוצע הפיזי מתעדכן מיד.</p>
+    </div>
+    <footer class="sheet-foot grid grid-cols-2 gap-2">
+      <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> שמור</button>
+      <button type="submit" form="review-delete-form" class="btn btn-outline btn-error" onclick="return confirm('למחוק את הציון הזה?')"><i class="fas fa-trash"></i> מחק</button>
+    </footer>
+  </form>
+  <form method="post" id="review-delete-form"></form>
+</dialog>
+
+<script>
+(function () {
+  var dialog = document.getElementById('review-edit');
+  var form = document.getElementById('review-edit-form');
+  var del = document.getElementById('review-delete-form');
+  var grade = document.getElementById('review-edit-grade');
+  var note = document.getElementById('review-edit-note');
+  var noteField = document.getElementById('review-edit-note-field');
+  var actHint = document.getElementById('review-edit-act-hint');
+  var stationLabel = document.getElementById('review-edit-station');
+
+  document.querySelectorAll('[data-edit-review]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var isAct = btn.dataset.kind === 'act';
+      form.action = btn.dataset.update;
+      del.action = btn.dataset.delete;
+      stationLabel.textContent = btn.dataset.station;
+      grade.value = (+btn.dataset.grade).toFixed(2).replace(/\.?0+$/, '');
+      note.value = btn.dataset.note;
+      noteField.hidden = isAct;
+      actHint.hidden = !isAct;
+      dialog.showModal();
+    });
+  });
+  dialog.querySelectorAll('[data-set-grade]').forEach(function (b) {
+    b.addEventListener('click', function () { grade.value = b.dataset.setGrade; });
+  });
+  dialog.querySelector('[data-close-edit]').addEventListener('click', function () { dialog.close(); });
+  dialog.addEventListener('click', function (e) { if (e.target === dialog) dialog.close(); });
+
+  var toggle = document.getElementById('history-toggle');
+  if (toggle) {
+    toggle.addEventListener('click', function () {
+      document.querySelectorAll('.history-more').forEach(function (li) { li.classList.remove('hidden'); });
+      toggle.remove();
+    });
+  }
+})();
+</script>
 
 <div class="h-6"></div>
 {% include "footer.html" %}
