@@ -13,7 +13,6 @@
 
 {% macro status_badge(s) %}
   {% if not s %}
-    <span class="badge badge-ghost badge-sm">לא הוזן</span>
   {% elif "אדום" in s %}
     <span class="badge badge-error badge-sm font-medium">{{ s }}</span>
   {% elif "ברירה" in s %}
@@ -23,13 +22,28 @@
   {% endif %}
 {% endmacro %}
 
+{# Doctor / HR notes, shown right next to the candidate number. #}
+{% macro staff_lines(staff_notes) %}
+  {% for note_type, css, icon in [("רפואה", "staff-note-med", "fa-user-md"), ("כוח אדם", "staff-note-hr", "fa-id-card")] %}
+    {% set list = staff_notes.get(note_type, []) %}
+    {% if list %}
+      <div class="staff-note {{ css }} mt-1.5">
+        <i class="fas {{ icon }} mt-0.5" aria-hidden="true"></i>
+        <span class="flex-1 min-w-0 line-clamp-2 break-words"><span class="sr-only">הערת {{ note_type }}: </span>{{ list[0].text }}</span>
+        {% if list|length > 1 %}<span class="font-bold shrink-0">+{{ list|length - 1 }}</span>{% endif %}
+      </div>
+    {% endif %}
+  {% endfor %}
+{% endmacro %}
+
+{% import "_prior-interviews.html" as pi with context %}
+
 {% block content %}
+{% set quick_note = "fab" %}
 {% include "header.html" %}
 
 {% set ns = namespace(sum=0, n=0) %}
-{% if total_avg is defined %}
-  {% for v in total_avg %}{% if v and v > 0 %}{% set ns.sum = ns.sum + v %}{% set ns.n = ns.n + 1 %}{% endif %}{% endfor %}
-{% endif %}
+{% for r in rows %}{% if r.total > 0 %}{% set ns.sum = ns.sum + r.total %}{% set ns.n = ns.n + 1 %}{% endif %}{% endfor %}
 {% set group_avg = (ns.sum / ns.n)|round(1) if ns.n else 0 %}
 
 <section class="app-hero px-5 pt-6 pb-7" style="background-image:url('{{ url_for('static', filename='img/my-group.jpg') }}')">
@@ -70,52 +84,121 @@
 </div>
 
 <section class="px-4 mt-1">
-  <div class="flex items-center justify-between mb-3">
-    <h2 class="font-display text-lg font-bold">המגובשים שלי</h2>
-    <a href="{{ url_for('showStationReviews') }}" class="text-sm text-primary font-semibold">דירוג מלא <i class="fas fa-chevron-left text-xs"></i></a>
-  </div>
+  <h2 class="font-display text-lg font-bold mb-3">המגובשים שלי</h2>
 
-  <div class="join mb-3">
-    <a href="{{ url_for('home') }}" class="btn btn-xs join-item {{ 'btn-primary' if sort != 'number' else 'btn-outline' }}">מיון לפי ציון</a>
-    <a href="{{ url_for('home', sort='number') }}" class="btn btn-xs join-item {{ 'btn-primary' if sort == 'number' else 'btn-outline' }}">מיון לפי מספר</a>
-  </div>
+  {% if prior_matches %}<div class="mb-3">{{ pi.banner(prior_matches, "מופיעים בטופס הראיונות") }}</div>{% endif %}
 
-  <div class="grid gap-2.5">
-    {% set rows = namespace(count=0) %}
-    {% if candidates %}
-      {% for index, candidate in candidates %}
-        {% if candidate.status != "פרש" %}
-          {% set rows.count = rows.count + 1 %}
-          <a href="{{ url_for('candidate_profile', candidate_id=candidate.id) }}" class="card bg-base-100 shadow-sm hover:shadow-md transition-shadow active:scale-[.99]">
-            <div class="card-body p-3 flex-row items-center gap-3">
-              <div class="bib">{{ candidate.id.split('/')[1] }}</div>
-              <div class="flex-1 min-w-0">
-                <div class="font-semibold truncate">{{ candidate.name }}</div>
-                <div class="flex flex-wrap gap-1.5 mt-1">
-                  {{ score_chip('פיזי', tiz_avg[index] if tiz_avg is defined else 0) }}
-                  {{ score_chip('כללי', total_avg[index] if total_avg is defined else 0) }}
-                </div>
-              </div>
-              {{ status_badge(candidate.final_status) }}
-              <i class="fas fa-chevron-left text-base-content/30 text-sm"></i>
-            </div>
-          </a>
-        {% endif %}
+  {% if rows %}
+  <div class="flex flex-col gap-2 mb-3">
+    <label class="input input-bordered input-sm flex items-center gap-2 w-full">
+      <i class="fas fa-search opacity-50" aria-hidden="true"></i>
+      <input id="cand-search" type="search" class="grow" placeholder="חיפוש לפי מספר או שם" autocomplete="off" enterkeyhint="search" aria-label="חיפוש מגובש">
+    </label>
+    <div class="join w-full" role="group" aria-label="מיון המגובשים">
+      {% for key, label in [("total", "ציון כללי"), ("physical", "ציון פיזי"), ("number", "מספר")] %}
+        <a href="{{ url_for('home', sort=key if key != 'total' else None) }}" data-sort="{{ key }}"
+           aria-pressed="{{ 'true' if sort == key else 'false' }}"
+           class="btn btn-sm join-item flex-1 {{ 'btn-primary' if sort == key else 'btn-outline' }}">{{ label }}</a>
       {% endfor %}
-    {% endif %}
+    </div>
+  </div>
+  {% endif %}
 
-    {% if rows.count == 0 %}
-      <div class="card bg-base-100 shadow-sm">
-        <div class="card-body items-center text-center py-10">
-          <div class="bib bib-ghost bib-lg mb-3"><i class="fas fa-user-plus text-2xl"></i></div>
-          <h3 class="font-display font-bold text-lg">אין עדיין מגובשים פעילים</h3>
-          <p class="text-base-content/60 text-sm mb-4">הוסיפו מגובשים כדי להתחיל להזין ציונים</p>
-          <a href="{{ url_for('addCandidate') }}" class="btn btn-primary"><i class="fas fa-plus"></i> הוסף מגובש</a>
+  <div id="cand-list" class="grid gap-2.5">
+    {% for r in rows %}
+      {% set c = r.candidate %}
+      <div class="card bg-base-100 shadow-sm overflow-hidden cand-card"
+           data-number="{{ r.number }}" data-total="{{ r.total }}" data-tiz="{{ r.tiz }}" data-name="{{ c.name }}">
+        <div class="flex items-stretch">
+          <a href="{{ url_for('candidate_profile', candidate_id=c.id) }}" class="tap-card flex-1 min-w-0 flex items-center gap-3 p-3">
+            <div class="relative shrink-0">
+              <div class="bib">{{ r.number }}</div>
+              {% if r.staff_notes %}
+              <div class="bib-flags" aria-hidden="true">
+                {% if r.staff_notes.get("רפואה") %}<span class="bib-flag bg-info"><i class="fas fa-user-md"></i></span>{% endif %}
+                {% if r.staff_notes.get("כוח אדם") %}<span class="bib-flag bg-secondary"><i class="fas fa-id-card"></i></span>{% endif %}
+              </div>
+              {% endif %}
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="font-semibold truncate">{{ c.name }}</div>
+              <div class="flex flex-wrap items-center gap-1.5 mt-1">
+                {{ score_chip('פיזי', r.tiz) }}
+                {{ score_chip('כללי', r.total) }}
+                {{ status_badge(c.final_status) }}
+              </div>
+              {{ staff_lines(r.staff_notes) }}
+              {{ pi.line(prior_by_id.get(c.id)) }}
+            </div>
+            <i class="fas fa-chevron-left text-base-content/30 text-sm" aria-hidden="true"></i>
+          </a>
+          <button type="button" class="note-btn" data-qn-open data-qn-candidate="{{ r.number }}" aria-label="הערה למגובש {{ r.number }}" title="הערה מהירה">
+            <i class="fas fa-comment-dots" aria-hidden="true"></i>
+          </button>
         </div>
       </div>
-    {% endif %}
+    {% endfor %}
   </div>
+  <p id="cand-no-match" class="hidden text-center text-base-content/60 py-6">לא נמצאו מגובשים מתאימים</p>
+
+  {% if not rows %}
+    <div class="card bg-base-100 shadow-sm">
+      <div class="card-body items-center text-center py-10">
+        <div class="bib bib-ghost bib-lg mb-3"><i class="fas fa-user-plus text-2xl"></i></div>
+        <h3 class="font-display font-bold text-lg">אין עדיין מגובשים פעילים</h3>
+        <p class="text-base-content/60 text-sm mb-4">הוסיפו מגובשים כדי להתחיל להזין ציונים</p>
+        <a href="{{ url_for('addCandidate') }}" class="btn btn-primary"><i class="fas fa-plus"></i> הוסף מגובש</a>
+      </div>
+    </div>
+  {% endif %}
 </section>
+
+<script>
+(function () {
+  // Sorting and search run on the phone — no reload, instant.
+  var list = document.getElementById('cand-list');
+  if (!list) return;
+  var cards = Array.prototype.slice.call(list.children);
+  var buttons = document.querySelectorAll('[data-sort]');
+  var search = document.getElementById('cand-search');
+  var noMatch = document.getElementById('cand-no-match');
+
+  function applySort(sort) {
+    var key = sort === 'physical' ? 'tiz' : 'total';
+    cards.sort(function (a, b) {
+      var na = +a.dataset.number, nb = +b.dataset.number;
+      if (sort === 'number') return na - nb;
+      return (+b.dataset[key]) - (+a.dataset[key]) || na - nb;
+    });
+    cards.forEach(function (c) { list.appendChild(c); });
+    buttons.forEach(function (b) {
+      var on = b.dataset.sort === sort;
+      b.classList.toggle('btn-primary', on);
+      b.classList.toggle('btn-outline', !on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    try { history.replaceState(null, '', sort === 'total' ? location.pathname : '?sort=' + sort); } catch (e) {}
+  }
+  buttons.forEach(function (b) {
+    b.addEventListener('click', function (e) { e.preventDefault(); applySort(b.dataset.sort); });
+  });
+
+  if (search) {
+    search.addEventListener('input', function () {
+      var q = search.value.trim().toLowerCase();
+      var shown = 0;
+      cards.forEach(function (c) {
+        var hit = !q || c.dataset.number.indexOf(q) === 0 || (c.dataset.name || '').toLowerCase().indexOf(q) !== -1;
+        c.classList.toggle('hidden', !hit);
+        if (hit) shown++;
+      });
+      noMatch.classList.toggle('hidden', shown > 0);
+    });
+  }
+})();
+</script>
+
+{{ pi.sheet(prior_matches) }}
 
 {% include "footer.html" %}
 {% endblock %}

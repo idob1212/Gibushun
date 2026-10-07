@@ -2,12 +2,12 @@
 
 Covers:
 - counter mode includes the sandbag stations
-- scores board "כולם" returns rows
+- candidate page shows the scores
 - admin group summary keeps the selected group
 - interview requires a summary note; duplicate request is ignored
 - group score entry gives last place to unscored candidates
 - final weighted grade page saves and exports
-- station rankings list only scored stations
+- removed station rankings page redirects home
 
 Run inside the project Docker image (local python can't install the pinned deps):
     docker build -t gibushun-smoke .
@@ -45,12 +45,13 @@ app.config["WTF_CSRF_ENABLED"] = False
 with client.session_transaction() as sess:
     sess["_user_id"] = "1"
 
-# 2) scores board "כולם" returns rows
-resp = client.post("/candidates/", data={"id": "כולם"})
+# 2) a candidate's scores show on the candidate page (the "הקבוצה שלי"
+#    board was removed in the v4 feedback round)
+resp = client.get("/candidate/1/1")
 assert resp.status_code == 200
 html = resp.get_data(as_text=True)
-assert "דיון מילוט" in html, "כולם view must show the existing review"
-print("OK: scores board כולם shows rows")
+assert "דיון מילוט" in html, "the candidate page must show the existing review"
+print("OK: candidate page shows the scores")
 
 # 3) interview without a note is rejected (form error re-render, no save)
 resp = client.post("/interview/", data={
@@ -85,23 +86,22 @@ with app.app_context():
     assert r1.grade == 4.0
 print("OK: unscored candidates get the last-place grade")
 
-# 6) final weighted grade page saves; only the interview-style options pass
-resp = client.post("/final-grade/", data={"id": "1", "grade": "91", "note": "חזק"})
+# 6) final weighted grade page saves; only the category options pass
+#    (since the 2026-08 v4 feedback the final grade is a category, no note)
+resp = client.post("/final-grade/", data={"id": "1", "grade": "91"})
 with app.app_context():
     assert Candidate.query.get("1/1").final_weighted_grade is None, \
         "a free-text grade must be rejected"
-resp = client.post("/final-grade/", data={"id": "1", "grade": "להתאבד", "note": "חזק"})
+resp = client.post("/final-grade/", data={"id": "1", "grade": "להתאבד"})
 with app.app_context():
     c = Candidate.query.get("1/1")
-    assert c.final_weighted_grade == "להתאבד" and c.final_weighted_note == "חזק"
-print("OK: final weighted grade saves with the option scale")
+    assert c.final_weighted_grade == "להתאבד"
+print("OK: final weighted grade saves with the category scale")
 
-# 7) station rankings list only scored stations
+# 7) the station ranking page was removed (v4 feedback) — old links go home
 resp = client.get("/station-reviews/")
-html = resp.get_data(as_text=True)
-assert "דיון מילוט" in html
-assert "נאסא" not in html, "unscored stations must not appear"
-print("OK: station list shows only scored stations")
+assert resp.status_code == 302 and resp.location.endswith("/")
+print("OK: station ranking page redirects home")
 
 # 8) admin group summary keeps the selected group
 with client.session_transaction() as sess:

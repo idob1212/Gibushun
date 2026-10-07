@@ -1,0 +1,86 @@
+{% block content %}
+{% include "header.html" %}
+
+<section class="app-hero px-5 pt-6 pb-6" style="background-image:url('{{ url_for('static', filename='img/physical.jpg') }}')">
+  <h1 class="text-2xl font-extrabold leading-tight">אקטים שנשמרו</h1>
+  <p class="text-white/75 text-sm mt-1">תיקון אקט שנשמר — העברה לתחנה הנכונה או מחיקה</p>
+</section>
+
+<div class="px-4 mt-4">
+  {% include "flash-messages.html" %}
+</div>
+
+<section class="px-4 mt-2">
+  <a href="{{ url_for('circles') }}" class="btn btn-outline w-full mb-3"><i class="fas fa-stopwatch"></i> חזרה לסדרי הגעה</a>
+  <p class="text-sm text-base-content/60 mb-3">ציון של מגובש בודד באקט נערך בדף המגובש (הקישו על המספר).</p>
+
+  {% if acts %}
+  <div class="grid gap-3">
+    {% for act in acts %}
+      <div class="card bg-base-100 shadow-sm" id="act-{{ loop.index }}">
+        <div class="card-body p-4 gap-3">
+          <div class="flex items-center justify-between gap-2">
+            <div>
+              <h2 class="font-display font-bold text-lg leading-tight">{{ act.base }}</h2>
+              <p class="text-sm text-base-content/60">אקט {{ act.number }} · {{ act.order|length }} מגובשים{% if loop.first %} · <span class="badge badge-accent badge-sm">האחרון שנשמר</span>{% endif %}</p>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap gap-1.5" aria-label="סדר ההגעה">
+            {% for number, grade in act.order %}
+              <a href="{{ url_for('candidate_profile', candidate_id=current_user.id ~ '/' ~ number) }}#history"
+                 class="badge badge-lg {{ 'badge-primary' if grade > 1 else 'badge-ghost' }} gap-1 font-display font-bold"
+                 title="ציון {{ '%.2f'|format(grade) }}">{{ number }}<span class="font-sans font-normal text-xs opacity-80">{{ '%.1f'|format(grade) }}</span></a>
+            {% endfor %}
+          </div>
+
+          <details class="rounded-box border border-base-300">
+            <summary class="cursor-pointer px-3 py-2 font-semibold text-sm">העבר לתחנה אחרת</summary>
+            <form method="post" action="{{ url_for('act_rename') }}" class="p-3 pt-1 grid gap-2">
+              <input type="hidden" name="station" value="{{ act.station }}">
+              <select name="new_base" class="select select-bordered select-sm w-full" data-other-toggle>
+                {% for base in bases %}
+                  <option value="{{ base }}" {% if base == act.base %}selected{% endif %}>{{ base }}</option>
+                {% endfor %}
+                <option value="אחר">אחר…</option>
+              </select>
+              <input type="text" name="other" class="input input-bordered input-sm w-full" placeholder="שם התחנה" maxlength="100" hidden>
+              <button type="submit" class="btn btn-sm btn-primary">העבר</button>
+            </form>
+          </details>
+
+          <form method="post" action="{{ url_for('act_delete') }}">
+            <input type="hidden" name="station" value="{{ act.station }}">
+            <button type="submit" class="btn btn-sm btn-outline btn-error w-full"
+                    onclick='return confirm({{ ("למחוק את \"" ~ act.station ~ "\" לכל המגובשים? לא ניתן לבטל.") | tojson }})'>
+              <i class="fas fa-trash"></i> מחק את האקט
+            </button>
+          </form>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+  {% else %}
+    <div class="card bg-base-100 shadow-sm">
+      <div class="card-body items-center text-center py-10">
+        <div class="bib bib-ghost bib-lg mb-3"><i class="fas fa-stopwatch text-2xl"></i></div>
+        <h3 class="font-display font-bold text-lg">עדיין לא נשמרו אקטים</h3>
+        <p class="text-base-content/60 text-sm">אקטים שנשמרים בסדרי הגעה יופיעו כאן</p>
+      </div>
+    </div>
+  {% endif %}
+</section>
+
+<script>
+  document.querySelectorAll('[data-other-toggle]').forEach(function (sel) {
+    var other = sel.form.querySelector('input[name="other"]');
+    sel.addEventListener('change', function () {
+      other.hidden = sel.value !== 'אחר';
+      other.required = !other.hidden;
+      if (!other.hidden) other.focus();
+    });
+  });
+</script>
+
+{% include "footer.html" %}
+{% endblock %}

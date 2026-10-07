@@ -1,0 +1,217 @@
+{% macro score_chip(label, val) %}
+  {% set v = val|float %}
+  {% if v <= 0 %}
+    <span class="score-chip bg-base-200 text-base-content/50">{{ label }} <b>—</b></span>
+  {% elif v >= 3.3 %}
+    <span class="score-chip score-good">{{ label }} <b>{{ '%.1f'|format(v) }}</b></span>
+  {% elif v >= 2.5 %}
+    <span class="score-chip score-mid">{{ label }} <b>{{ '%.1f'|format(v) }}</b></span>
+  {% else %}
+    <span class="score-chip score-low">{{ label }} <b>{{ '%.1f'|format(v) }}</b></span>
+  {% endif %}
+{% endmacro %}
+
+{% set tone = {"להתאבד": "badge-success", "לקחת": "badge-success", "כן, אבל": "badge-info",
+               "בלית ברירה": "badge-warning", "לא לגעת - קו אדום": "badge-error"} %}
+
+{% macro candidate_item(r, category) %}
+  {% set c = r.candidate %}
+  <li class="card bg-base-100 shadow-sm" data-number="{{ r.number }}" data-saved="{{ category }}">
+    <div class="card-body p-3 gap-2">
+      <div class="flex items-center gap-2.5">
+        <span class="rank font-display font-extrabold text-base min-w-8 text-center text-primary/80" aria-hidden="true"></span>
+        <div class="bib shrink-0">{{ r.number }}</div>
+        <div class="flex-1 min-w-0">
+          <div class="font-semibold truncate">{{ c.name }}</div>
+          <div class="flex flex-wrap gap-1 mt-1">
+            {{ score_chip('פיזי', r.tiz) }}
+            {{ score_chip('כללי', r.total) }}
+            {% if c.interview_grade %}<span class="score-chip bg-base-200 text-base-content">ראיון <b>{{ c.interview_grade }}</b></span>{% endif %}
+          </div>
+        </div>
+        <div class="flex flex-col gap-1 shrink-0 move-controls">
+          <button type="button" class="btn btn-sm btn-square btn-outline" data-move="up" aria-label="הזז את מגובש {{ r.number }} למעלה"><i class="fas fa-chevron-up"></i></button>
+          <button type="button" class="btn btn-sm btn-square btn-outline" data-move="down" aria-label="הזז את מגובש {{ r.number }} למטה"><i class="fas fa-chevron-down"></i></button>
+        </div>
+      </div>
+      <select class="select select-bordered select-sm w-full" data-category-select aria-label="קטגוריה למגובש {{ r.number }}">
+        <option value="" {% if not category %}selected{% endif %}>ללא ציון סופי</option>
+        {% for cat in categories %}
+          <option value="{{ cat }}" {% if cat == category %}selected{% endif %}>{{ cat }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </li>
+{% endmacro %}
+
+{% block content %}
+{% include "header.html" %}
+
+<section class="app-hero px-5 pt-6 pb-6" style="background-image:url('{{ url_for('static', filename='img/ODT.jpg') }}')">
+  <h1 class="text-2xl font-extrabold leading-tight">סיכום ציונים סופיים</h1>
+  <p class="text-white/75 text-sm mt-1">קבוצה {{ group_id }} · דירוג המגובשים בתוך כל קטגוריה</p>
+</section>
+
+<div class="px-4 mt-4">
+  {% include "flash-messages.html" %}
+</div>
+
+{% if groups %}
+<section class="px-4 mt-2">
+  <nav class="flex gap-2 overflow-x-auto pb-2" aria-label="בחירת קבוצה">
+    {% for g in groups %}
+      <a href="{{ url_for('final_summary', group=g) }}" class="btn btn-sm shrink-0 {{ 'btn-primary' if g == group_id else 'btn-outline' }}">קבוצה {{ g }}</a>
+    {% endfor %}
+  </nav>
+</section>
+{% endif %}
+
+<section class="px-4 mt-2">
+  <div class="flex items-center justify-between gap-2 mb-3">
+    <p class="text-sm text-base-content/70">החצים קובעים את סדר העדיפות בתוך הקטגוריה. השמירה אוטומטית.</p>
+    <span id="save-state" class="text-sm font-semibold shrink-0" role="status" aria-live="polite"></span>
+  </div>
+
+  {% for section in sections %}
+    <div class="mb-5" data-section>
+      <h2 class="flex items-center gap-2 mb-2">
+        <span class="badge {{ tone.get(section.category, 'badge-ghost') }} font-bold">{{ section.category }}</span>
+        <span class="text-sm text-base-content/60" data-count>{{ section.rows|length }}</span>
+      </h2>
+      <ol class="grid gap-2" data-category="{{ section.category }}">
+        {% for r in section.rows %}{{ candidate_item(r, section.category) }}{% endfor %}
+      </ol>
+      <p class="text-sm text-base-content/50 border border-dashed border-base-300 rounded-box p-3 text-center" data-empty {% if section.rows %}hidden{% endif %}>אין מגובשים בקטגוריה</p>
+    </div>
+  {% endfor %}
+
+  <div class="mb-5" data-section>
+    <h2 class="flex items-center gap-2 mb-2">
+      <span class="badge badge-ghost font-bold">ללא ציון סופי</span>
+      <span class="text-sm text-base-content/60" data-count>{{ unassigned|length }}</span>
+    </h2>
+    <ol class="grid gap-2" data-category="">
+      {% for r in unassigned %}{{ candidate_item(r, "") }}{% endfor %}
+    </ol>
+    <p class="text-sm text-base-content/50 border border-dashed border-base-300 rounded-box p-3 text-center" data-empty {% if unassigned %}hidden{% endif %}>כל המגובשים קיבלו ציון סופי</p>
+  </div>
+</section>
+
+<style>
+  /* Unranked candidates have no order to change. */
+  ol[data-category=""] .move-controls, ol[data-category=""] .rank { display: none; }
+</style>
+
+<script>
+(function () {
+  var GROUP = {{ group_id | tojson }};
+  var stateEl = document.getElementById('save-state');
+  var lists = {};
+  document.querySelectorAll('ol[data-category]').forEach(function (ol) { lists[ol.dataset.category] = ol; });
+  var dirty = {};
+  var timer = null;
+  var inFlight = false;
+
+  function status(text, kind) {
+    stateEl.textContent = text;
+    stateEl.className = 'text-sm font-semibold shrink-0 ' + (kind === 'error' ? 'text-error' : kind === 'ok' ? 'text-success' : 'text-base-content/60');
+  }
+
+  function refresh(ol) {
+    var items = ol.querySelectorAll(':scope > li');
+    items.forEach(function (li, i) {
+      var rank = li.querySelector('.rank');
+      rank.textContent = ol.dataset.category ? '#' + (i + 1) : '';
+      rank.setAttribute('title', 'מקום ' + (i + 1) + ' בקטגוריה');
+      var up = li.querySelector('[data-move="up"]'), down = li.querySelector('[data-move="down"]');
+      if (up) up.disabled = i === 0;
+      if (down) down.disabled = i === items.length - 1;
+    });
+    var section = ol.closest('[data-section]');
+    section.querySelector('[data-count]').textContent = items.length;
+    section.querySelector('[data-empty]').hidden = items.length > 0;
+  }
+
+  function order(ol) {
+    return Array.prototype.map.call(ol.querySelectorAll(':scope > li'), function (li) { return +li.dataset.number; });
+  }
+
+  function save() {
+    if (inFlight) { timer = setTimeout(save, 300); return; }
+    var payload = {};
+    var seen = {};   // the category each row had at the last save
+    var rows = [];
+    Object.keys(dirty).forEach(function (cat) {
+      payload[cat] = order(lists[cat]);
+      lists[cat].querySelectorAll(':scope > li').forEach(function (li) {
+        seen[li.dataset.number] = li.dataset.saved;
+        rows.push([li, cat]);
+      });
+    });
+    dirty = {};
+    if (!Object.keys(payload).length) return;
+    inFlight = true;
+    status('שומר…');
+    fetch('{{ url_for("final_summary_save") }}' + (GROUP ? '?group=' + GROUP : ''), {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order: payload, from: seen, group: GROUP })
+    }).then(function (res) {
+      return res.json().then(function (d) { return { ok: res.ok, d: d }; });
+    }).then(function (r) {
+      if (!r.ok || !r.d.success) throw new Error(r.d.message || '');
+      rows.forEach(function (pair) { pair[0].dataset.saved = pair[1]; });
+      if (r.d.stale) status(r.d.message, 'error');
+      else status(r.d.queued ? 'נשמר במכשיר ✓' : 'נשמר ✓', 'ok');
+    }).catch(function () {
+      // Keep the categories marked so the next change retries them.
+      Object.keys(payload).forEach(function (cat) { dirty[cat] = true; });
+      status('השמירה נכשלה — שינוי נוסף ינסה שוב', 'error');
+    }).then(function () {
+      inFlight = false;
+    });
+  }
+
+  function touch(cat) {
+    dirty[cat] = true;
+    status('…');
+    clearTimeout(timer);
+    timer = setTimeout(save, 450);
+  }
+
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-move]');
+    if (!btn) return;
+    var li = btn.closest('li');
+    var ol = li.parentNode;
+    if (btn.dataset.move === 'up' && li.previousElementSibling) ol.insertBefore(li, li.previousElementSibling);
+    else if (btn.dataset.move === 'down' && li.nextElementSibling) ol.insertBefore(li.nextElementSibling, li);
+    else return;
+    refresh(ol);
+    touch(ol.dataset.category);
+    btn.focus();
+    li.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  });
+
+  document.addEventListener('change', function (e) {
+    var sel = e.target.closest('[data-category-select]');
+    if (!sel) return;
+    var li = sel.closest('li');
+    var from = li.parentNode;
+    var to = lists[sel.value];
+    if (!to || to === from) return;
+    to.appendChild(li); // joins the end of its new category
+    refresh(from);
+    refresh(to);
+    touch(from.dataset.category);
+    touch(to.dataset.category);
+    li.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  });
+
+  Object.keys(lists).forEach(function (cat) { refresh(lists[cat]); });
+})();
+</script>
+
+{% include "footer.html" %}
+{% endblock %}

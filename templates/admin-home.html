@@ -23,7 +23,11 @@
   {% endif %}
 {% endmacro %}
 
+{% import "_prior-interviews.html" as pi with context %}
+
 {% block content %}
+{% set quick_note = "fab" %}
+{% set quick_note_group = group_id %}{# the bubble writes to the group on screen #}
 {% include "header.html" %}
 
 <section class="app-hero px-5 pt-6 pb-6" style="background-image:url('{{ url_for('static', filename='img/my-group.jpg') }}')">
@@ -39,6 +43,50 @@
   {% include "flash-messages.html" %}
 </div>
 
+{# Interview check: upload the interview form's Excel, see who was already
+   interviewed (all groups). #}
+<section class="px-4 mt-4" id="prior-interviews">
+  <div class="card bg-base-100 shadow-sm">
+    <div class="card-body p-4 gap-3">
+      <div class="flex items-center gap-3">
+        <span class="pi-banner-icon" aria-hidden="true"><i class="fas fa-user-check"></i></span>
+        <div class="flex-1 min-w-0">
+          <h2 class="font-display font-bold text-base leading-tight">בדיקת ראיונות קודמים</h2>
+          <p class="text-xs text-base-content/65 mt-0.5 break-words">
+            {% if prior_sync %}{{ prior_total }} ראיונות בטופס · עודכן {{ prior_sync.synced_at.strftime('%d/%m %H:%M') }}
+            {% else %}העלו את קובץ ה-Excel של טופס הראיונות כדי לגלות מי כבר רואיין{% endif %}
+          </p>
+        </div>
+      </div>
+
+      {% if prior_matches %}
+        {{ pi.banner(prior_matches, "בכל הקבוצות") }}
+      {% elif prior_sync %}
+        <p class="text-sm text-success flex items-center gap-2"><i class="fas fa-check-circle" aria-hidden="true"></i> אף מגובש בגיבוש לא מופיע בטופס</p>
+      {% endif %}
+
+      <div class="flex items-center gap-2">
+        <form method="POST" action="{{ url_for('interviews_sync') }}" enctype="multipart/form-data" class="flex-1" data-file-upload>
+          <input type="hidden" name="next" value="{{ request.path }}">
+          <label class="btn btn-sm w-full {{ 'btn-outline btn-primary' if prior_sync else 'btn-primary' }}">
+            <input type="file" name="file" class="sr-only" aria-label="{{ 'סנכרון קובץ ראיונות מעודכן' if prior_sync else 'העלאת קובץ ראיונות' }}"
+                   accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv">
+            <i class="fas fa-file-excel" aria-hidden="true"></i>
+            {{ 'סנכרון קובץ מעודכן' if prior_sync else 'העלאת קובץ ראיונות' }}
+          </label>
+        </form>
+        {% if prior_sync %}
+        <form method="POST" action="{{ url_for('interviews_clear') }}">
+          <input type="hidden" name="next" value="{{ request.path }}">
+          <button type="submit" class="btn btn-sm btn-ghost text-error" aria-label="מחיקת רשימת הראיונות" title="מחיקת רשימת הראיונות"
+                  onclick="return confirm('למחוק את רשימת הראיונות שסונכרנה?')"><i class="fas fa-trash-alt" aria-hidden="true"></i></button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+
 <section class="px-4 mt-4">
   <form method="POST" class="card bg-base-100 shadow-sm">
     <div class="card-body p-4 flex-row items-end gap-3">
@@ -52,48 +100,68 @@
   </form>
 </section>
 
-{% set pairs = candidates|list %}
-
 <section class="px-4 mt-4">
-  <h2 class="font-display text-lg font-bold mb-3">המגובשים בקבוצה</h2>
+  <div class="flex items-center justify-between mb-3 gap-2">
+    <h2 class="font-display text-lg font-bold">המגובשים בקבוצה</h2>
+    <button type="button" class="btn btn-sm btn-accent" data-qn-open data-qn-group="{{ group_id }}"><i class="fas fa-comment-dots"></i> הערה לקבוצה</button>
+  </div>
 
   <div class="grid gap-2.5">
-    {% set rows = namespace(count=0, retired=0) %}
-    {% for index, candidate in pairs %}
-      {% if candidate.status != "פרש" %}
-        {% set rows.count = rows.count + 1 %}
-        <div class="card bg-base-100 shadow-sm">
-          <div class="card-body p-3">
+    {% for r in rows %}
+      {% set candidate = r.candidate %}
+      <div class="card bg-base-100 shadow-sm overflow-hidden">
+        <div class="flex items-stretch">
+          <div class="card-body p-3 flex-1 min-w-0">
             <div class="flex items-center gap-3">
-              <div class="bib">{{ candidate.id.split('/')[1] }}</div>
-              <div class="flex-1 min-w-0">
+              <div class="relative shrink-0">
+                <div class="bib">{{ r.number }}</div>
+                {% if r.staff_notes %}
+                <div class="bib-flags" aria-hidden="true">
+                  {% if r.staff_notes.get("רפואה") %}<span class="bib-flag bg-info"><i class="fas fa-user-md"></i></span>{% endif %}
+                  {% if r.staff_notes.get("כוח אדם") %}<span class="bib-flag bg-secondary"><i class="fas fa-id-card"></i></span>{% endif %}
+                </div>
+                {% endif %}
+              </div>
+              <a href="{{ url_for('candidate_profile', candidate_id=candidate.id) }}" class="flex-1 min-w-0">
                 <div class="font-semibold truncate">{{ candidate.name }}</div>
                 <div class="flex flex-wrap gap-1.5 mt-1">
-                  {{ score_chip('פיזי', tiz_avg[index]) }}
-                  {{ score_chip('כללי', total_avg[index]) }}
+                  {{ score_chip('פיזי', r.tiz) }}
+                  {{ score_chip('כללי', r.total) }}
                 </div>
-              </div>
+              </a>
               {{ status_badge(candidate.final_status) }}
             </div>
+            {% for note_type, css, icon in [("רפואה", "staff-note-med", "fa-user-md"), ("כוח אדם", "staff-note-hr", "fa-id-card")] %}
+              {% set list = r.staff_notes.get(note_type, []) %}
+              {% if list %}
+                <div class="staff-note {{ css }} mt-2">
+                  <i class="fas {{ icon }} mt-0.5" aria-hidden="true"></i>
+                  <span class="flex-1 min-w-0 line-clamp-2 break-words"><span class="sr-only">הערת {{ note_type }}: </span>{{ list[0].text }}</span>
+                  {% if list|length > 1 %}<span class="font-bold shrink-0">+{{ list|length - 1 }}</span>{% endif %}
+                </div>
+              {% endif %}
+            {% endfor %}
+            {{ pi.line(prior_by_id.get(candidate.id), admin=True) }}
             {% if candidate.final_note %}
               <p class="text-sm text-base-content/70 mt-2 border-t border-base-200 pt-2">{{ candidate.final_note }}</p>
             {% endif %}
             <div class="flex flex-wrap gap-2 mt-3 pt-3 border-t border-base-200">
-              <form method="POST" class="inline" action="{{ url_for('delete_candidate', candidate_id=candidate.id.split('/')[1], reason='medical', group=group_id) }}">
+              <form method="POST" class="inline" action="{{ url_for('delete_candidate', candidate_id=r.number, reason='medical', group=group_id) }}">
                 <button type="submit" class="btn btn-sm btn-outline btn-error" onclick="return confirm('האם אתה בטוח שברצונך לסמן מועמד זה כפורש בעקבות החלטת רופא?')"><i class="fas fa-user-md"></i>&nbsp;הופרש על ידי הרופא</button>
               </form>
-              <form method="POST" class="inline" action="{{ url_for('delete_candidate', candidate_id=candidate.id.split('/')[1], group=group_id) }}">
+              <form method="POST" class="inline" action="{{ url_for('delete_candidate', candidate_id=r.number, group=group_id) }}">
                 <button type="submit" class="btn btn-sm btn-outline btn-warning" onclick="return confirm('האם אתה בטוח שברצונך לסמן מועמד זה כפורש?')">פרש</button>
               </form>
             </div>
           </div>
+          <button type="button" class="note-btn" data-qn-open data-qn-group="{{ group_id }}" data-qn-candidate="{{ r.number }}" aria-label="הערה למגובש {{ r.number }}" title="הערה מהירה">
+            <i class="fas fa-comment-dots" aria-hidden="true"></i>
+          </button>
         </div>
-      {% else %}
-        {% set rows.retired = rows.retired + 1 %}
-      {% endif %}
+      </div>
     {% endfor %}
 
-    {% if rows.count == 0 %}
+    {% if not rows %}
       <div class="card bg-base-100 shadow-sm">
         <div class="card-body items-center text-center py-10">
           <div class="bib bib-ghost bib-lg mb-3"><i class="fas fa-users text-2xl"></i></div>
@@ -104,33 +172,33 @@
   </div>
 </section>
 
-{% if rows.retired > 0 %}
+{% if retired %}
 <section class="px-4 mt-4">
   <h2 class="font-display text-lg font-bold mb-3">מגובשים שפרשו</h2>
   <div class="grid gap-2.5">
-    {% for index, candidate in pairs %}
-      {% if candidate.status == "פרש" %}
-        <div class="card bg-base-100 shadow-sm">
-          <div class="card-body p-3">
-            <div class="flex items-center gap-3">
-              <div class="bib ring-2 ring-error">{{ candidate.id.split('/')[1] }}</div>
-              <div class="flex-1 min-w-0 flex items-center gap-2">
-                <span class="font-semibold truncate">{{ candidate.name }}</span>
-                {% if candidate.withdraw_reason == "רפואי" %}
-                  <span class="badge badge-error badge-sm font-medium">הופרש ע"י הרופא</span>
-                {% endif %}
-              </div>
-              <form method="POST" class="inline" action="{{ url_for('return_candidate', candidate_id=candidate.id.split('/')[1], group=group_id) }}">
-                <button type="submit" class="btn btn-sm btn-outline btn-success">הפוך לפעיל</button>
-              </form>
+    {% for candidate in retired %}
+      <div class="card bg-base-100 shadow-sm">
+        <div class="card-body p-3">
+          <div class="flex items-center gap-3">
+            <div class="bib ring-2 ring-error">{{ candidate.number }}</div>
+            <div class="flex-1 min-w-0 flex items-center gap-2">
+              <span class="font-semibold truncate">{{ candidate.name }}</span>
+              {% if candidate.withdraw_reason == "רפואי" %}
+                <span class="badge badge-error badge-sm font-medium">הופרש ע"י הרופא</span>
+              {% endif %}
             </div>
+            <form method="POST" class="inline" action="{{ url_for('return_candidate', candidate_id=candidate.number, group=group_id) }}">
+              <button type="submit" class="btn btn-sm btn-outline btn-success">הפוך לפעיל</button>
+            </form>
           </div>
         </div>
-      {% endif %}
+      </div>
     {% endfor %}
   </div>
 </section>
 {% endif %}
+
+{{ pi.sheet(prior_matches, admin=True, open_now=prior_open) }}
 
 {% include "footer.html" %}
 {% endblock %}

@@ -47,7 +47,7 @@
             <tbody>
               {% for candidate in candidates %}
               <tr>
-                <td class="font-semibold w-px whitespace-nowrap">{{ candidate }}</td>
+                <td class="font-semibold w-px whitespace-nowrap">{{ candidate }}<input type="hidden" name="subject" value="{{ candidate }}"></td>
                 <td class="w-px whitespace-nowrap">{{ user_form.grade(class="select select-bordered select-sm w-20 text-center font-bold group-grade") }}</td>
                 <td class="w-full">{{ user_form.note(class="input input-bordered input-sm w-full", placeholder="הערה…") }}</td>
               </tr>

@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
   <meta name="description" content="">
   <meta name="theme-color" content="#1f2937">
   <title>מימדיון</title>
@@ -41,17 +41,18 @@
   <link href="{{ url_for('static', filename='css/app.css') }}" rel="stylesheet">
 </head>
 
-<body class="bg-base-200 text-base-content min-h-screen">
+<body class="bg-base-200 text-base-content">
 
 {% set is_admin = current_user.is_authenticated and current_user.id == 0 %}
 
-<div class="drawer">
+{# App shell: fixed to the viewport; only <main> scrolls (see input.css). #}
+<div class="drawer app-shell">
   <input id="nav-drawer" type="checkbox" class="drawer-toggle" />
 
-  <div class="drawer-content flex flex-col min-h-screen">
+  <div class="drawer-content app-frame">
 
     <!-- Top bar -->
-    <div class="navbar bg-base-100 shadow-sm sticky top-0 z-30 px-1 min-h-14 app-topbar">
+    <div class="navbar bg-base-100 shadow-sm px-1 min-h-14 app-topbar">
       {% if current_user.is_authenticated %}
       <div class="flex-none">
         <label for="nav-drawer" class="btn btn-square btn-ghost" aria-label="תפריט">
@@ -78,7 +79,10 @@
           <a href="{{ url_for('login') }}" class="btn btn-primary btn-sm">התחבר</a>
         {% endif %}
       </div>
+      <div class="app-progress" aria-hidden="true"></div>
     </div>
 
-    <!-- Page content (closed in footer.html) -->
-    <main class="flex-1 w-full max-w-3xl mx-auto px-3 py-4 pb-36 md:pb-6">
+    <!-- Page content (closed in footer.html). Pages with the quick-note
+         bubble set `quick_note = "fab"` before including this file. -->
+    <main id="app-main" class="app-scroll">
+    <div class="app-page w-full max-w-3xl mx-auto px-3 py-4 pb-8{% if quick_note == 'fab' and current_user.is_authenticated %} has-fab{% endif %}">

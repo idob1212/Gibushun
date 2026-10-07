@@ -1,0 +1,98 @@
+{% block content %}
+{% set quick_note = "fab" %}
+{% set quick_note_group = group_id %}
+{% include "header.html" %}
+
+<section class="app-hero px-5 pt-6 pb-6" style="background-image:url('{{ url_for('static', filename='img/my-group.jpg') }}')">
+  <div class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-white/80 mb-3">
+    <span class="inline-block w-1.5 h-1.5 rounded-full bg-accent animate-pulse"></span>
+    עמדה מובנית
+  </div>
+  <div class="flex items-center gap-4">
+    <div class="bib bib-lg ring-2 ring-white/30"><i class="fas {{ role.icon }}"></i></div>
+    <div>
+      <h1 class="text-2xl font-extrabold leading-tight">שלום, {{ role.title }}</h1>
+      <p class="text-white/75 text-sm">הערות {{ role.note_type }} לכל הקבוצות — מופיעות למגבש ליד מספר המגובש</p>
+    </div>
+  </div>
+</section>
+
+<div class="px-4 mt-4">
+  {% include "flash-messages.html" %}
+</div>
+
+<section class="px-4 mt-2">
+  <h2 class="font-display text-base font-bold mb-2">קבוצה</h2>
+  {% if groups %}
+  <nav class="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1" aria-label="בחירת קבוצה">
+    {% for g in groups %}
+      <a href="{{ url_for('staff_home', group=g.id) }}"
+         class="btn btn-sm shrink-0 {{ 'btn-primary' if g.id == group_id else 'btn-outline' }}"
+         {% if g.id == group_id %}aria-current="page"{% endif %}>קבוצה {{ g.id }}{% if g.name %} · {{ g.name }}{% endif %}</a>
+    {% endfor %}
+  </nav>
+  {% else %}
+    <p class="text-base-content/60">עדיין לא נוספו קבוצות.</p>
+  {% endif %}
+</section>
+
+{% if group_id %}
+<section class="px-4 mt-3">
+  <div class="grid gap-2.5">
+    {% for c in candidates %}
+      {% set mine = notes.get(c.id, []) %}
+      <div class="card bg-base-100 shadow-sm">
+        <div class="card-body p-3 gap-2">
+          <div class="flex items-center gap-3">
+            <div class="bib {{ 'ring-2 ring-error' if c.status == 'פרש' else '' }}">{{ c.number }}</div>
+            <div class="flex-1 min-w-0">
+              <div class="font-semibold truncate">{{ c.name }}</div>
+              {% if c.status == 'פרש' %}
+                <span class="badge badge-sm {{ 'badge-error' if c.withdraw_reason == 'רפואי' else 'badge-neutral' }}">{{ 'הופרש ע"י הרופא' if c.withdraw_reason == 'רפואי' else 'פרש' }}</span>
+              {% elif mine %}
+                <span class="text-xs text-base-content/60">{{ mine|length }} הערות</span>
+              {% endif %}
+            </div>
+            {% if c.status != 'פרש' %}
+            <button type="button" class="btn btn-sm btn-primary" data-qn-open data-qn-group="{{ group_id }}" data-qn-candidate="{{ c.number }}" data-qn-reload>
+              <i class="fas fa-plus"></i> הערה
+            </button>
+            {% endif %}
+          </div>
+
+          {% for note in mine %}
+            <div class="staff-note {{ 'staff-note-med' if note.type == 'רפואה' else 'staff-note-hr' }} !text-sm !p-2.5">
+              <div class="flex-1 min-w-0">
+                <div class="text-xs opacity-70">{{ note.date }}</div>
+                <p class="whitespace-pre-wrap break-words">{{ note.text }}</p>
+              </div>
+              {% if note.author_id == current_user.id %}
+              <form method="post" action="{{ url_for('delete_note', note_id=note.id, next=url_for('staff_home', group=group_id)) }}">
+                <button type="submit" class="btn btn-ghost btn-xs btn-square" aria-label="מחק הערה" onclick="return confirm('למחוק את ההערה?')"><i class="fas fa-trash"></i></button>
+              </form>
+              {% endif %}
+            </div>
+          {% endfor %}
+
+          {% if is_doctor %}
+            {% if c.status != 'פרש' %}
+              <form method="post" action="{{ url_for('delete_candidate', candidate_id=c.number, group=group_id, reason='medical') }}">
+                <button type="submit" class="btn btn-xs btn-outline btn-error" onclick="return confirm('להפריש את מגובש {{ c.number }} מסיבה רפואית?')"><i class="fas fa-user-md"></i> הפרשה רפואית</button>
+              </form>
+            {% elif c.withdraw_reason == 'רפואי' %}
+              <form method="post" action="{{ url_for('return_candidate', candidate_id=c.number, group=group_id) }}">
+                <button type="submit" class="btn btn-xs btn-outline btn-success">החזר לפעילות</button>
+              </form>
+            {% endif %}
+          {% endif %}
+        </div>
+      </div>
+    {% else %}
+      <p class="text-base-content/60 text-center py-6">אין מגובשים בקבוצה זו</p>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% include "footer.html" %}
+{% endblock %}
