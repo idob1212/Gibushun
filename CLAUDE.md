@@ -175,8 +175,13 @@ jump sends the tap elsewhere.
 - Admin operations require `current_user.id == 0` check
 
 **Form Handling:**
-- All forms are defined in `forms.py`
-- Use WTForms validation
+- All forms are defined in `forms.py` and inherit `AppForm` (Hebrew WTForms messages;
+  a refused POST sets the `X-Form-Errors` header, which the offline outbox treats as
+  "not saved" — never as synced)
+- Render fields with `_formhelpers.html` (`render_field`, `chip_field`, `field_error`):
+  each field gets a `[data-field]` wrapper and error slot; `required` + `data-msg` come
+  from the validators, and `app.js` checks them before anything is sent or queued
+- A required choice starts on an empty "choose" entry — never pre-select a real value
 - Hebrew labels and validation messages
 
 ### Technical Debt and Limitations

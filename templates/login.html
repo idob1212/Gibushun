@@ -1,3 +1,4 @@
+{% import "_formhelpers.html" as f %}
 {% block content %}
 {% include "header.html" %}
 
@@ -31,14 +32,17 @@
           </div>
         </div>
 
-        <div class="form-control w-full" id="group-field" {% if form.role.data and form.role.data != 'group' %}hidden{% endif %}>
+        {# Group number: required only for a group login (hidden for staff). #}
+        <div class="form-control w-full" id="group-field" data-field="id" {% if form.role.data and form.role.data != 'group' %}hidden{% endif %}>
           <label class="label pb-1" for="id"><span class="label-text font-medium">{{ form.id.label.text }}</span></label>
-          {{ form.id(class="input input-bordered w-full", inputmode="numeric", autocomplete="username") }}
+          {{ form.id(class="input input-bordered w-full", inputmode="numeric", autocomplete="username", required=True, **{'data-msg': 'הזן מספר קבוצה'}) }}
+          {{ f.field_error(form.id) }}
         </div>
 
-        <div class="form-control w-full">
+        <div class="form-control w-full{{ ' is-invalid' if form.password.errors }}" data-field="password">
           <label class="label pb-1" for="password"><span class="label-text font-medium">{{ form.password.label.text }}</span></label>
-          {{ form.password(class="input input-bordered w-full", autocomplete="current-password") }}
+          {{ form.password(class="input input-bordered w-full", autocomplete="current-password", **{'data-msg': required_message(form.password)}) }}
+          {{ f.field_error(form.password) }}
         </div>
 
         <button type="submit" class="btn btn-primary btn-lg w-full mt-2">התחבר</button>
@@ -62,6 +66,7 @@
         o.setAttribute('aria-pressed', on ? 'true' : 'false');
       });
       groupField.hidden = b.dataset.role !== 'group';
+      document.getElementById('id').required = !groupField.hidden;
       (groupField.hidden ? document.getElementById('password') : document.getElementById('id')).focus();
     });
   });

@@ -1,4 +1,17 @@
-{% macro render_field(field, label=None) %}
+{# Shared form rendering. Every field sits in a [data-field] wrapper with an
+   error slot: the server fills it when it refuses a POST, and app.js fills it
+   (same Hebrew messages, taken from data-msg) before anything is sent or
+   queued offline. The rules themselves live once, in forms.py. #}
+
+{% macro field_error(field) -%}
+  <p class="field-error" id="{{ field.id }}-error" data-error-for="{{ field.name }}" role="alert"{% if not field.errors %} hidden{% endif %}>{{ field.errors[-1] if field.errors else '' }}</p>
+{%- endmacro %}
+
+{% macro label_for(field, label=None, mark=True, optional=False) -%}
+  <span class="label-text font-medium">{{ label or field.label.text }}{% if mark and field.flags.required %} <span class="req-mark" aria-hidden="true">*</span>{% endif %}{% if optional %} <span class="font-normal opacity-60">(לא חובה)</span>{% endif %}</span>
+{%- endmacro %}
+
+{% macro render_field(field, label=None, mark=True, optional=False, placeholder=None, rows=None) %}
   {% if field.type in ['CSRFTokenField', 'HiddenField'] %}
     {{ field() }}
   {% elif field.type == 'SubmitField' %}
@@ -9,30 +22,69 @@
       <span class="label-text font-medium">{{ label or field.label.text }}</span>
     </label>
   {% else %}
-    <div class="form-control w-full">
-      <label class="label pb-1" for="{{ field.id }}"><span class="label-text font-medium">{{ label or field.label.text }}</span></label>
-      {% if field.type == 'SelectField' %}
-        {{ field(class="select select-bordered w-full") }}
-      {% elif field.type == 'TextAreaField' %}
-        {{ field(class="textarea textarea-bordered w-full min-h-28") }}
+    {% set attrs = {'data-msg': required_message(field)} %}
+    {% if field.errors %}{% set _ = attrs.update({'aria-invalid': 'true', 'aria-describedby': field.id ~ '-error'}) %}{% endif %}
+    {% if placeholder %}{% set _ = attrs.update({'placeholder': placeholder}) %}{% endif %}
+    {% if rows %}{% set _ = attrs.update({'rows': rows}) %}{% endif %}
+    <div class="form-control w-full{{ ' is-invalid' if field.errors }}" data-field="{{ field.name }}">
+      {% if field.type == 'RadioField' %}
+        <span class="label pb-1" id="{{ field.id }}-label">{{ label_for(field, label, mark, optional) }}</span>
+        <div class="seg-pick" role="radiogroup" aria-labelledby="{{ field.id }}-label">
+          {% for opt in field %}
+            <label class="seg-opt">{{ opt(required=field.flags.required, **attrs) }}<span>{{ opt.label.text }}</span></label>
+          {% endfor %}
+        </div>
       {% else %}
-        {{ field(class="input input-bordered w-full") }}
+        <label class="label pb-1" for="{{ field.id }}">{{ label_for(field, label, mark, optional) }}</label>
+        {% if field.type == 'SelectField' %}
+          {{ field(class="select select-bordered w-full", **attrs) }}
+        {% elif field.type == 'TextAreaField' %}
+          {{ field(class="textarea textarea-bordered w-full min-h-28", **attrs) }}
+        {% else %}
+          {{ field(class="input input-bordered w-full", **attrs) }}
+        {% endif %}
       {% endif %}
-      {% for err in field.errors %}
-        <span class="text-error text-sm mt-1">{{ err }}</span>
-      {% endfor %}
+      {{ field_error(field) }}
     </div>
   {% endif %}
 {% endmacro %}
 
-{% macro render_form(form, submit_label=None, action=None, offline=False) %}
+{# A refused form that is not about one field (an expired CSRF token). #}
+{% macro form_alert(form) %}
+  {% if form.errors.get('csrf_token') %}
+    <div class="alert alert-error text-sm" role="alert"><i class="fas fa-exclamation-triangle"></i><span>פג תוקף הטופס — רענן את הדף ונסה שוב</span></div>
+  {% endif %}
+{% endmacro %}
+
+{# `marks=False` for filter/report forms, where a required star means nothing. #}
+{% macro render_form(form, submit_label=None, action=None, offline=False, marks=True) %}
   <form method="POST" {% if action %}action="{{ action }}"{% endif %}{% if offline %} data-offline{% endif %} novalidate class="flex flex-col gap-3">
+    {{ form_alert(form) }}
     {% for field in form %}
       {% if field.type == 'SubmitField' %}
         {{ render_field(field, label=submit_label) }}
       {% else %}
-        {{ render_field(field) }}
+        {{ render_field(field, mark=marks) }}
       {% endif %}
     {% endfor %}
   </form>
+{% endmacro %}
+
+{# Candidate picker as tappable number chips (radio inputs, so the form
+   posts and replays offline like any other field) — the same chips as the
+   quick-note sheet. #}
+{% macro chip_field(field, label=None) %}
+  {% set attrs = {'data-msg': required_message(field)} %}
+  <div class="form-control w-full{{ ' is-invalid' if field.errors }}" data-field="{{ field.name }}">
+    <div class="flex items-baseline justify-between gap-2 pb-1">
+      <span class="label p-0" id="{{ field.id }}-label">{{ label_for(field, label) }}</span>
+      <span class="text-sm font-semibold text-primary" data-chip-picked aria-live="polite"></span>
+    </div>
+    <div class="chip-pick" role="radiogroup" aria-labelledby="{{ field.id }}-label">
+      {% for value, text, selected in field.iter_choices() %}
+        <label class="chip-opt"><input type="radio" name="{{ field.name }}" value="{{ value }}" id="{{ field.id }}-{{ value }}"{% if selected %} checked{% endif %}{% if field.flags.required %} required{% endif %} data-msg="{{ attrs['data-msg'] }}" aria-label="מגובש {{ text }}"><span>{{ text }}</span></label>
+      {% endfor %}
+    </div>
+    {{ field_error(field) }}
+  </div>
 {% endmacro %}

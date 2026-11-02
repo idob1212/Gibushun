@@ -16,7 +16,7 @@
   <a href="{{ url_for('add_new_note') }}" class="btn btn-accent w-full mb-3"><i class="fas fa-pen"></i> כתוב הערה</a>
   <div class="card bg-base-100 shadow-sm">
     <div class="card-body p-4">
-      {{ f.render_form(form, submit_label="הצג") }}
+      {{ f.render_form(form, submit_label="הצג", marks=False) }}
     </div>
   </div>
 </section>

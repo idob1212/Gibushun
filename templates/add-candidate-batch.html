@@ -29,7 +29,9 @@
     </div>
     {% endif %}
 
-    <form method="POST" id="batch-form">
+    {# Rows are checked by the script below (empty rows are skipped, half-filled
+       rows are flagged), not by the browser's required fields. #}
+    <form method="POST" id="batch-form" novalidate data-validate="off">
       <div class="card bg-base-100 shadow-sm mb-4">
         <div class="card-body p-3">
           <div class="overflow-x-auto">
@@ -235,20 +237,38 @@ document.getElementById('batch-form').addEventListener('submit', function(e) {
 
     const rows = document.querySelectorAll('.candidate-row');
     const candidates = [];
+    const halfFilled = [];
 
-    rows.forEach(row => {
+    rows.forEach((row, index) => {
         const inputs = row.querySelectorAll('input, select');
         const candidate = {};
 
         inputs.forEach(input => {
             candidate[input.name] = input.value.trim();
+            input.classList.remove('input-error');
         });
 
-        // Only add if both ID and name are present
+        // Empty rows are skipped; a row with only a number or only a name is
+        // shown, never dropped silently (field audit).
         if (candidate.id && candidate.name) {
             candidates.push(candidate);
+        } else if (candidate.id || candidate.name) {
+            halfFilled.push('שורה ' + (index + 1) + ': ' + (candidate.id ? 'חסר שם' : 'חסר מספר'));
+            inputs.forEach(input => { if (!input.value.trim()) input.classList.add('input-error'); });
         }
     });
+
+    if (halfFilled.length) {
+        document.querySelectorAll('.validation-alert').forEach(alert => alert.remove());
+        const box = document.createElement('div');
+        box.className = 'alert alert-error validation-alert mb-3';
+        box.setAttribute('role', 'alert');
+        box.textContent = 'השלם או נקה את השורות: ' + halfFilled.join(' · ');
+        const form = document.getElementById('batch-form');
+        form.parentNode.insertBefore(box, form);
+        box.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        return;
+    }
 
     if (candidates.length === 0) {
         alert('אנא הוסף לפחות מגובש אחד עם מספר ושם.');

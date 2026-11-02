@@ -1,3 +1,5 @@
+{% import "_formhelpers.html" as f %}
+
 {% block content %}
 {% include "header.html" %}
 
@@ -18,49 +20,50 @@
     <i class="fas fa-list"></i> הצג הערות
   </a>
 
+  {# Same fields, order and rules as the quick-note sheet (_quick-note.html):
+     candidate, type, note, then the optional location. #}
   <div class="card bg-base-100 shadow-sm">
     <div class="card-body p-4">
-      <form method="POST" data-offline novalidate class="flex flex-col gap-3">
+      <form method="POST" data-offline{% if is_edit %} data-keep{% endif %} novalidate class="flex flex-col gap-4">
         {{ form.hidden_tag() }}
+        {{ f.form_alert(form) }}
 
-        <div class="form-control w-full">
-          <label class="label pb-1" for="subject"><span class="label-text font-medium">מספר מגובש</span></label>
-          {{ form.subject(class="input input-bordered w-full", required="required") }}
-        </div>
+        {{ f.chip_field(form.subject) }}
 
-        <div class="form-control w-full">
-          <span class="label-text font-medium mb-1">סוג הערה</span>
-          <div class="flex flex-col gap-2 mt-1">
-            {% for choice in form.type %}
-              <label class="label cursor-pointer justify-start gap-3 py-1" for="{{ choice.id }}">
-                {{ choice(class="radio radio-primary") }}
-                {% if choice.label.text == "טובה" %}
-                  <span class="label-text font-medium text-success">{{ choice.label.text }}</span>
-                {% elif choice.label.text == "ניטרלית" %}
-                  <span class="label-text font-medium text-info">{{ choice.label.text }}</span>
-                {% else %}
-                  <span class="label-text font-medium text-error">{{ choice.label.text }}</span>
-                {% endif %}
-              </label>
+        <div class="form-control w-full{{ ' is-invalid' if form.type.errors }}" data-field="type">
+          <span class="label pb-1" id="type-label">{{ f.label_for(form.type) }}</span>
+          <div class="type-pick" role="radiogroup" aria-labelledby="type-label">
+            {% for opt in form.type %}
+              <label class="type-opt" data-type="{{ opt.data }}">{{ opt(required=True, **{'data-msg': required_message(form.type)}) }}<span>{{ opt.label.text }}</span></label>
             {% endfor %}
           </div>
+          {{ f.field_error(form.type) }}
         </div>
 
-        <div class="form-control w-full">
-          <label class="label pb-1" for="location"><span class="label-text font-medium">מיקום</span></label>
-          {{ form.location(class="input input-bordered w-full", required="required") }}
-        </div>
+        {{ f.render_field(form.text, placeholder="מה ראית?", rows=3) }}
+        {{ f.render_field(form.location, mark=False, optional=True) }}
 
-        <div class="form-control w-full">
-          <label class="label pb-1" for="text"><span class="label-text font-medium">הערה</span></label>
-          {{ form.text(class="textarea textarea-bordered w-full min-h-28", required="required") }}
-        </div>
-
-        {{ form.submit(class="btn btn-primary btn-lg w-full mt-2") }}
+        <button type="submit" class="btn btn-primary btn-lg w-full mt-1"><i class="fas fa-paper-plane"></i> {% if is_edit %}שמור שינויים{% else %}שמור הערה{% endif %}</button>
       </form>
     </div>
   </div>
 </section>
+
+<script>
+  // The picked candidate's name next to the label, as in the quick-note sheet.
+  document.addEventListener('DOMContentLoaded', function () {
+    var names = {{ (candidate_names or {}) | tojson }};
+    var picked = document.querySelector('[data-chip-picked]');
+    function show() {
+      var r = document.querySelector('input[name="subject"]:checked');
+      picked.textContent = r ? ('מגובש ' + r.value + (names[r.value] ? ' · ' + names[r.value] : '')) : '';
+    }
+    document.addEventListener('change', function (e) { if (e.target.name === 'subject') show(); });
+    document.addEventListener('mm:prefilled', show);
+    document.addEventListener('reset', function () { setTimeout(show, 0); }, true); // queued offline
+    show();
+  });
+</script>
 
 {% include "footer.html" %}
 {% endblock %}

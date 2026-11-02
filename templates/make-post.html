@@ -1,3 +1,5 @@
+{% import "_formhelpers.html" as f %}
+
 {% block content %}
 {% include "header.html" %}
 
@@ -21,43 +23,46 @@
 <section class="px-4 mt-2 max-w-md mx-auto">
   <div class="card bg-base-100 shadow-sm">
     <div class="card-body p-4">
-      <form method="POST" novalidate data-offline class="flex flex-col gap-3">
+      <form method="POST" novalidate data-offline{% if is_edit %} data-keep{% endif %} class="flex flex-col gap-3">
         {{ form.hidden_tag() }}
+        {{ f.form_alert(form) }}
 
-        <div class="form-control w-full">
+        <div class="form-control w-full{{ ' is-invalid' if form.station.errors }}" data-field="station">
           <div class="flex items-center justify-between pb-1">
-            <label class="label p-0" for="station"><span class="label-text font-medium">תחנה</span></label>
+            <label class="label p-0" for="station">{{ f.label_for(form.station) }}</label>
             <button type="button" class="station-help-dot" data-sg-open aria-label="הסבר על התחנה" title="הסבר על התחנה">?</button>
           </div>
-          {{ form.station(class="select select-bordered w-full", required="required") }}
+          {{ form.station(class="select select-bordered w-full", **{'data-msg': required_message(form.station)}) }}
+          {{ f.field_error(form.station) }}
         </div>
 
-        <div class="form-control w-full" id="additionalField" {% if form.station.data != 'ODT' %}style="display:none"{% endif %}>
-          <label class="label pb-1" for="odt"><span class="label-text font-medium">שם תחנה</span></label>
-          {{ form.odt(class="input input-bordered w-full", value=odt_val) }}
+        {% set custom = form.station.data in ('ODT', 'אחר') %}
+        <div class="form-control w-full{{ ' is-invalid' if form.odt.errors }}" id="additionalField" data-field="odt"{% if not custom %} hidden{% endif %}>
+          <label class="label pb-1" for="odt"><span class="label-text font-medium">שם תחנה <span class="req-mark" aria-hidden="true">*</span></span></label>
+          {{ form.odt(class="input input-bordered w-full", maxlength=100, autocomplete="off", required=custom, **{'data-msg': required_message(form.odt)}) }}
+          {{ f.field_error(form.odt) }}
         </div>
 
-        <div class="form-control w-full">
-          <label class="label pb-1" for="subject"><span class="label-text font-medium">מספר מגובש</span></label>
-          {{ form.subject(class="select select-bordered w-full", required="required") }}
-        </div>
+        {{ f.render_field(form.subject) }}
 
-        <div class="form-control w-full">
-          <label class="label pb-1"><span class="label-text font-medium">ציון</span></label>
-          <div class="grade-pick flex justify-center gap-4 py-1">
+        {# No grade is pre-selected: one nobody tapped must not be saved as 1. #}
+        <div class="form-control w-full{{ ' is-invalid' if form.grade.errors }}" data-field="grade">
+          <span class="label pb-1" id="grade-label">{{ f.label_for(form.grade) }}</span>
+          <div class="grade-pick flex justify-center gap-4 py-1" role="radiogroup" aria-labelledby="grade-label">
             {% for value, label in form.grade.choices %}
             <label>
-              <input type="radio" name="grade" value="{{ value }}" {% if value == grade or (not grade and loop.first) %}checked{% endif %}>
+              <input type="radio" name="grade" value="{{ value }}" required data-msg="{{ required_message(form.grade) }}"{% if form.grade.data is not none and form.grade.data|string == value|string %} checked{% endif %}>
               <span class="btn btn-circle btn-lg text-lg">{{ label }}</span>
             </label>
             {% endfor %}
           </div>
+          {% if saved_grade is defined and saved_grade is not none and form.grade.data is none %}
+            <p class="text-sm text-base-content/60 text-center">הציון השמור: {{ '%.1f'|format(saved_grade) }} — בחר ציון חדש כדי לשמור</p>
+          {% endif %}
+          {{ f.field_error(form.grade) }}
         </div>
 
-        <div class="form-control w-full">
-          <label class="label pb-1" for="note"><span class="label-text font-medium">הערות</span></label>
-          {{ form.note(class="textarea textarea-bordered w-full min-h-28", value=note) }}
-        </div>
+        {{ f.render_field(form.note, mark=False, optional=True) }}
 
         <button type="submit" class="btn btn-primary btn-lg w-full mt-2">{% if is_edit %}עדכן{% else %}הוסף תוצאה{% endif %}</button>
       </form>
@@ -69,11 +74,16 @@
   document.addEventListener('DOMContentLoaded', function () {
     var stationField = document.getElementById('station');
     var additionalField = document.getElementById('additionalField');
+    var odt = document.getElementById('odt');
     if (!stationField) return;
-    stationField.addEventListener('change', function () {
-      var v = stationField.value;
-      additionalField.style.display = (v === 'ODT' || v === 'אחר') ? 'block' : 'none';
-    });
+    function sync() {
+      var custom = stationField.value === 'ODT' || stationField.value === 'אחר';
+      additionalField.hidden = !custom;
+      odt.required = custom;   // the same rule as the server (forms.RequiredWhen)
+    }
+    stationField.addEventListener('change', sync);
+    document.addEventListener('mm:prefilled', sync);
+    sync();
   });
 </script>
 

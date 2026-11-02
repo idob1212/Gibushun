@@ -110,7 +110,8 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateAllReviews(explicit = false) {
         const data = {
             station: currentStation,
-            reviews: []
+            reviews: [],
+            finished: explicit   // "סיים מסע": all-zero still saves (after the confirm)
         };
 
         // Collect all grades and notes
@@ -127,10 +128,12 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         if (explicit && window.AppUI) AppUI.markButton(submitAll, true);
-        // Submit all reviews for normalization and saving
+        // Submit all reviews for normalization and saving. keepalive: a save
+        // fired as the page is left (pagehide) still reaches the server.
         return fetch('/update-counter-reviews', {
             method: 'POST',
             credentials: 'same-origin',
+            keepalive: !explicit,
             headers: {
                 'Content-Type': 'application/json',
             },
@@ -152,12 +155,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // ponytail: 400ms trailing debounce on +/- POSTs — every tap used to fire one,
     // which flooded the offline outbox. "סיים מסע" and station switches flush it.
     var debounceTimer = null;
-    function scheduleUpdate() {
+    function scheduleUpdate(delay) {
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(function() {
             debounceTimer = null;
             updateAllReviews();
-        }, 400);
+        }, delay || 400);
     }
     function flushPendingUpdate() {
         if (debounceTimer !== null) {
@@ -188,16 +191,31 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Keep the local cache fresh on note edits (notes are still only
-    // submitted with the next counter change or "סיים מסע")
+    // Notes save on their own (field audit: a note typed without a +/- tap
+    // after it was lost on leaving the page or switching station).
     document.querySelectorAll('.note-input').forEach(input => {
+        input.addEventListener('input', function() {
+            cacheRow(this.id.replace('note-', ''));
+            scheduleUpdate(1200);
+        });
         input.addEventListener('change', function() {
             cacheRow(this.id.replace('note-', ''));
+            flushPendingUpdate();
         });
+    });
+    // Leaving the page (dock, back, app switch) sends what is still pending.
+    window.addEventListener('pagehide', flushPendingUpdate);
+    document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'hidden') flushPendingUpdate();
     });
 
     // Handle submit all button (finish march)
     submitAll.addEventListener('click', function() {
+        var counters = Array.prototype.map.call(document.querySelectorAll('.grade-value'), function (el) {
+            return parseInt(el.textContent, 10) || 0;
+        });
+        if (counters.length && Math.max.apply(null, counters) === 0 &&
+            !window.confirm('כל המונים על 0 — כולם יקבלו ציון 1 בתחנה הזאת. לסיים בכל זאת?')) return;
         clearTimeout(debounceTimer);
         debounceTimer = null;
         updateAllReviews(true);  // Show success message when explicitly finishing march

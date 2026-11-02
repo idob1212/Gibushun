@@ -1,3 +1,5 @@
+{% import "_formhelpers.html" as f %}
+
 {% block content %}
 {% include "header.html" %}
 
@@ -16,83 +18,217 @@
   {% include "flash-messages.html" %}
 </div>
 
+{# One card per candidate: one-tap "– 1 2 3 4" (– = not graded) and a
+   full-width note. Field feedback: "what is 0?", a note on a 0 row vanished
+   while the page said "saved", and the one-line note box was too narrow. #}
 <section class="px-4 mt-2">
-  <div class="card bg-base-100 shadow-sm">
-    <div class="card-body p-4 gap-4">
-      <form method="POST" action="{{ url_for('update_all') }}" data-offline class="flex flex-col gap-4">
-        {{ user_form.csrf_token }}
+  <form method="POST" action="{{ url_for('update_all') }}" data-offline novalidate id="group-form" class="flex flex-col gap-3">
+    {{ user_form.csrf_token }}
 
-        <div class="form-control w-full">
+    <div class="card bg-base-100 shadow-sm">
+      <div class="card-body p-4 gap-3">
+        <div class="form-control w-full" data-field="station">
           <div class="flex items-center justify-between pb-1">
             <label class="label p-0" for="station"><span class="label-text font-semibold">בחר תחנה</span></label>
             <button type="button" class="station-help-dot" data-sg-open aria-label="הסבר על התחנה" title="הסבר על התחנה">?</button>
           </div>
-          {{ user_form.station(class="select select-bordered w-full") }}
+          {{ user_form.station(class="select select-bordered w-full", required=True, **{'data-msg': 'בחר תחנה'}) }}
+          {{ f.field_error(user_form.station) }}
         </div>
 
-        <div class="form-control w-full" id="additionalField" style="display:none">
-          <label class="label pb-1" for="odt"><span class="label-text font-medium">שם תחנה</span></label>
-          {{ user_form.odt(class="input input-bordered w-full") }}
+        {% set custom = user_form.station.data in ('ODT', 'אחר') %}
+        <div class="form-control w-full" id="additionalField" data-field="odt"{% if not custom %} hidden{% endif %}>
+          <label class="label pb-1" for="odt"><span class="label-text font-medium">שם תחנה <span class="req-mark" aria-hidden="true">*</span></span></label>
+          {{ user_form.odt(class="input input-bordered w-full", maxlength=100, autocomplete="off", required=custom, **{'data-msg': 'כתוב את שם התחנה'}) }}
+          {{ f.field_error(user_form.odt) }}
         </div>
 
-        <div class="rounded-box border border-base-300">
-          <table class="table table-zebra score-table">
-            <thead>
-              <tr>
-                <th class="w-px whitespace-nowrap">מס׳</th>
-                <th class="w-px whitespace-nowrap text-center">ציון</th>
-                <th class="w-full">הערה</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for candidate in candidates %}
-              <tr>
-                <td class="font-semibold w-px whitespace-nowrap">{{ candidate }}<input type="hidden" name="subject" value="{{ candidate }}"></td>
-                <td class="w-px whitespace-nowrap">{{ user_form.grade(class="select select-bordered select-sm w-20 text-center font-bold group-grade") }}</td>
-                <td class="w-full">{{ user_form.note(class="input input-bordered input-sm w-full", placeholder="הערה…") }}</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-
-        <button type="submit" class="btn btn-primary btn-lg w-full">הזן ציונים</button>
-      </form>
+        <p class="text-sm text-base-content/70"><b>–</b> = לא דורג. מי שנשאר – יקבל 1, כמו מי שלא סיים בספרינטים.</p>
+      </div>
     </div>
-  </div>
+
+    {% if form_error %}
+      <div class="alert alert-error text-sm" role="alert"><i class="fas fa-exclamation-triangle"></i><span>{{ form_error }}</span></div>
+    {% endif %}
+
+    <ol class="grid gap-2" id="group-rows" aria-label="מגובשים">
+      {% for candidate in candidates %}
+        {% set n = candidate.number %}
+        {% set v = values.get(n) if values else none %}
+        {% set grade = v[0] if v else '0' %}
+        {% set note = v[1] if v else '' %}
+        <li class="card bg-base-100 shadow-sm group-row{{ ' is-invalid' if row_errors.get(n) }}" data-field="row-{{ n }}" data-number="{{ n }}">
+          <div class="card-body p-3 gap-2">
+            <input type="hidden" name="subject" value="{{ n }}">
+            <div class="flex items-center gap-2.5">
+              <span class="bib bib-sm shrink-0" title="{{ candidate.name }}">{{ n }}</span>
+              <div class="grade-seg grow" role="radiogroup" aria-label="ציון למגובש {{ n }}">
+                {% for value, label in [('0', '–'), ('1', '1'), ('2', '2'), ('3', '3'), ('4', '4')] %}
+                  <label><input type="radio" name="grade-{{ n }}" value="{{ value }}"{% if grade == value %} checked{% endif %} aria-label="{{ 'לא דורג' if value == '0' else 'ציון ' ~ value }}"><span>{{ label }}</span></label>
+                {% endfor %}
+              </div>
+            </div>
+            <button type="button" class="note-open self-start" data-note-open{% if note %} hidden{% endif %}><i class="fas fa-plus"></i> הערה</button>
+            <textarea name="note-{{ n }}" class="textarea textarea-bordered w-full note-area" rows="1" maxlength="2000" placeholder="הערה…" aria-label="הערה למגובש {{ n }}"{% if not note %} hidden{% endif %}>{{ note }}</textarea>
+            <p class="field-error" role="alert"{% if not row_errors.get(n) %} hidden{% endif %}>{{ row_errors.get(n, '') }}</p>
+          </div>
+        </li>
+      {% endfor %}
+    </ol>
+
+    <div class="group-foot">
+      <div class="flex items-center justify-between text-sm font-semibold">
+        <span id="graded-count" aria-live="polite"></span>
+        <span id="ungraded-count" class="text-base-content/60"></span>
+      </div>
+      <p class="field-error" id="group-error" role="alert" hidden></p>
+      <button type="submit" class="btn btn-primary btn-lg w-full">שמור ציונים</button>
+    </div>
+  </form>
 </section>
 
 <script>
   document.addEventListener('DOMContentLoaded', function () {
-    // Enter inside a text field must NOT submit the whole batch form (mobile
-    // keyboards make this an easy accident that wipes unentered grades).
-    // Blur instead, which closes the on-screen keyboard. Submitting stays
-    // explicit via the הזן ציונים button.
-    document.querySelector('form[data-offline]').addEventListener('keydown', function (e) {
-      if (e.key === 'Enter' && e.target.matches('input, select')) {
-        e.preventDefault();
-        e.target.blur();
-      }
-    });
-
-    var stationField = document.getElementById('station');
+    var form = document.getElementById('group-form');
+    var station = document.getElementById('station');
     var additionalField = document.getElementById('additionalField');
-    if (!stationField) return;
-    stationField.addEventListener('change', function () {
-      var v = stationField.value;
-      additionalField.style.display = (v === 'ODT' || v === 'אחר') ? 'block' : 'none';
+    var odt = document.getElementById('odt');
+    var rows = Array.prototype.slice.call(document.querySelectorAll('.group-row'));
+    var saved = {{ saved | tojson }};
+    var gradedEl = document.getElementById('graded-count');
+    var ungradedEl = document.getElementById('ungraded-count');
+    var groupError = document.getElementById('group-error');
+    var refusedValues = {{ 'true' if values else 'false' }};
+
+    function gradeOf(row) {
+      var r = row.querySelector('input[type="radio"]:checked');
+      return r ? r.value : '0';
+    }
+    function noteOf(row) { return row.querySelector('.note-area'); }
+    function grow(area) {
+      area.style.height = 'auto';
+      area.style.height = area.scrollHeight + 2 + 'px';
+    }
+    function showNote(row, focus) {
+      var area = noteOf(row);
+      area.hidden = false;
+      row.querySelector('[data-note-open]').hidden = true;
+      grow(area);
+      if (focus) area.focus();
+    }
+    function setRowError(row, msg) {
+      var slot = row.querySelector('.field-error');
+      row.classList.toggle('is-invalid', !!msg);
+      slot.textContent = msg || '';
+      slot.hidden = !msg;
+    }
+    function count() {
+      var graded = rows.filter(function (row) { return gradeOf(row) !== '0'; }).length;
+      gradedEl.textContent = 'דורגו ' + graded + ' מתוך ' + rows.length;
+      var rest = rows.length - graded;
+      ungradedEl.textContent = rest ? (rest + ' יקבלו 1') : '';
+      if (graded) groupError.hidden = true;
+    }
+
+    // Already-saved grades for the chosen station, so a second visit shows
+    // them instead of a row of "–" (and the counts stay true).
+    function stationName() {
+      var v = station.value;
+      if (v === 'אחר') return odt.value.trim();
+      if (v === 'ODT') return 'ODT ' + odt.value.trim();
+      return v;
+    }
+    function applySaved() {
+      var data = saved[stationName()] || {};
+      rows.forEach(function (row) {
+        var entry = data[row.dataset.number];
+        var value = entry ? String(entry[0]) : '0';
+        var radio = row.querySelector('input[type="radio"][value="' + value + '"]');
+        (radio || row.querySelector('input[value="0"]')).checked = true;
+        var area = noteOf(row);
+        area.value = entry ? (entry[1] || '') : '';
+        if (area.value) showNote(row, false);
+        else { area.hidden = true; row.querySelector('[data-note-open]').hidden = false; }
+        setRowError(row, '');
+      });
+      count();
+    }
+
+    function syncStation() {
+      var custom = station.value === 'ODT' || station.value === 'אחר';
+      additionalField.hidden = !custom;
+      odt.required = custom;   // the same rule as the server
+    }
+    station.addEventListener('change', function () { syncStation(); applySaved(); });
+    odt.addEventListener('change', applySaved);
+
+    form.addEventListener('click', function (e) {
+      var open = e.target.closest('[data-note-open]');
+      if (open) showNote(open.closest('.group-row'), true);
+    });
+    form.addEventListener('input', function (e) {
+      if (e.target.classList.contains('note-area')) grow(e.target);
+      var row = e.target.closest('.group-row');
+      if (row && row.classList.contains('is-invalid') && !(gradeOf(row) === '0' && noteOf(row).value.trim())) setRowError(row, '');
+    });
+    form.addEventListener('change', function (e) {
+      var row = e.target.closest('.group-row');
+      if (row && !(gradeOf(row) === '0' && noteOf(row).value.trim())) setRowError(row, '');
+      count();
+    });
+    // Enter in a one-line field must not send the whole sheet.
+    form.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && e.target.matches('input, select')) { e.preventDefault(); e.target.blur(); }
     });
 
-    // Mark rows that actually have a score (grade != 0) so it's obvious at a
-    // glance who has been graded and who hasn't.
-    function markScored(sel) {
-      var scored = sel.value && sel.value !== '0';
-      sel.classList.toggle('is-scored', scored);
-    }
-    document.querySelectorAll('.group-grade').forEach(function (sel) {
-      markScored(sel);
-      sel.addEventListener('change', function () { markScored(sel); });
+    // Runs from app.js's validator, before anything is sent or queued: the
+    // same two rules /add-all enforces.
+    form.mmValidate = function () {
+      var first = null;
+      var any = false;
+      rows.forEach(function (row) {
+        var g = gradeOf(row);
+        if (g !== '0') any = true;
+        var bad = g === '0' && noteOf(row).value.trim();
+        setRowError(row, bad ? 'יש הערה בלי ציון — בחר ציון או מחק את ההערה' : '');
+        if (bad && !first) first = row.querySelector('input[type="radio"]');
+      });
+      if (!first && !any) {
+        groupError.textContent = 'לא סומן אף ציון — בחר ציון לפחות למגובש אחד';
+        groupError.hidden = false;
+        first = rows.length ? rows[0].querySelector('input[type="radio"]') : null;
+      } else {
+        groupError.hidden = true;
+      }
+      return first;
+    };
+
+    // A refilled sheet (fix & resend from the outbox) shows its notes.
+    document.addEventListener('mm:prefilled', function () {
+      syncStation();
+      rows.forEach(function (row) { if (noteOf(row).value) showNote(row, false); });
+      count();
     });
+
+    // Queued offline: the sheet resets to how the page loaded.
+    form.addEventListener('reset', function () {
+      setTimeout(function () {
+        syncStation();
+        rows.forEach(function (row) {
+          var area = noteOf(row);
+          area.hidden = !area.value;
+          row.querySelector('[data-note-open]').hidden = !!area.value;
+          setRowError(row, '');
+        });
+        count();
+      }, 0);
+    });
+
+    window.quickNoteLocation = function () { return stationName(); };
+    syncStation();
+    if (!refusedValues) applySaved();
+    rows.forEach(function (row) { if (noteOf(row).value) grow(noteOf(row)); });
+    count();
   });
 </script>
 
