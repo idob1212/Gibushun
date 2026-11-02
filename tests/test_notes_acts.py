@@ -171,7 +171,27 @@ with app.app_context():
     db.session.commit()
 html = html_of(client.get("/acts/order?station=ספרינטים - אקט 1"))
 assert "[4, 2, 6, 1, 3]" in html and "[5]" in html, "finishers vs non-finishers recovered from the grades"
-print("OK: older acts (no places saved) split into finishers and non-finishers")
+UNSURE = 'role="status" data-unsure>'
+assert UNSURE not in html, "5 finishers: the grades pin the split down"
+
+# ... but with 1-2 finishers the grades fit both splits: asked, not guessed
+with app.app_context():
+    db.session.add(Review(station="ספרינטים - אקט 7", subject_id="1/3", grade=4, author_id=1))
+    for n in (1, 2, 4, 5, 6):
+        db.session.add(Review(station="ספרינטים - אקט 7", subject_id=f"1/{n}", grade=1, author_id=1))
+    db.session.commit()
+html = html_of(client.get("/acts?base=ספרינטים"))
+assert "לבדיקה: האקט נשמר לפני" in html
+html = html_of(client.get("/acts/order?station=ספרינטים - אקט 7"))
+assert UNSURE in html and "הרשימה נכונה — שמור" in html
+# confirming the shown split stores the places; the act is no longer unsure
+client.post("/acts/order", json={"station": "ספרינטים - אקט 7", "finished": [3, 1], "unfinished": [2, 4, 5, 6]})
+html = html_of(client.get("/acts/order?station=ספרינטים - אקט 7"))
+assert UNSURE not in html and "[3, 1]" in html
+with app.app_context():
+    rows = {int(r.subject_id.split("/")[1]): r for r in Review.query.filter_by(station="ספרינטים - אקט 7")}
+    assert rows[3].place == 1 and rows[1].place == 2 and rows[2].place == 0
+print("OK: older acts split by their grades; when the grades can't tell, the page asks")
 
 # 6) Moving an act shows up with an undo that restores the exact name
 resp = client.post("/acts/rename", data={"station": "ספרינטים - אקט 1", "new_base": "זחילות"}, follow_redirects=True)

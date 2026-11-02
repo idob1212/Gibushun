@@ -12,6 +12,19 @@
 <section class="px-4 mt-4 pb-4">
   <a href="{{ url_for('acts_page', base=base) }}" class="btn btn-outline w-full mb-3"><i class="fas fa-arrow-right"></i> חזרה לאקטים</a>
 
+  {% if unsure %}
+  {# Saved before places were kept, and its grades fit more than one split
+     (1–2 finishers): show the likely one and ask, instead of guessing. #}
+  <div class="alert alert-warning mb-3 items-start" role="status" data-unsure>
+    <i class="fas fa-question-circle mt-1"></i>
+    <div class="flex flex-col gap-2">
+      <p class="font-semibold">האקט נשמר לפני שהאפליקציה שמרה מי סיים, ולפי הציונים אי אפשר לדעת בוודאות.</p>
+      <p class="text-sm">בדקו מי ברשימת ״סיימו״ ומי ב״לא סיימו״. אם צריך — ״סמן כלא סיים״ או ״סיים״. כל שינוי נשמר, או:</p>
+      <button type="button" class="btn btn-sm self-start" data-confirm-order>הרשימה נכונה — שמור</button>
+    </div>
+  </div>
+  {% endif %}
+
   <div class="flex items-center justify-between gap-2 mb-3">
     <p class="text-sm text-base-content/70">החצים קובעים את סדר ההגעה. הציון מתעדכן לפי המקום. השמירה אוטומטית.</p>
     <span id="save-state" class="text-sm font-semibold shrink-0" role="status" aria-live="polite"></span>
@@ -145,6 +158,8 @@
     }).then(function (r) {
       if (!r.ok || !r.d.success) throw new Error(r.d.message || '');
       status(r.d.queued ? 'נשמר במכשיר ✓' : 'נשמר ✓', 'ok');
+      var unsure = document.querySelector('[data-unsure]');
+      if (unsure) unsure.remove();   // the places are stored now
     }).catch(function (err) {
       dirty = true;   // the next change retries
       var msg = err && err.message && !/JSON|fetch|network/i.test(err.message) ? err.message : 'השמירה נכשלה';
@@ -169,6 +184,9 @@
     fin.insertBefore(li, fin.children[to - 1] || null);
     changed(li);
   });
+
+  var confirmBtn = document.querySelector('[data-confirm-order]');
+  if (confirmBtn) confirmBtn.addEventListener('click', function () { changed(null); });
 
   document.addEventListener('click', function (e) {
     var btn = e.target.closest('[data-move], [data-dnf], [data-finish]');

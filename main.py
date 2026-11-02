@@ -2743,16 +2743,19 @@ def _number_of(review):
 
 
 def act_split(rows):
-    """(finishers in finishing order, non-finishers by number) of one act."""
+    """(finishers in finishing order, non-finishers by number, certain) of
+    one act. `certain` is False only for an act saved before places were
+    kept whose grades fit more than one split: the page then asks to check
+    it once instead of guessing silently (saving it stores the places)."""
     rows = sorted(rows, key=lambda r: r.id)
     if rows and all(r.place is not None for r in rows):
         finished = sorted((r for r in rows if r.place), key=lambda r: (r.place, r.id))
-        return finished, sorted((r for r in rows if not r.place), key=_number_of)
+        return finished, sorted((r for r in rows if not r.place), key=_number_of), True
     # Saved before places were kept: the rows went in finishing order, then
     # the non-finishers by number, all with 1 — and the last finishers get 1
     # too. The finisher count is the one whose grades match the formula (the
-    # 2nd grade pins it down); for tiny acts, the one whose tail is in number
-    # order.
+    # 2nd grade pins it down from 3 finishers up); with 1–2 finishers both
+    # fit, so the one whose tail is in number order is shown, marked unsure.
     total = len(rows)
     numbers = [_number_of(r) for r in rows]
     run = 1 if total else 0
@@ -2772,7 +2775,7 @@ def act_split(rows):
         count = fits[0] if fits else valid[-1]
     else:  # edited by hand since: everyone above 1 finished
         count = max((i + 1 for i, r in enumerate(rows) if (r.grade or 0) > 1), default=total)
-    return rows[:count], sorted(rows[count:], key=_number_of)
+    return rows[:count], sorted(rows[count:], key=_number_of), len(valid) == 1
 
 
 def act_saved_at(rows):
@@ -2794,9 +2797,10 @@ def group_acts(group_id):
         act["rows"].append(review)
         act["last_id"] = max(act["last_id"], review.id)
     for act in acts.values():
-        finished, unfinished = act_split(act["rows"])
+        finished, unfinished, certain = act_split(act["rows"])
         act["finished"] = [_number_of(r) for r in finished]
         act["unfinished"] = [_number_of(r) for r in unfinished]
+        act["unsure"] = not certain
         act["saved_at"] = act_saved_at(act["rows"])
     return sorted(acts.values(), key=lambda a: -a["last_id"])
 
@@ -2895,10 +2899,10 @@ def act_order():
     if not rows:
         flash("האקט כבר לא קיים", "warning")
         return redirect(url_for("acts_page"))
-    finished, unfinished = act_split(rows)
+    finished, unfinished, certain = act_split(rows)
     names = {c.number: c.name for c in Candidate.query.filter_by(group_id=group_id).all()}
     return render_template("act-order.html", station=station, base=parsed[0], number=parsed[1],
-                           saved_at=act_saved_at(rows), names=names,
+                           saved_at=act_saved_at(rows), names=names, unsure=not certain,
                            finished=[_number_of(r) for r in finished],
                            unfinished=[_number_of(r) for r in unfinished])
 

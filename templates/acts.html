@@ -49,6 +49,9 @@
             {% if loop.first %}<span class="badge badge-accent badge-sm shrink-0 mt-1">האחרון שנשמר</span>{% endif %}
           </div>
 
+          {% if act.unsure %}
+            <p class="text-sm font-semibold text-warning-content bg-warning/25 rounded-box px-3 py-2">לבדיקה: האקט נשמר לפני שהאפליקציה שמרה מי סיים. פתחו ״סדר מחדש״ ואשרו את הרשימה.</p>
+          {% endif %}
           <p class="text-sm"><span class="text-base-content/60">ראשונים:</span>
             <span class="font-display font-bold">{{ act.finished[:5]|join(', ') }}</span>{% if act.finished|length > 5 %} <span class="text-base-content/50">…</span>{% endif %}</p>
 

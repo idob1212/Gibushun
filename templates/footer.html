@@ -100,6 +100,7 @@
       var theme = box.checked ? 'meymadion-dark' : 'meymadion';
       html.setAttribute('data-theme', theme);
       try { localStorage.setItem('theme', theme); } catch (e) {}
+      if (window.mmStatusBar) window.mmStatusBar();
     });
   })();
 </script>
