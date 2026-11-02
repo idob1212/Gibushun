@@ -5,9 +5,9 @@
        is_admin never reaches this file — recompute it here. #}
     {% set is_admin = current_user.is_authenticated and current_user.id == 0 %}
     {% set is_staff = current_user.is_authenticated and current_user.id < 0 %}
-    {% macro dock_item(endpoints, href, icon, label) -%}
+    {% macro dock_item(endpoints, href, icon, label, attrs='') -%}
       {%- set on = request.endpoint in endpoints -%}
-      <a href="{{ href }}" class="{{ 'dock-active' if on else '' }}"{% if on %} aria-current="page"{% endif %}><i class="fas {{ icon }}"></i><span class="dock-label">{{ label }}</span></a>
+      <a href="{{ href }}" class="{{ 'dock-active' if on else '' }}"{% if on %} aria-current="page"{% endif %}{{ attrs }}><i class="fas {{ icon }}"></i><span class="dock-label">{{ label }}</span></a>
     {%- endmacro %}
 
     {% if current_user.is_authenticated %}
@@ -29,7 +29,8 @@
           {{ dock_item(['staff_home'], url_for('staff_home'), 'fa-home', 'בית') }}
         {% else %}
           {{ dock_item(['home', 'candidate_profile'], url_for('home'), 'fa-home', 'בית') }}
-          {{ dock_item(['circles', 'counter_review', 'add_new_review', 'add_new_group_review', 'acts_page'], url_for('circles'), 'fa-edit', 'ציונים') }}
+          {# app.js points this at the grading mode used last on this phone. #}
+          {{ dock_item(['circles', 'counter_review', 'add_new_review', 'add_new_group_review', 'acts_page', 'act_order'], url_for('circles'), 'fa-edit', 'ציונים', (' data-grade-dock="%d"' % current_user.id)|safe) }}
           {{ dock_item(['show_notes', 'add_new_note', 'edit_note'], url_for('show_notes'), 'fa-comment', 'הערות') }}
           {{ dock_item(['Interview', 'showInterview', 'edit_interview'], url_for('Interview'), 'fa-comment-dots', 'ראיון') }}
         {% endif %}
@@ -60,7 +61,7 @@
         <li><a href="{{ url_for('staff_home') }}"><i class="fas fa-home w-5"></i>בית</a></li>
       {% else %}
         <li><a href="{{ url_for('home') }}"><i class="fas fa-home w-5"></i>בית</a></li>
-        <li><a href="{{ url_for('circles') }}"><i class="fas fa-edit w-5"></i>הזן ציונים</a></li>
+        <li><a href="{{ url_for('circles') }}" data-grade-dock="{{ current_user.id }}"><i class="fas fa-edit w-5"></i>הזן ציונים</a></li>
         <li><a href="{{ url_for('acts_page') }}"><i class="fas fa-history w-5"></i>אקטים שנשמרו</a></li>
         <li><a href="{{ url_for('show_notes') }}"><i class="fas fa-comment w-5"></i>הערות</a></li>
         <li><a href="{{ url_for('Interview') }}"><i class="fas fa-comment-dots w-5"></i>הזן ראיון</a></li>

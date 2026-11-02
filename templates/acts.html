@@ -3,63 +3,90 @@
 
 <section class="app-hero px-5 pt-6 pb-6" style="background-image:url('{{ url_for('static', filename='img/physical.jpg') }}')">
   <h1 class="text-2xl font-extrabold leading-tight">אקטים שנשמרו</h1>
-  <p class="text-white/75 text-sm mt-1">תיקון אקט שנשמר — העברה לתחנה הנכונה או מחיקה</p>
+  <p class="text-white/75 text-sm mt-1">לפי תחנה, החדש למעלה. תיקון אקט = תיקון הסדר שלו.</p>
 </section>
 
 <div class="px-4 mt-4">
   {% include "flash-messages.html" %}
+  {% if replaced %}
+    <div class="alert alert-success shadow-sm mb-2" role="status">
+      <i class="fas fa-check-circle"></i>
+      <span class="font-medium">הסדר של "{{ replaced.station }}" הוחלף · {{ replaced.finished|length }} סיימו. השם והמספר נשארו.</span>
+    </div>
+  {% endif %}
+  {% if undo %}
+    <form method="post" action="{{ url_for('act_undo_move') }}" class="alert alert-info shadow-sm mb-2">
+      <i class="fas fa-undo"></i>
+      <span class="font-medium">"{{ undo.back }}" הועבר ל-"{{ undo.station }}"</span>
+      <input type="hidden" name="station" value="{{ undo.station }}">
+      <input type="hidden" name="back" value="{{ undo.back }}">
+      <button type="submit" class="btn btn-sm">בטל</button>
+    </form>
+  {% endif %}
 </div>
 
-<section class="px-4 mt-2">
+<section class="px-4 mt-2 pb-4">
   <a href="{{ url_for('circles') }}" class="btn btn-outline w-full mb-3"><i class="fas fa-stopwatch"></i> חזרה לסדרי הגעה</a>
-  <p class="text-sm text-base-content/60 mb-3">ציון של מגובש בודד באקט נערך בדף המגובש (הקישו על המספר).</p>
 
   {% if acts %}
+  <nav class="kind-chips mb-3" aria-label="תחנה" data-act-tabs>
+    {% for base, count in tabs %}
+      <button type="button" class="kind-chip" data-kind="{{ base }}" aria-pressed="{{ 'true' if base == picked else 'false' }}">{{ base }} <b>{{ count }}</b></button>
+    {% endfor %}
+  </nav>
+
   <div class="grid gap-3">
     {% for act in acts %}
-      <div class="card bg-base-100 shadow-sm" id="act-{{ loop.index }}">
+      <div class="card bg-base-100 shadow-sm" data-act data-base="{{ act.base }}"{% if act.base != picked %} hidden{% endif %}>
         <div class="card-body p-4 gap-3">
-          <div class="flex items-center justify-between gap-2">
-            <div>
-              <h2 class="font-display font-bold text-lg leading-tight">{{ act.base }}</h2>
-              <p class="text-sm text-base-content/60">אקט {{ act.number }} · {{ act.order|length }} מגובשים{% if loop.first %} · <span class="badge badge-accent badge-sm">האחרון שנשמר</span>{% endif %}</p>
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <h2 class="font-display font-bold text-lg leading-tight">{{ act.base }} · אקט {{ act.number }}</h2>
+              <p class="text-sm text-base-content/60">
+                {% if act.saved_at %}נשמר {{ act.saved_at.strftime('%d/%m %H:%M') }} · {% endif %}{{ act.finished|length }} סיימו{% if act.unfinished %} · {{ act.unfinished|length }} לא סיימו{% endif %}
+              </p>
             </div>
+            {% if loop.first %}<span class="badge badge-accent badge-sm shrink-0 mt-1">האחרון שנשמר</span>{% endif %}
           </div>
 
-          <div class="flex flex-wrap gap-1.5" aria-label="סדר ההגעה">
-            {% for number, grade in act.order %}
-              <a href="{{ url_for('candidate_profile', candidate_id=current_user.id ~ '/' ~ number) }}#history"
-                 class="badge badge-lg {{ 'badge-primary' if grade > 1 else 'badge-ghost' }} gap-1 font-display font-bold"
-                 title="ציון {{ '%.2f'|format(grade) }}">{{ number }}<span class="font-sans font-normal text-xs opacity-80">{{ '%.1f'|format(grade) }}</span></a>
-            {% endfor %}
+          <p class="text-sm"><span class="text-base-content/60">ראשונים:</span>
+            <span class="font-display font-bold">{{ act.finished[:5]|join(', ') }}</span>{% if act.finished|length > 5 %} <span class="text-base-content/50">…</span>{% endif %}</p>
+
+          <div class="grid grid-cols-2 gap-2">
+            <a href="{{ url_for('act_order', station=act.station) }}" class="btn btn-primary"><i class="fas fa-sort"></i> סדר מחדש</a>
+            <a href="{{ url_for('circles', redo=act.station) }}" class="btn btn-outline btn-primary"><i class="fas fa-redo"></i> בצע מחדש</a>
           </div>
 
-          <details class="rounded-box border border-base-300">
-            <summary class="cursor-pointer px-3 py-2 font-semibold text-sm">העבר לתחנה אחרת</summary>
-            <form method="post" action="{{ url_for('act_rename') }}" class="p-3 pt-1 grid gap-2">
-              <input type="hidden" name="station" value="{{ act.station }}">
-              <select name="new_base" class="select select-bordered select-sm w-full" data-other-toggle>
-                {% for base in bases %}
-                  <option value="{{ base }}" {% if base == act.base %}selected{% endif %}>{{ base }}</option>
-                {% endfor %}
-                <option value="אחר">אחר…</option>
-              </select>
-              <input type="text" name="other" class="input input-bordered input-sm w-full" placeholder="שם התחנה" maxlength="100" hidden>
-              <button type="submit" class="btn btn-sm btn-primary">העבר</button>
-            </form>
+          <details class="act-more rounded-box border border-base-300">
+            <summary class="cursor-pointer px-3 py-2 text-sm font-semibold flex items-center gap-2"><i class="fas fa-ellipsis-h" aria-hidden="true"></i> עוד: נשמר בתחנה הלא נכונה / מחיקה</summary>
+            <div class="p-3 pt-1 grid gap-3">
+              <form method="post" action="{{ url_for('act_rename') }}" class="grid gap-2" data-act-move>
+                <input type="hidden" name="station" value="{{ act.station }}">
+                <label class="text-sm font-medium" for="move-{{ loop.index }}">העבר לתחנה אחרת</label>
+                <select id="move-{{ loop.index }}" name="new_base" class="select select-bordered select-sm w-full" data-other-toggle>
+                  {% for base in bases %}
+                    <option value="{{ base }}" {% if base == act.base %}selected{% endif %}>{{ base }}</option>
+                  {% endfor %}
+                  <option value="אחר">אחר…</option>
+                </select>
+                <input type="text" name="other" class="input input-bordered input-sm w-full" placeholder="שם התחנה" maxlength="100" hidden>
+                <p class="text-sm text-base-content/70" data-move-preview aria-live="polite"></p>
+                <button type="submit" class="btn btn-sm btn-primary" disabled>העבר</button>
+              </form>
+              <form method="post" action="{{ url_for('act_delete') }}">
+                <input type="hidden" name="station" value="{{ act.station }}">
+                <button type="submit" class="btn btn-sm btn-outline btn-error w-full"
+                        onclick='return confirm({{ ("למחוק את \"" ~ act.station ~ "\" לכל המגובשים? לא ניתן לבטל.") | tojson }})'>
+                  <i class="fas fa-trash"></i> מחק את האקט
+                </button>
+              </form>
+            </div>
           </details>
-
-          <form method="post" action="{{ url_for('act_delete') }}">
-            <input type="hidden" name="station" value="{{ act.station }}">
-            <button type="submit" class="btn btn-sm btn-outline btn-error w-full"
-                    onclick='return confirm({{ ("למחוק את \"" ~ act.station ~ "\" לכל המגובשים? לא ניתן לבטל.") | tojson }})'>
-              <i class="fas fa-trash"></i> מחק את האקט
-            </button>
-          </form>
         </div>
       </div>
     {% endfor %}
   </div>
+  <p class="text-sm text-base-content/60 mt-3">ציון של מגובש בודד באקט נערך בדף המגובש.</p>
   {% else %}
     <div class="card bg-base-100 shadow-sm">
       <div class="card-body items-center text-center py-10">
@@ -72,14 +99,44 @@
 </section>
 
 <script>
-  document.querySelectorAll('[data-other-toggle]').forEach(function (sel) {
-    var other = sel.form.querySelector('input[name="other"]');
-    sel.addEventListener('change', function () {
-      other.hidden = sel.value !== 'אחר';
-      other.required = !other.hidden;
-      if (!other.hidden) other.focus();
+(function () {
+  // Station tabs (kept in the address, so "back" returns to the same one).
+  var tabs = document.querySelectorAll('[data-act-tabs] .kind-chip');
+  var cards = document.querySelectorAll('[data-act]');
+  tabs.forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      var base = tab.dataset.kind;
+      tabs.forEach(function (t) { t.setAttribute('aria-pressed', t === tab ? 'true' : 'false'); });
+      cards.forEach(function (c) { c.hidden = c.dataset.base !== base; });
+      try { history.replaceState(history.state, '', location.pathname + '?base=' + encodeURIComponent(base)); } catch (e) {}
     });
   });
+
+  // Moving shows exactly what it does: "from → to", with the number the act
+  // will get there (the target station may already have acts).
+  var maxNumber = {};
+  {% for act in acts %}maxNumber[{{ act.base | tojson }}] = Math.max(maxNumber[{{ act.base | tojson }}] || 0, {{ act.number }});
+  {% endfor %}
+  document.querySelectorAll('[data-act-move]').forEach(function (form) {
+    var sel = form.querySelector('select');
+    var other = form.querySelector('input[name="other"]');
+    var preview = form.querySelector('[data-move-preview]');
+    var btn = form.querySelector('[type="submit"]');
+    var from = form.closest('[data-act]').querySelector('h2').textContent.trim();
+    var current = form.closest('[data-act]').dataset.base;
+    function update() {
+      other.hidden = sel.value !== 'אחר';
+      other.required = !other.hidden;
+      var target = sel.value === 'אחר' ? other.value.trim() : sel.value;
+      var ok = target && target !== current;
+      btn.disabled = !ok;
+      preview.textContent = ok ? (from + ' ← ' + target + ' · אקט ' + ((maxNumber[target] || 0) + 1)) : 'בחרו את התחנה הנכונה';
+    }
+    sel.addEventListener('change', function () { update(); if (!other.hidden) other.focus(); });
+    other.addEventListener('input', update);
+    update();
+  });
+})();
 </script>
 
 {% include "footer.html" %}

@@ -60,7 +60,9 @@ The database is created automatically when the app starts. Tables are created us
 fixed to the viewport, only `<main id="app-main">` scrolls, and the bottom dock is a
 flex row, not `position: fixed` (iOS left the dock stranded mid-screen otherwise).
 Never toggle layout on input focus/blur — a tap on "save" blurs first and a layout
-jump sends the tap elsewhere.
+jump sends the tap elsewhere. The same goes for anything that appears or goes away
+by itself: the offline bar grows `<main>`'s scroll position by its own height, and
+self-dismissing messages fade but keep their space (`AppUI.fadeAway`).
 
 ### Database Models
 
@@ -79,6 +81,8 @@ jump sends the tap elsewhere.
 - Station-based evaluations
 - Links candidates to their performance scores
 - Supports both numerical grades and counter-based evaluations
+- `created_at` (Israel time, NULL on older rows); arrival-order rows keep `place`
+  (1 = first, 0 = did not finish; NULL on older rows — `act_split()` infers it)
 
 **Note Model (`notes` table):**
 - Behavioral observations and notes
@@ -119,8 +123,15 @@ jump sends the tap elsewhere.
 - `/candidate/<group>/<number>` - Candidate page: scores, notes, edit/delete saved grades
 
 **Evaluation System:**
-- `/circles` - Arrival order (circle mode); `/acts` - saved heats (move/delete)
-- `/counter-review` - March counters; `/new-review`, `/new-group-review` - station grades
+- `/circles` - Arrival order (circle mode); `?redo=<act>` replaces a saved act's order in place
+- `/acts` - saved heats by station; `/acts/order` reorders one (▲▼, like `/final-summary/`);
+  moving to another station (`/acts/rename`) can be undone (`/acts/undo-move`). An act
+  keeps its name, number and saved time whatever is fixed
+- `/counter-review` - March counters; `/new-review`, `/new-group-review` - station grades.
+  The four grading screens share one mode switcher (`_grade-modes.html`); the dock's
+  "ציונים" reopens the last mode, and single/group mode remember the station per group
+- `/show-notes` (`/notes-admin/` for the admin) - notes board: notes and grade comments
+  ("תחנה", with the grade), newest first, filtered on the phone
 - `/notes/quick` - JSON endpoint behind the floating quick-note sheet
 - `/interview/`, `/show-interview/` - Interviews (summary lists all by default)
 - `/final-grade/`, `/final-summary/` - Final category and ranking inside each category

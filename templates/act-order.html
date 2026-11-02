@@ -1,0 +1,203 @@
+{% block content %}
+{% include "header.html" %}
+
+<section class="app-hero px-5 pt-6 pb-6" style="background-image:url('{{ url_for('static', filename='img/physical.jpg') }}')">
+  <h1 class="text-2xl font-extrabold leading-tight">{{ base }} · אקט {{ number }}</h1>
+  <p class="text-white/75 text-sm mt-1">{% if saved_at %}נשמר {{ saved_at.strftime('%d/%m %H:%M') }} · {% endif %}<span data-summary></span></p>
+</section>
+
+{# Field feedback: fixing an act means fixing its order — "move them in the
+   ranking like the final opinion ranking". The same ▲▼, places and
+   auto-save as סיכום ציונים סופיים; the act keeps its name, number and time. #}
+<section class="px-4 mt-4 pb-4">
+  <a href="{{ url_for('acts_page', base=base) }}" class="btn btn-outline w-full mb-3"><i class="fas fa-arrow-right"></i> חזרה לאקטים</a>
+
+  <div class="flex items-center justify-between gap-2 mb-3">
+    <p class="text-sm text-base-content/70">החצים קובעים את סדר ההגעה. הציון מתעדכן לפי המקום. השמירה אוטומטית.</p>
+    <span id="save-state" class="text-sm font-semibold shrink-0" role="status" aria-live="polite"></span>
+  </div>
+
+  <ol class="grid gap-2" data-finished aria-label="סיימו"></ol>
+
+  <h2 class="font-display font-bold mt-5 mb-2">לא סיימו <span class="text-sm font-normal text-base-content/60">· מקבלים 1</span></h2>
+  <ol class="grid gap-2" data-unfinished aria-label="לא סיימו"></ol>
+  <p class="text-sm text-base-content/50 border border-dashed border-base-300 rounded-box p-3 text-center" data-none hidden>כולם סיימו</p>
+</section>
+
+<script>
+(function () {
+  var STATION = {{ station | tojson }};
+  var NAMES = {{ names | tojson }};
+  var fin = document.querySelector('[data-finished]');
+  var dnf = document.querySelector('[data-unfinished]');
+  var none = document.querySelector('[data-none]');
+  var summary = document.querySelector('[data-summary]');
+  var stateEl = document.getElementById('save-state');
+  var timer = null, inFlight = false, dirty = false;
+
+  function grades(count) {   // the same 4 → 1 formula the server saves with
+    var penalty = count > 1 ? 4 / (count - 1) : 0;
+    var out = [];
+    for (var i = 0; i < count; i++) out.push(Math.max(1, 4 - i * penalty));
+    return out;
+  }
+  function rows(list) { return Array.prototype.slice.call(list.children); }
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function button(cls, text, attr, label) {
+    var b = el('button', cls, text);
+    b.type = 'button';
+    b.setAttribute(attr[0], attr[1]);
+    if (label) b.setAttribute('aria-label', label);
+    return b;
+  }
+
+  // One row; `was` is its place when the page opened (0 = did not finish).
+  function row(n, was, finished) {
+    var li = el('li', 'card bg-base-100 shadow-sm');
+    li.dataset.number = n;
+    li.dataset.was = was;
+    var body = el('div', 'card-body p-3 flex-row items-center gap-2.5');
+    var name = NAMES[n] || '';
+    if (finished) {
+      // The place is a picker: a long move is one choice on the phone's
+      // wheel instead of tapping ▲ ten times (no keyboard, no typos).
+      var place = el('select', 'rank rank-pick font-display font-extrabold text-base min-w-9 text-center text-primary');
+      place.setAttribute('data-place', '');
+      place.setAttribute('aria-label', 'מקום של מגובש ' + n);
+      body.appendChild(place);
+      body.appendChild(el('div', 'bib bib-sm shrink-0', n));
+      var mid = el('div', 'flex-1 min-w-0');
+      mid.appendChild(el('div', 'font-semibold truncate', name));
+      var sub = el('div', 'text-xs text-base-content/60 flex items-center gap-2');
+      sub.appendChild(el('span', '', ''));
+      sub.lastChild.setAttribute('data-moved', '');
+      // An action, not a status: under every finisher a bare "לא סיים" read as one.
+      sub.appendChild(button('btn btn-xs btn-ghost px-1.5 font-medium', 'סמן כלא סיים', ['data-dnf', ''], 'סמן שמגובש ' + n + ' לא סיים'));
+      mid.appendChild(sub);
+      body.appendChild(mid);
+      var grade = el('span', 'font-display font-bold text-lg w-10 text-center', '');
+      grade.setAttribute('data-grade', '');
+      body.appendChild(grade);
+      var arrows = el('div', 'flex flex-col gap-1 shrink-0');
+      arrows.appendChild(button('btn btn-sm btn-square btn-outline', '', ['data-move', 'up'], 'הזז את מגובש ' + n + ' למעלה'));
+      arrows.lastChild.innerHTML = '<i class="fas fa-chevron-up"></i>';
+      arrows.appendChild(button('btn btn-sm btn-square btn-outline', '', ['data-move', 'down'], 'הזז את מגובש ' + n + ' למטה'));
+      arrows.lastChild.innerHTML = '<i class="fas fa-chevron-down"></i>';
+      body.appendChild(arrows);
+    } else {
+      body.appendChild(el('span', 'rank font-display font-extrabold text-base min-w-9 text-center text-base-content/40', '–'));
+      body.appendChild(el('div', 'bib bib-sm bib-ghost shrink-0', n));
+      body.appendChild(el('div', 'flex-1 min-w-0 font-semibold truncate', name));
+      body.appendChild(el('span', 'font-display font-bold text-lg w-10 text-center text-base-content/50', '1.0'));
+      body.appendChild(button('btn btn-sm btn-outline btn-primary', 'סיים', ['data-finish', ''], 'סמן שמגובש ' + n + ' סיים'));
+    }
+    li.appendChild(body);
+    return li;
+  }
+
+  function refresh() {
+    var items = rows(fin), g = grades(items.length);
+    items.forEach(function (li, i) {
+      var place = li.querySelector('[data-place]');
+      if (place.options.length !== items.length) {
+        place.innerHTML = '';
+        for (var k = 1; k <= items.length; k++) place.appendChild(new Option('#' + k, k));
+      }
+      place.value = String(i + 1);
+      li.querySelector('[data-grade]').textContent = g[i].toFixed(1);
+      var was = +li.dataset.was, moved = li.querySelector('[data-moved]');
+      moved.textContent = !was ? 'נוסף' : (was > i + 1 ? '↑ היה ' + was : (was < i + 1 ? '↓ היה ' + was : ''));
+      moved.className = was === i + 1 ? '' : 'font-semibold text-primary';
+      li.querySelector('[data-move="up"]').disabled = i === 0;
+      li.querySelector('[data-move="down"]').disabled = i === items.length - 1;
+      li.querySelector('[data-dnf]').hidden = items.length === 1;   // someone must finish
+    });
+    none.hidden = dnf.children.length > 0;
+    summary.textContent = items.length + ' סיימו' + (dnf.children.length ? ' · ' + dnf.children.length + ' לא סיימו' : '');
+  }
+
+  function status(text, kind) {
+    stateEl.textContent = text;
+    stateEl.className = 'text-sm font-semibold shrink-0 ' + (kind === 'error' ? 'text-error' : kind === 'ok' ? 'text-success' : 'text-base-content/60');
+  }
+  function save() {
+    if (inFlight) { timer = setTimeout(save, 300); return; }
+    if (!dirty) return;
+    dirty = false;
+    inFlight = true;
+    status('שומר…');
+    var num = function (li) { return +li.dataset.number; };
+    fetch('{{ url_for("act_order") }}', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ station: STATION, finished: rows(fin).map(num), unfinished: rows(dnf).map(num) })
+    }).then(function (res) {
+      return res.json().then(function (d) { return { ok: res.ok, d: d }; });
+    }).then(function (r) {
+      if (!r.ok || !r.d.success) throw new Error(r.d.message || '');
+      status(r.d.queued ? 'נשמר במכשיר ✓' : 'נשמר ✓', 'ok');
+    }).catch(function (err) {
+      dirty = true;   // the next change retries
+      var msg = err && err.message && !/JSON|fetch|network/i.test(err.message) ? err.message : 'השמירה נכשלה';
+      status(msg + ' — שינוי נוסף ינסה שוב', 'error');
+    }).then(function () { inFlight = false; });
+  }
+  function changed(li) {
+    refresh();
+    dirty = true;
+    status('…');
+    clearTimeout(timer);
+    timer = setTimeout(save, 450);
+    if (li) li.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+
+  document.addEventListener('change', function (e) {
+    var place = e.target.closest('[data-place]');
+    if (!place) return;
+    var li = place.closest('li');
+    var to = +place.value;
+    fin.removeChild(li);
+    fin.insertBefore(li, fin.children[to - 1] || null);
+    changed(li);
+  });
+
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-move], [data-dnf], [data-finish]');
+    if (!btn) return;
+    var li = btn.closest('li');
+    var n = +li.dataset.number;
+    if (btn.dataset.move === 'up' && li.previousElementSibling) {
+      fin.insertBefore(li, li.previousElementSibling);
+    } else if (btn.dataset.move === 'down' && li.nextElementSibling) {
+      fin.insertBefore(li.nextElementSibling, li);
+    } else if (btn.hasAttribute('data-dnf')) {
+      var out = row(n, li.dataset.was, false);
+      li.remove();
+      dnf.insertBefore(out, rows(dnf).filter(function (o) { return +o.dataset.number > n; })[0] || null);
+      li = out;
+    } else if (btn.hasAttribute('data-finish')) {
+      var back = row(n, li.dataset.was, true);   // joins the end of the finishers
+      li.remove();
+      fin.appendChild(back);
+      li = back;
+    } else {
+      return;
+    }
+    changed(li);
+    if (btn.dataset.move && btn.isConnected) btn.focus();
+  });
+
+  {{ finished | tojson }}.forEach(function (n, i) { fin.appendChild(row(n, i + 1, true)); });
+  {{ unfinished | tojson }}.forEach(function (n) { dnf.appendChild(row(n, 0, false)); });
+  refresh();
+})();
+</script>
+
+{% include "footer.html" %}
+{% endblock %}

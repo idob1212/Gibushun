@@ -7,10 +7,8 @@
   <p class="text-white/75 text-sm mt-1">מצב מסע — תחנה פיזית</p>
 </section>
 
-<section class="px-4 mt-4 grid gap-2">
-  <a href="{{ url_for('circles') }}" class="btn btn-outline w-full">עבור למצב סדרי הגעה</a>
-  <a href="{{ url_for('add_new_group_review') }}" class="btn btn-outline w-full">עבור למצב קבוצתי</a>
-  <a href="{{ url_for('add_new_review') }}" class="btn btn-outline w-full">עבור למצב יחיד</a>
+<section class="px-4 mt-4">
+  {% include "_grade-modes.html" %}
 </section>
 
 <div class="px-4 mt-4">
@@ -87,13 +85,7 @@ document.addEventListener('DOMContentLoaded', function() {
         box.querySelector('span').textContent = message;
         box.querySelector('button').addEventListener('click', function () { box.remove(); });
         flashContainer.appendChild(box);
-        if (kind === 'success') {
-            setTimeout(() => {
-                box.style.transition = 'opacity .4s';
-                box.style.opacity = '0';
-                setTimeout(() => box.remove(), 400);
-            }, 3000);
-        }
+        if (kind === 'success' && window.AppUI) AppUI.fadeAway(box, 3000);
     }
     // Per-station in-page cache: station -> { candidateId: {counter, note} }.
     // Keeps this session's entries when switching stations offline.

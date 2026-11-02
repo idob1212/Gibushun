@@ -8,10 +8,8 @@
   <p class="text-white/75 text-sm mt-1">מצב קבוצתי — כל המגובשים יחד</p>
 </section>
 
-<section class="px-4 mt-4 grid gap-2">
-  <a href="{{ url_for('circles') }}" class="btn btn-outline w-full">עבור למצב סדרי הגעה</a>
-  <a href="{{ url_for('counter_review') }}" class="btn btn-outline w-full">עבור למצב מסע</a>
-  <a href="{{ url_for('add_new_review') }}" class="btn btn-outline w-full">עבור למצב יחיד</a>
+<section class="px-4 mt-4">
+  {% include "_grade-modes.html" %}
 </section>
 
 <div class="px-4 mt-4">
@@ -22,7 +20,7 @@
    full-width note. Field feedback: "what is 0?", a note on a 0 row vanished
    while the page said "saved", and the one-line note box was too narrow. #}
 <section class="px-4 mt-2">
-  <form method="POST" action="{{ url_for('update_all') }}" data-offline novalidate id="group-form" class="flex flex-col gap-3">
+  <form method="POST" action="{{ url_for('update_all') }}" data-offline data-keep-fields="station odt"{% if not user_form.station.data and not values %} data-restore-station{% endif %} novalidate id="group-form" class="flex flex-col gap-3">
     {{ user_form.csrf_token }}
 
     <div class="card bg-base-100 shadow-sm">
@@ -159,8 +157,21 @@
       additionalField.hidden = !custom;
       odt.required = custom;   // the same rule as the server
     }
-    station.addEventListener('change', function () { syncStation(); applySaved(); });
-    odt.addEventListener('change', applySaved);
+    // The station is remembered on the phone, per group (field feedback:
+    // "I have to pick it again every time").
+    var STATION_KEY = 'mm-group-station:' + {{ current_user.id | tojson }};
+    function rememberStation() {
+      try { localStorage.setItem(STATION_KEY, JSON.stringify({ station: station.value, odt: odt.value })); } catch (e) {}
+    }
+    function restoreStation() {
+      var s = null;
+      try { s = JSON.parse(localStorage.getItem(STATION_KEY) || 'null'); } catch (e) {}
+      if (!s || !Array.prototype.some.call(station.options, function (o) { return o.value === s.station; })) return;
+      station.value = s.station;
+      odt.value = s.odt || '';
+    }
+    station.addEventListener('change', function () { syncStation(); applySaved(); rememberStation(); });
+    odt.addEventListener('change', function () { applySaved(); rememberStation(); });
 
     form.addEventListener('click', function (e) {
       var open = e.target.closest('[data-note-open]');
@@ -224,7 +235,28 @@
       }, 0);
     });
 
+    // Queued offline: the station stays (data-keep-fields) and the sheet
+    // shows what was just queued — the same view as the reload after an
+    // online save.
+    form.addEventListener('mm:queued', function (e) {
+      var data = {};
+      var sent = {};
+      (e.detail && e.detail.fields || []).forEach(function (kv) { sent[kv[0]] = kv[1]; });
+      var mine = saved[stationName()] || {};
+      rows.forEach(function (row) {
+        var n = row.dataset.number;
+        var g = sent['grade-' + n];
+        if (g && g !== '0') data[n] = [+g, sent['note-' + n] || ''];
+        else if (mine[n]) data[n] = mine[n];
+        else data[n] = [1, ''];  // "–" rows got 1, as the server does
+      });
+      saved[stationName()] = data;
+      applySaved();
+    });
+
     window.quickNoteLocation = function () { return stationName(); };
+    if (form.hasAttribute('data-restore-station')) restoreStation();
+    rememberStation();
     syncStation();
     if (!refusedValues) applySaved();
     rows.forEach(function (row) { if (noteOf(row).value) grow(noteOf(row)); });

@@ -257,8 +257,20 @@
     });
   }
 
+  // A confirmation that goes away by itself fades out but keeps its space:
+  // removing it pulled everything below up, and a tap on its way landed on
+  // whatever slid under the finger (the lost-tap rule in CLAUDE.md). The
+  // next message on the page takes its place.
+  function fadeAway(el, delay) {
+    setTimeout(function () {
+      el.style.transition = 'opacity .4s';
+      el.style.opacity = '0';
+      setTimeout(function () { el.style.visibility = 'hidden'; }, 400);
+    }, delay);
+  }
+
   window.AppUI = { setBusy: setBusy, markButton: markButton, setFormBusy: setFormBusy, toast: toast, uuid: uuid,
-                   validateForm: validateForm };
+                   validateForm: validateForm, fadeAway: fadeAway };
 
   // --- Quick note sheet -----------------------------------------------------
   var sheet = document.getElementById('qn-sheet');
@@ -500,6 +512,23 @@
       // Blocked: let the same file be picked again.
       setTimeout(function () { if (!form.__mmSubmitting) input.value = ''; }, 0);
     });
+  });
+
+  // --- Grading mode memory --------------------------------------------------
+  // The dock's "ציונים" reopens the mode used last on this phone (field
+  // feedback: it always opened arrival order, two taps away from single
+  // mode). Kept per group, since a phone can log into another group.
+  var GRADE_MODES = ['/circles', '/counter-review', '/new-review', '/new-group-review'];
+  var modeTabs = document.querySelector('[data-grade-modes]');
+  if (modeTabs && GRADE_MODES.indexOf(location.pathname) !== -1) {
+    try { localStorage.setItem('mm-grade-mode:' + modeTabs.getAttribute('data-grade-modes'), location.pathname); } catch (e) {}
+  }
+  // Every "enter grades" link: the dock, the menu and the home button.
+  document.querySelectorAll('[data-grade-dock]').forEach(function (link) {
+    try {
+      var lastMode = localStorage.getItem('mm-grade-mode:' + link.getAttribute('data-grade-dock'));
+      if (GRADE_MODES.indexOf(lastMode) !== -1) link.setAttribute('href', lastMode);
+    } catch (e) {}
   });
 
   // --- "Already interviewed" sheet ------------------------------------------

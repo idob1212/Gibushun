@@ -200,6 +200,10 @@ class Candidate(db.Model):
     def number(self):
         return int(self.id.split("/")[1])
 
+def israel_now():
+    return datetime.now(pytz.timezone('Israel')).replace(tzinfo=None, microsecond=0)
+
+
 class Review(db.Model):
     __tablename__ = "reviews"
     id = db.Column(db.Integer, primary_key=True)
@@ -211,6 +215,11 @@ class Review(db.Model):
     grade = db.Column(db.Float, nullable=False)
     note = db.Column(db.Text)
     counter_value = db.Column(db.Integer, nullable=True)
+    # When the row was first saved (Israel time); rows from before have none.
+    created_at = db.Column(db.DateTime, nullable=True, default=israel_now)
+    # Arrival-order heats only: finishing place, 1 = first, 0 = did not
+    # finish. NULL on rows saved before places were kept (see act_order).
+    place = db.Column(db.Integer, nullable=True)
 
 class Note(db.Model):
     __tablename__ = "notes"
@@ -334,6 +343,19 @@ def _add_final_rank_column():
 
 
 _add_final_rank_column()
+
+
+def _add_review_time_and_place_columns():
+    inspector = sqlalchemy.inspect(db.engine)
+    columns = [col["name"] for col in inspector.get_columns("reviews")]
+    to_add = [("created_at", "TIMESTAMP"), ("place", "INTEGER")]
+    with db.engine.connect() as conn:
+        for name, col_type in to_add:
+            if name not in columns:
+                conn.execute(sqlalchemy.text(f"ALTER TABLE reviews ADD COLUMN {name} {col_type}"))
+
+
+_add_review_time_and_place_columns()
 
 app.config['WTF_CSRF_TIME_LIMIT'] = None
 
@@ -1321,10 +1343,12 @@ def add_new_review():
     # Only the stations for this mode (plus "אחר" for a one-off custom name).
     form = CreateReviewForm()
     form.station.choices = MODE_STATIONS["individual"] + ["אחר"]
-    # An explicit "choose" entry: a list that starts on a real number shows
-    # candidate 1 whenever the wanted one is missing (e.g. retired), and a
-    # careless tap grades the wrong person.
-    form.subject.choices = [("", "— בחרו מגובש —")] + [(n, str(n)) for n in active_candidate_numbers(current_user.id)]
+    # Number chips with nothing picked: a list that starts on a real number
+    # shows candidate 1 whenever the wanted one is missing (e.g. retired),
+    # and a careless tap grades the wrong person.
+    candidates = active_candidates(current_user.id)
+    numbers = [c.number for c in candidates]
+    form.subject.choices = [(n, str(n)) for n in numbers]
     if form.validate_on_submit():
         if is_duplicate_request():
             flash('חוות הדעת כבר נשמרה', 'success')
@@ -1338,13 +1362,42 @@ def add_new_review():
         form.station.data = station  # summaries are keyed by the saved name
         update_avgs(form)
         form.station.data = chosen
-        flash(f'הערכת תחנה {station} עבור {candidate.name} נשמרה בהצלחה!', 'success')
-        # Keep the station (and its custom name) for the next candidate; the
-        # grade starts empty again so a stale tap is never saved twice.
+        flash(f'נשמר ✓ {candidate.name} ({candidate.number}) קיבל {form.grade.data} ב"{station}"', 'success')
+        # Keep the station (and its custom name) and move on to the next
+        # candidate without a grade there. The grade starts empty again, so
+        # a stale tap is never saved twice; the save button names who's next.
+        done = set(single_mode_graded(current_user.id).get(station, []))
+        upcoming = next_ungraded(numbers, done, candidate.number)
+        form.subject.data = str(upcoming) if upcoming is not None else None  # choices compare as text
         form.grade.data = None
-        form.subject.data = None
         form.note.data = ""
-    return render_template("make-post.html", form=form, current_user=current_user)
+    return render_template("make-post.html", form=form, current_user=current_user,
+                           candidate_names={c.number: c.name for c in candidates},
+                           graded=single_mode_graded(current_user.id),
+                           restore_station=request.method == "GET")
+
+
+def single_mode_graded(group_id):
+    """{station: [numbers]} of the group's one-candidate grades — the ✓ on
+    chips already graded at the picked station."""
+    rows = db.session.query(Review.station, Review.subject_id) \
+        .filter(Review.subject_id.like(f"{group_id}/%")).all()
+    graded = defaultdict(set)
+    for station, subject_id in rows:
+        if not station or parse_act_station(station) or station.endswith(" סיכום") \
+                or station in MODE_STATIONS["counter"]:
+            continue
+        graded[station].add(int(subject_id.split("/")[1]))
+    return {station: sorted(numbers) for station, numbers in graded.items()}
+
+
+def next_ungraded(numbers, done, after=None):
+    """The first number after `after` (wrapping around) with no grade yet."""
+    order = numbers
+    if after in numbers:
+        i = numbers.index(after)
+        order = numbers[i + 1:] + numbers[:i]
+    return next((n for n in order if n not in done), None)
 
 
 def review_station_name(form):
@@ -2288,7 +2341,16 @@ def circles():
     circles = [{'id': n, 'clicked': False, 'finished': False} for n in active_candidate_numbers(current_user.id)]
     # Custom ("אחר") stations this group already ran stay selectable.
     custom = sorted(s for s in getPhysicalStations() if s not in MODE_STATIONS["circles"])
-    return render_template('test.html', circles=circles, physical_stations=custom)
+    # ?redo=<act>: run a saved act again; saving replaces its order in place.
+    redo = None
+    redo_station = request.args.get("redo") or ""
+    parsed = parse_act_station(redo_station)
+    if parsed and not parsed[2]:
+        rows = Review.query.filter_by(author_id=current_user.id, station=redo_station).all()
+        if rows:
+            redo = {"station": redo_station, "base": parsed[0], "number": parsed[1],
+                    "saved_at": act_saved_at(rows), "finished": len(act_split(rows)[0])}
+    return render_template('test.html', circles=circles, physical_stations=custom, redo=redo)
 
 
 @app.route('/circles/finished', methods=['POST'])
@@ -2334,11 +2396,13 @@ def circles_finished():
     for circle_number in circle_numbers:
         counter += 1
         subject_id = str(current_user.id) + "/" + str(circle_number)
-        review = Review(station=station, author=current_user, subject_id=subject_id, grade=max(1, 4 - counter * penalty), subject=candidate_map.get(subject_id))
+        review = Review(station=station, author=current_user, subject_id=subject_id, grade=max(1, 4 - counter * penalty),
+                        place=counter + 1, subject=candidate_map.get(subject_id))
         db.session.add(review)
     for circle_number in candidates:
         subject_id = str(current_user.id) + "/" + str(circle_number)
-        review = Review(station=station, author=current_user, subject_id=subject_id, grade=1, subject=candidate_map.get(subject_id))
+        review = Review(station=station, author=current_user, subject_id=subject_id, grade=1, place=0,
+                        subject=candidate_map.get(subject_id))
         db.session.add(review)
     db.session.commit()
     # Process the finished circle numbers as desired
@@ -2380,6 +2444,20 @@ def circles_finished_act():
         circle_numbers = circle_numbers[::-1]
 
     unfinished = [n for n in full_candidates if n not in circle_numbers]
+    replace = (data.get('replace') or '').strip()
+    if replace:
+        # "בצע מחדש": the new arrival order replaces the act's old one; the
+        # act keeps its name, number and saved time.
+        parsed = parse_act_station(replace)
+        rows = Review.query.filter_by(author_id=group_id, station=replace).all() \
+            if parsed and not parsed[2] else []
+        if not rows:
+            return jsonify({'success': False, 'message': 'האקט כבר לא קיים — שמרו אותו כאקט חדש'}), 404
+        apply_act_order(group_id, replace, rows, circle_numbers, unfinished)
+        # No flash: a replay from the outbox would leave it for a later page.
+        return jsonify({'success': True, 'station': replace, 'replaced': True,
+                        'redirect': url_for('acts_page', base=parsed[0], replaced=replace),
+                        'message': f'הסדר של "{replace}" הוחלף'})
     base = data.get('movement_type') or ''
     if base == "אחר":
         base = (data.get('other') or '').strip()
@@ -2388,17 +2466,17 @@ def circles_finished_act():
     station = f"{base} - אקט {next_act_number(group_id, base)}"
 
     # Linear 4 → 1 by finishing position; everyone who did not finish gets 1.
-    penalty = 4 / (len(circle_numbers) - 1) if len(circle_numbers) > 1 else 0
-    grades = [(n, max(1, 4 - i * penalty)) for i, n in enumerate(circle_numbers)]
-    grades += [(n, 1) for n in unfinished]
-    for number, grade in grades:
+    grades = [(n, grade, place) for place, (n, grade)
+              in enumerate(zip(circle_numbers, act_grades(len(circle_numbers))), start=1)]
+    grades += [(n, 1, 0) for n in unfinished]
+    for number, grade, place in grades:
         db.session.add(Review(station=station, author_id=group_id,
-                              subject_id=f"{group_id}/{number}", grade=grade))
+                              subject_id=f"{group_id}/{number}", grade=grade, place=place))
     db.session.flush()
     # Only this heat's summaries change — the old updateActAvgs() re-queried
     # every act of every candidate on each save and slowed down as the day
     # went on.
-    for number, _ in grades:
+    for number, _, _ in grades:
         recompute_act_summary(f"{group_id}/{number}", station, group_id)
     db.session.commit()
     update_avgs_nf(group_id)
@@ -2461,88 +2539,110 @@ def edit_note(note_id):
     return render_template("make-note.html", form=form, current_user=current_user, is_edit=True,
                            candidate_names={c.number: c.name for c in candidates})
 
+NOTE_TONES = {"טובה": "success", "ניטרלית": "warning", "רעה": "error", "רפואה": "info", "כוח אדם": "secondary"}
+# A grade's comment on the notes board. It used to be wrapped in a fake
+# ניטרלית note, so "excellent at the sand table" read as neutral.
+STATION_NOTE_KIND = "תחנה"
+NOTE_DATE_FORMATS = ("%d-%m-%Y %H:%M", "%d-%m-%Y", "%d/%m/%Y %H:%M", "%d/%m/%Y")
+
+
+def parse_note_date(text):
+    """Notes keep their time as text (israel_now_str); some only a date."""
+    for fmt in NOTE_DATE_FORMATS:
+        try:
+            return datetime.strptime((text or "").strip(), fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def grade_tone(grade):
+    """Colour of a station comment, from the grade it came with."""
+    if grade is None:
+        return "warning"
+    if grade >= 3:
+        return "success"
+    return "error" if grade < 2 else "warning"
+
+
+def notes_board_items(candidates, can_edit):
+    """Everything written about these candidates, newest first: notes under
+    their own type, and grade comments as "תחנה" with their grade."""
+    by_id = {c.id: c for c in candidates}
+    if not by_id:
+        return []
+    items = []
+    for note in Note.query.filter(Note.subject_id.in_(list(by_id))).all():
+        candidate = by_id[note.subject_id]
+        items.append({
+            "kind": note.type, "tone": NOTE_TONES.get(note.type, "error"),
+            "number": candidate.number, "name": candidate.name,
+            "text": note.text or "", "place": note.location or "", "grade": None,
+            "when": parse_note_date(note.date), "has_time": ":" in (note.date or ""), "seq": note.id,
+            "edit": url_for("edit_note", note_id=note.id)
+                    if can_edit and note.type not in STAFF_NOTE_TYPES else None,
+        })
+    for review in Review.query.filter(Review.subject_id.in_(list(by_id)), Review.note.isnot(None)).all():
+        text = (review.note or "").strip()
+        # Summaries copy the first comment of their station — shown once.
+        if not text or text == "אקט" or review_kind(review) == "summary":
+            continue
+        candidate = by_id[review.subject_id]
+        items.append({
+            "kind": STATION_NOTE_KIND, "tone": grade_tone(review.grade),
+            "number": candidate.number, "name": candidate.name,
+            "text": text, "place": review.station, "grade": review.grade,
+            "when": review.created_at, "has_time": review.created_at is not None, "seq": review.id,
+            "edit": _profile_url(candidate, "#history") if can_edit else None,
+        })
+    # Undated rows (grades saved before times were kept) go last.
+    items.sort(key=lambda i: (i["when"] or datetime.min, i["seq"]), reverse=True)
+    return items
+
+
+def notes_board_kinds(items):
+    """Filter chips: the three note types and "תחנה" always, staff types
+    only where a note of theirs exists."""
+    present = {i["kind"] for i in items}
+    kinds = NOTE_TYPES + [STATION_NOTE_KIND] + [k for k in STAFF_NOTE_TYPES if k in present]
+    return kinds + sorted(present - set(kinds))
+
+
+def render_notes_board(template, candidates, can_edit, **context):
+    items = notes_board_items(candidates, can_edit)
+    try:
+        picked = int(request.values.get("c") or request.values.get("id") or 0)
+    except ValueError:
+        picked = 0
+    kind = request.args.get("k") or ""
+    return render_template(template, items=items, kinds=notes_board_kinds(items),
+                           tones=NOTE_TONES, board_candidates=candidates,
+                           picked=picked if picked in {c.number for c in candidates} else 0,
+                           picked_kind=kind, picked_sort="number" if request.args.get("s") == "number" else "new",
+                           **context)
+
+
 @app.route("/show-notes", methods=["GET", "POST"])
 def show_notes():
-    form = selectCandidate()
-    candidates = Candidate.query.filter_by(group_id=current_user.id).all()
-    all_notes = []
-    candidate_nums = []
-    for candidate in candidates:
-        if candidate.status != "פרש":
-            candidate_nums.append(int(candidate.id.split("/")[1]))
-    candidate_nums.sort()
-    candidate_nums = ["כולם"] + candidate_nums
-    candidate = ""
-    form.id.choices = candidate_nums
-    if form.validate_on_submit():
-        if form.id.data == "כולם":
-            for candidate_num in candidate_nums[1:]:
-                candidate = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(candidate_num)).first()
-                notes = Note.query.filter_by(subject_id=candidate.id).all()
-                reviews = Review.query.filter_by(subject_id=candidate.id).all()
-                reviews = [review for review in reviews if review.note != None and review.note not in["", "אקט"]]
-                for review in reviews:
-                    template_note = Note(type="ניטרלית", text=review.note, location=review.station, date="", subject_id=candidate.id, subject=candidate, author=current_user, author_id=current_user.id)
-                    notes.append(template_note)
-                all_notes.append(notes)
-            if len(candidate_nums) == 1:
-                return render_template('show-notes.html', form=form)
-            return render_template('show-notes.html', notes=all_notes, candidate_id=candidate.id.split("/")[1], form=form, all_notes=all_notes, everyone=True)
-        candidate = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(form.id.data)).first()
-        notes = Note.query.filter_by(subject_id=candidate.id).all()
-        reviews = Review.query.filter_by(subject_id=candidate.id).all()
-        reviews = [review for review in reviews if review.note != None and review.note not in["", "אקט"]]
-        for review in reviews:
-            template_note = Note(type="ניטרלית", text=review.note, location=review.station, date="", subject_id=candidate.id, subject=candidate, author=current_user, author_id=current_user.id)
-            notes.append(template_note)
-        return render_template('show-notes.html', notes=notes, candidate_id=candidate.id.split("/")[1], form=form, all_notes=all_notes, everyone=False)
-    return render_template('show-notes.html', form=form, everyone=False)
+    # Everything shows at once; the candidate / type / order filters apply
+    # on the phone as they change (no "הצג" round trip). POST is what old
+    # pages sent — it lands on the same board, filtered to that candidate.
+    return render_notes_board("show-notes.html", active_candidates(current_user.id), can_edit=True)
+
 
 @app.route("/notes-admin/", methods=["GET", "POST"])
 @admin_only
 def showNotesAdmin():
-    form = selectCandidateAdmin()
-    form.group.choices = get_groups()
-    clean_reviews = []
-    candidates = []
-    candidate = ""
-    if form.group.data:
-        candidates = [int(candidate.id.split("/")[1]) for candidate in Candidate.query.filter_by(group_id=int(form.group.data)).all() if candidate.status != "פרש"]
-        candidates.sort()
-        candidates = ["כולם"] + candidates
-        form.id.choices = candidates
-    elif len(get_groups()) > 0:
-        candidates = [int(candidate.id.split("/")[1]) for candidate in Candidate.query.filter_by(group_id=get_groups()[0]).all() if candidate.status != "פרש"]
-        candidates.sort()
-        candidates = ["כולם"] + candidates
-        form.id.choices = candidates
-    if request.method == "POST":
-        if form.id.data == "כולם":
-            all_notes = []
-            notes = []
-            for candidate_num in candidates[1:]:
-                candidate = Candidate.query.filter_by(id=str(form.group.data) + "/" + str(candidate_num)).first()
-                notes = Note.query.filter_by(subject_id=candidate.id).all()
-                reviews = Review.query.filter_by(subject_id=candidate.id).all()
-                reviews = [review for review in reviews if review.note != None and review.note not in["", "אקט"]]
-                for review in reviews:
-                    template_note = Note(type="ניטרלית", text=review.note, location=review.station, date="", subject_id=candidate.id, subject=candidate, author=current_user, author_id=current_user.id)
-                    notes.append(template_note)
-                all_notes.append(notes)
-            if len(candidates) == 1:
-                return render_template('notes-admin.html', form=form)
-            return render_template('notes-admin.html', notes=notes, candidate_id=candidate.id.split("/")[1], form=form, all_notes=all_notes, group=form.group.data)
-        candidate = Candidate.query.filter_by(id=str(form.group.data) + "/" + str(form.id.data)).first()
-        if not candidate:
-            return render_template('notes-admin.html', form=form)
-        notes = Note.query.filter_by(subject_id=candidate.id).all()
-        reviews = Review.query.filter_by(subject_id=candidate.id).all()
-        reviews = [review for review in reviews if review.note != None and review.note not in["", "אקט"]]
-        for review in reviews:
-            template_note = Note(type="ניטרלית", text=review.note, location=review.station, date="", subject_id=candidate.id, subject=candidate, author=current_user, author_id=current_user.id)
-            notes.append(template_note)
-        return render_template('notes-admin.html', notes=notes, candidate_id=candidate.id.split("/")[1], form=form, group = form.group.data)
-    return render_template('notes-admin.html', form=form)
+    groups = get_groups()
+    try:
+        group_id = int(request.values.get("group") or 0)
+    except ValueError:
+        group_id = 0
+    if group_id not in groups:
+        group_id = groups[0] if groups else None
+    candidates = active_candidates(group_id) if group_id else []
+    return render_notes_board("notes-admin.html", candidates, can_edit=False,
+                              groups=groups, group_id=group_id)
 
 # --- Editing saved scores from the candidate page ---------------------------
 
@@ -2626,6 +2726,59 @@ def delete_note(note_id):
 
 
 # --- Saved circle-mode heats ("אקטים") --------------------------------------
+# Field feedback: "I got lost… no idea what the original act was… the numbers
+# started jumping". An act is fixed by fixing its order — reorder it like the
+# final-summary ranking, or run it again on the arrival screen — and either
+# way it keeps its station, number and saved time. Moving it to another
+# station is only for an act saved under the wrong one.
+
+def act_grades(count):
+    """Linear 4 → 1 by finishing place (the same as when the act is saved)."""
+    penalty = 4 / (count - 1) if count > 1 else 0
+    return [max(1, 4 - i * penalty) for i in range(count)]
+
+
+def _number_of(review):
+    return int(review.subject_id.split("/")[1])
+
+
+def act_split(rows):
+    """(finishers in finishing order, non-finishers by number) of one act."""
+    rows = sorted(rows, key=lambda r: r.id)
+    if rows and all(r.place is not None for r in rows):
+        finished = sorted((r for r in rows if r.place), key=lambda r: (r.place, r.id))
+        return finished, sorted((r for r in rows if not r.place), key=_number_of)
+    # Saved before places were kept: the rows went in finishing order, then
+    # the non-finishers by number, all with 1 — and the last finishers get 1
+    # too. The finisher count is the one whose grades match the formula (the
+    # 2nd grade pins it down); for tiny acts, the one whose tail is in number
+    # order.
+    total = len(rows)
+    numbers = [_number_of(r) for r in rows]
+    run = 1 if total else 0
+    for i in range(total - 1, 0, -1):
+        if numbers[i - 1] >= numbers[i]:
+            break
+        run += 1
+    valid = []
+    close = lambda a, b: abs((a or 0) - b) < 0.006  # grades get rounded to 2 places (update_avgs_nf)
+    for count in range(1, total + 1):
+        expect = act_grades(count)
+        if all(close(rows[i].grade, expect[i]) for i in range(count)) and \
+                all(close(rows[i].grade, 1) for i in range(count, total)):
+            valid.append(count)
+    if valid:
+        fits = [count for count in valid if total - count <= run]
+        count = fits[0] if fits else valid[-1]
+    else:  # edited by hand since: everyone above 1 finished
+        count = max((i + 1 for i, r in enumerate(rows) if (r.grade or 0) > 1), default=total)
+    return rows[:count], sorted(rows[count:], key=_number_of)
+
+
+def act_saved_at(rows):
+    times = [r.created_at for r in rows if r.created_at]
+    return min(times) if times else None
+
 
 def group_acts(group_id):
     """The group's heats, newest first, each with its finishing order."""
@@ -2641,9 +2794,47 @@ def group_acts(group_id):
         act["rows"].append(review)
         act["last_id"] = max(act["last_id"], review.id)
     for act in acts.values():
-        # Rows are inserted in finishing order, non-finishers last.
-        act["order"] = [(int(r.subject_id.split("/")[1]), r.grade) for r in act["rows"]]
+        finished, unfinished = act_split(act["rows"])
+        act["finished"] = [_number_of(r) for r in finished]
+        act["unfinished"] = [_number_of(r) for r in unfinished]
+        act["saved_at"] = act_saved_at(act["rows"])
     return sorted(acts.values(), key=lambda a: -a["last_id"])
+
+
+def apply_act_order(group_id, station, rows, finished, unfinished):
+    """Give an act a new finishing order in place: same station name, act
+    number and saved time; grades from the places with today's formula."""
+    by_number = {_number_of(r): r for r in rows}
+    saved_at = act_saved_at(rows)
+    plan = [(n, grade, place) for place, (n, grade) in enumerate(zip(finished, act_grades(len(finished))), start=1)]
+    plan += [(n, 1, 0) for n in unfinished]
+    touched = set()
+    for number, grade, place in plan:
+        row = by_number.get(number)
+        if row is None:  # active now, not when the act was saved
+            row = Review(station=station, author_id=group_id, subject_id=f"{group_id}/{number}",
+                         grade=grade, created_at=saved_at or israel_now())
+            db.session.add(row)
+        row.grade = grade
+        row.place = place
+        touched.add(row.subject_id)
+    db.session.flush()
+    for subject_id in touched:
+        recompute_act_summary(subject_id, station, group_id)
+    db.session.commit()
+    update_avgs_nf(group_id)
+
+
+def _act_numbers(values, allowed):
+    numbers = []
+    for value in values or []:
+        try:
+            number = int(value)
+        except (TypeError, ValueError):
+            continue
+        if number in allowed and number not in numbers:
+            numbers.append(number)
+    return numbers
 
 
 @app.route("/acts")
@@ -2653,7 +2844,14 @@ def acts_page():
     acts = group_acts(current_user.id)
     bases = list(MODE_STATIONS["circles"])
     bases += [a["base"] for a in acts if a["base"] not in bases]
-    return render_template("acts.html", acts=acts, bases=list(dict.fromkeys(bases)))
+    tabs = [(base, sum(1 for a in acts if a["base"] == base)) for base in dict.fromkeys(a["base"] for a in acts)]
+    picked = request.args.get("base")
+    if picked not in dict(tabs):
+        picked = acts[0]["base"] if acts else None
+    replaced = request.args.get("replaced")
+    replaced = next((a for a in acts if a["station"] == replaced), None)
+    return render_template("acts.html", acts=acts, bases=list(dict.fromkeys(bases)), tabs=tabs, picked=picked,
+                           undo=session.pop("act_undo", None), replaced=replaced)
 
 
 def _act_from_form():
@@ -2663,6 +2861,46 @@ def _act_from_form():
         abort(400)
     rows = Review.query.filter_by(author_id=current_user.id, station=station).all()
     return station, parsed, rows
+
+
+def _acts_url(base=None):
+    return url_for("acts_page", base=base) if base else url_for("acts_page")
+
+
+@app.route("/acts/order", methods=["GET", "POST"])
+def act_order():
+    """Reorder a saved act with ▲▼, as on the final-summary ranking."""
+    if current_user.id <= 0:
+        return redirect(url_for("home"))
+    group_id = current_user.id
+    if request.method == "POST":
+        data = request.get_json(silent=True) or {}
+        station = data.get("station") or ""
+        parsed = parse_act_station(station)
+        rows = Review.query.filter_by(author_id=group_id, station=station).all() if parsed and not parsed[2] else []
+        if not rows:
+            return jsonify({"success": False, "message": "האקט כבר לא קיים"}), 404
+        if is_duplicate_request():
+            return jsonify({"success": True, "message": "הסדר כבר נשמר ✓"})
+        allowed = {_number_of(r) for r in rows} | set(active_candidate_numbers(group_id))
+        finished = _act_numbers(data.get("finished"), allowed)
+        unfinished = [n for n in _act_numbers(data.get("unfinished"), allowed) if n not in finished]
+        if not finished:
+            return jsonify({"success": False, "message": "לפחות מגובש אחד צריך לסיים"}), 400
+        apply_act_order(group_id, station, rows, finished, unfinished)
+        return jsonify({"success": True, "message": "הסדר נשמר ✓"})
+    station = request.args.get("station") or ""
+    parsed = parse_act_station(station)
+    rows = Review.query.filter_by(author_id=group_id, station=station).all() if parsed and not parsed[2] else []
+    if not rows:
+        flash("האקט כבר לא קיים", "warning")
+        return redirect(url_for("acts_page"))
+    finished, unfinished = act_split(rows)
+    names = {c.number: c.name for c in Candidate.query.filter_by(group_id=group_id).all()}
+    return render_template("act-order.html", station=station, base=parsed[0], number=parsed[1],
+                           saved_at=act_saved_at(rows), names=names,
+                           finished=[_number_of(r) for r in finished],
+                           unfinished=[_number_of(r) for r in unfinished])
 
 
 @app.route("/acts/delete", methods=["POST"])
@@ -2680,7 +2918,22 @@ def act_delete():
     db.session.commit()
     update_avgs_nf(current_user.id, extra_stations={parsed[0]})
     flash(f'"{station}" נמחק', 'success')
-    return redirect(url_for("acts_page"))
+    return redirect(_acts_url(parsed[0]))
+
+
+def move_act(rows, station, new_station, group_id):
+    """Rename an act's rows; its places and saved time stay."""
+    subject_ids = {r.subject_id for r in rows}
+    for row in rows:
+        row.station = new_station
+    for summary in Review.query.filter(Review.station == f"סיכום {station}",
+                                       Review.subject_id.in_(subject_ids)).all():
+        db.session.delete(summary)
+    db.session.flush()
+    for subject_id in subject_ids:
+        recompute_act_summary(subject_id, new_station, group_id)
+    db.session.commit()
+    update_avgs_nf(group_id, extra_stations={parse_act_station(station)[0], parse_act_station(new_station)[0]})
 
 
 @app.route("/acts/rename", methods=["POST"])
@@ -2694,25 +2947,33 @@ def act_rename():
         return redirect(url_for("acts_page"))
     if not new_base or " - אקט " in new_base:
         flash("יש לבחור שם תחנה תקין", "error")
-        return redirect(url_for("acts_page"))
+        return redirect(_acts_url(parsed[0]))
     if new_base == parsed[0]:
         flash("לא בוצע שינוי — זו כבר התחנה של האקט", "info")
-        return redirect(url_for("acts_page"))
+        return redirect(_acts_url(parsed[0]))
     group_id = current_user.id
     new_station = f"{new_base} - אקט {next_act_number(group_id, new_base)}"
-    subject_ids = {r.subject_id for r in rows}
-    for row in rows:
-        row.station = new_station
-    for summary in Review.query.filter(Review.station == f"סיכום {station}",
-                                       Review.subject_id.in_(subject_ids)).all():
-        db.session.delete(summary)
-    db.session.flush()
-    for subject_id in subject_ids:
-        recompute_act_summary(subject_id, new_station, group_id)
-    db.session.commit()
-    update_avgs_nf(group_id, extra_stations={parsed[0], new_base})
-    flash(f'"{station}" הועבר ל-"{new_station}"', 'success')
-    return redirect(url_for("acts_page"))
+    move_act(rows, station, new_station, group_id)
+    # One message, with the way back (no separate flash saying the same).
+    session["act_undo"] = {"station": new_station, "back": station}
+    return redirect(_acts_url(new_base))
+
+
+@app.route("/acts/undo-move", methods=["POST"])
+def act_undo_move():
+    """Put a moved act back under its old name — the exact one, number too."""
+    station, parsed, rows = _act_from_form()
+    back = request.form.get("back") or ""
+    back_parsed = parse_act_station(back)
+    if not rows or not back_parsed or back_parsed[2]:
+        flash("לא ניתן לבטל — האקט השתנה בינתיים", "warning")
+        return redirect(url_for("acts_page"))
+    group_id = current_user.id
+    if Review.query.filter_by(author_id=group_id, station=back).first():
+        back = f"{back_parsed[0]} - אקט {next_act_number(group_id, back_parsed[0])}"
+    move_act(rows, station, back, group_id)
+    flash(f'ההעברה בוטלה — האקט חזר ל-"{back}"', 'success')
+    return redirect(_acts_url(back_parsed[0]))
 
 
 # --- Quick notes (floating bubble) ------------------------------------------
@@ -3263,10 +3524,6 @@ def prior_interview_text(match):
     if not match["exact"]:
         parts.append(f"שם דומה: {latest.name}")
     return " · ".join(parts)
-
-
-def israel_now():
-    return datetime.now(pytz.timezone('Israel')).replace(tzinfo=None, microsecond=0)
 
 
 @app.route("/interviews/sync", methods=["POST"])
