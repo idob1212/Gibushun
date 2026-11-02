@@ -20,15 +20,29 @@
 </section>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Get the candidate select element
-    var candidateSelect = document.getElementById('id');
-
-    // Add change event listener
-    candidateSelect.addEventListener('change', function() {
-        // Redirect to same page with candidate_id parameter
-        window.location.href = "{{ url_for('AddStatus') }}?candidate_id=" + this.value;
-    });
+document.addEventListener('DOMContentLoaded', function () {
+  // Saved status + summary per candidate: switching candidates fills them in
+  // without a reload. A summary typed and not saved is not thrown away
+  // silently (field audit) — the switch asks first.
+  var current = {{ current | tojson }};
+  var candidate = document.getElementById('id');
+  var status = document.getElementById('final_status');
+  var note = document.getElementById('final_note');
+  if (!candidate || !status || !note) return;
+  var shown = candidate.value;
+  function loaded() { return current[shown] || ['', '']; }
+  function dirty() { return status.value !== loaded()[0] || note.value !== loaded()[1]; }
+  candidate.addEventListener('change', function () {
+    if (dirty() && !window.confirm('הסיכום של מגובש ' + shown + ' לא נשמר. לעבור בכל זאת?')) {
+      candidate.value = shown;
+      return;
+    }
+    shown = candidate.value;
+    status.value = loaded()[0];
+    note.value = loaded()[1];
+    [status, note].forEach(function (el) { el.dispatchEvent(new Event('change', { bubbles: true })); });
+    try { history.replaceState(null, '', '?candidate_id=' + encodeURIComponent(shown)); } catch (e) {}
+  });
 });
 </script>
 

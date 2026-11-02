@@ -13,7 +13,8 @@ import pytz
 import requests
 import sqlalchemy
 from flask import Flask, render_template, redirect, url_for, flash, abort, request, jsonify, send_from_directory, \
-    send_file, after_this_request, request, session
+    send_file, after_this_request, request, session, g
+from urllib.parse import quote
 from flask_bootstrap import Bootstrap
 from flask_ckeditor import CKEditor
 from datetime import date, datetime, timedelta
@@ -26,7 +27,7 @@ from flask_login import UserMixin, login_user, LoginManager, login_required, cur
 from forms import CounterReviewForm, LoginForm, RegisterForm, CreateReviewForm, EditUserForm, Search_review, EditReviewForm, \
     UpdateDateForm, NewCandidateForm, SelectPhysicalReviewsForm, selectCandidate, AddFinalStatusForm, \
     SelectPhysicalReviewsFormAdmin, selectCandidateAdmin, selectGroup, AddNameForm, InterviewForm, \
-    GroupReviewForm, CreateNoteForm, FinalWeightedGradeForm
+    GroupReviewForm, CreateNoteForm, FinalWeightedGradeForm, mark_form_errors, RequiredWhen, REQUIRED
 from flask_gravatar import Gravatar
 import sys
 import logging
@@ -44,6 +45,9 @@ import logging
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = "8BYkEfBA6O6donzWlSihBXox7C0sKR6b"
+# Validator messages come from WTForms' own Hebrew catalog (forms.AppForm);
+# Flask-WTF's i18n would need Flask-Babel, which this app does not use.
+app.config['WTF_I18N_ENABLED'] = False
 ckeditor = CKEditor(app)
 Bootstrap(app)
 gravatar = Gravatar(app, size=100, rating='g', default='retro', force_default=False, force_lower=False, use_ssl=False, base_url=None)
@@ -332,6 +336,28 @@ def _add_final_rank_column():
 _add_final_rank_column()
 
 app.config['WTF_CSRF_TIME_LIMIT'] = None
+
+
+@app.template_global()
+def required_message(field):
+    """The Hebrew message a required field shows — the same text on the
+    phone (data-msg, before sending) and from the server."""
+    for validator in field.validators:
+        if "required" in getattr(validator, "field_flags", ()) or isinstance(validator, RequiredWhen):
+            return validator.message or REQUIRED
+    return REQUIRED
+
+
+@app.after_request
+def flag_refused_forms(response):
+    """A refused form is re-rendered as a plain 200 with its errors. The
+    header tells the phone's outbox (offline.js) that the save did NOT
+    happen, and why — without it a replayed POST counted as synced."""
+    errors = g.get("form_errors")
+    if errors and request.method == "POST" and response.status_code == 200:
+        response.headers["X-Form-Errors"] = quote(" · ".join(errors)[:400], safe="")
+    return response
+
 # iOS can drop the session-only cookie between field days; the remember cookie
 # logs the group back in so queued offline writes do not bounce to /login.
 app.config['REMEMBER_COOKIE_DURATION'] = timedelta(days=60)
@@ -845,15 +871,25 @@ def addCandidateBatch():
                 })
                 continue
                 
-            # Validate that candidate ID is an integer (including 0)
+            if not str(candidate.get('name') or '').strip():
+                results["invalid_data"].append({
+                    "row": i + 1,
+                    "id": new_id,
+                    "name": "",
+                    "error": "חסר שם"
+                })
+                continue
+
+            # Whole number from 1 — the same rule as adding one candidate
+            # (0 is the separator in arrival-order posts).
             try:
                 candidate_number = int(new_id)
-                if candidate_number < 0:
+                if candidate_number < 1:
                     results["invalid_data"].append({
                         "row": i + 1,
                         "id": new_id,
                         "name": candidate['name'],
-                        "error": "מספר מגובש חייב להיות מספר שלם חיובי או אפס"
+                        "error": "מספר מגובש מתחיל מ-1"
                     })
                     continue
                 # Convert back to string for consistency with existing logic
@@ -863,7 +899,7 @@ def addCandidateBatch():
                     "row": i + 1,
                     "id": new_id,
                     "name": candidate['name'],
-                    "error": "מספר מגובש חייב להיות מספר שלם (כולל 0)"
+                    "error": "מספר מגובש חייב להיות מספר שלם"
                 })
                 continue
                 
@@ -966,7 +1002,8 @@ def login():
             if not user:
                 flash("מספר קבוצה שגוי", "error")
                 return redirect(url_for('login'))
-        if user.password != password:
+        # Staff passwords are saved stripped (set_staff_password); compare alike.
+        if user.password != password and not (role in STAFF_BY_KEY and user.password == password.strip()):
             flash('סיסמה לא נכונה', "error")
             return redirect(url_for('login', role=role if role in STAFF_BY_KEY else None))
         login_user(user, remember=True)
@@ -1282,52 +1319,102 @@ def getAllStations():
 @app.route("/new-review", methods=["GET", "POST"])
 def add_new_review():
     # Only the stations for this mode (plus "אחר" for a one-off custom name).
-    stations = MODE_STATIONS["individual"] + ["אחר"]
     form = CreateReviewForm()
-    form.station.choices = stations
-    candidates = Candidate.query.filter_by(group_id=current_user.id).all()
-    candidate_nums = []
-    for candidate in candidates:
-        if candidate.status != "פרש":
-            candidate_nums.append(int(candidate.id.split("/")[1]))
-    candidate_nums.sort()
-    form.subject.choices = candidate_nums
+    form.station.choices = MODE_STATIONS["individual"] + ["אחר"]
+    # An explicit "choose" entry: a list that starts on a real number shows
+    # candidate 1 whenever the wanted one is missing (e.g. retired), and a
+    # careless tap grades the wrong person.
+    form.subject.choices = [("", "— בחרו מגובש —")] + [(n, str(n)) for n in active_candidate_numbers(current_user.id)]
     if form.validate_on_submit():
         if is_duplicate_request():
             flash('חוות הדעת כבר נשמרה', 'success')
             return redirect(url_for('add_new_review'))
-        if form.station.data == "ODT":
-            form.station.data = form.station.data + " " + form.odt.data
-        if form.station.data == "אחר":
-            form.station.data = form.odt.data
-        new_review = Review(
-            station=form.station.data,
-            subject_id=str(current_user.id) + "/" + str(form.subject.data),
-            grade=form.grade.data,
-            note=form.note.data,
-            author=current_user,
-            subject=Candidate.query.filter_by(id=str(current_user.id) + "/" + str(form.subject.data)).first()
-        )
-        db.session.add(new_review)
+        station = review_station_name(form)
+        candidate = Candidate.query.get(f"{current_user.id}/{form.subject.data}")
+        db.session.add(Review(station=station, subject_id=candidate.id, grade=form.grade.data,
+                              note=form.note.data, author=current_user))
         db.session.commit()
+        chosen = form.station.data
+        form.station.data = station  # summaries are keyed by the saved name
         update_avgs(form)
-        candidate_name = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(form.subject.data)).first().name
-        flash(f'הערכת תחנה {form.station.data} עבור {candidate_name} נשמרה בהצלחה!', 'success')
+        form.station.data = chosen
+        flash(f'הערכת תחנה {station} עבור {candidate.name} נשמרה בהצלחה!', 'success')
+        # Keep the station (and its custom name) for the next candidate; the
+        # grade starts empty again so a stale tap is never saved twice.
+        form.grade.data = None
+        form.subject.data = None
         form.note.data = ""
-        form.odt.data = ""
-        return render_template("make-post.html", form=form, current_user=current_user, selected_subject=form.station.data)
-    return render_template("make-post.html", form=form, current_user=current_user, selected_subject=0)
+    return render_template("make-post.html", form=form, current_user=current_user)
+
+
+def review_station_name(form):
+    """The station a single-mode review is saved under: ODT and "אחר" carry
+    the typed name (forms.RequiredWhen guarantees it is there)."""
+    if form.station.data == "ODT":
+        return "ODT " + form.odt.data.strip()
+    if form.station.data == "אחר":
+        return form.odt.data.strip()
+    return form.station.data
+
+
+def refresh_after_review_edit(form, group_id):
+    # update_avgs() works on the logged-in group's ids; an admin editing
+    # another group's review recomputes that group instead.
+    if group_id == current_user.id:
+        update_avgs(form)
+    else:
+        update_avgs_nf(group_id)
+
+
+def edit_review_form(review, stations, **initial):
+    """Grade-edit form for a saved review: the candidate list is the review's
+    own group (an admin editing another group used to get an empty list and
+    could never save), and the saved station and grade are pre-filled — the
+    page used to show 1 and overwrite the real grade with it."""
+    group_id = int(review.subject_id.split("/")[0])
+    form = CreateReviewForm(**initial)
+    form.subject.choices = active_candidate_numbers(group_id)
+    form.station.choices = list(dict.fromkeys(stations + [initial.get("station", review.station)]))
+    if not form.is_submitted():
+        grade = review.grade
+        form.grade.data = int(grade) if grade is not None and float(grade).is_integer() else None
+    return form, group_id
 
 @app.route("/new-group-review", methods=["GET", "POST"])
 def add_new_group_review():
+    # After a save the sheet comes back on the same station.
+    station = request.args.get("station")
+    if station not in MODE_STATIONS["group"] + ["אחר"]:
+        station = None
+    return render_group_review(station=station, custom=(request.args.get("odt") or "")[:100])
+
+
+GROUP_GRADES = ("1", "2", "3", "4")
+
+
+def group_review_saved(group_id):
+    """{station: {number: [grade, note]}} of this group's station grades, so
+    the page shows what is already saved instead of a row of "–"."""
+    saved = defaultdict(dict)
+    for review in Review.query.filter(Review.author_id == group_id).order_by(Review.id).all():
+        if "אקט" in review.station or "סיכום" in review.station:
+            continue
+        number = int(review.subject_id.split("/")[1])
+        grade = review.grade
+        saved[review.station].setdefault(number, [int(grade) if float(grade).is_integer() else grade, review.note or ""])
+    return saved
+
+
+def render_group_review(station=None, custom="", values=None, row_errors=None, form_error=None):
     form = GroupReviewForm()
-    # Only the stations for this mode (plus "אחר" for a one-off custom name).
-    stations = MODE_STATIONS["group"] + ["אחר"]
-    form.station.choices = stations
-    candidates = Candidate.query.filter_by(group_id=current_user.id).all()
-    candidates = [int(candidate.id.split("/")[1]) for candidate in candidates if candidate.status != "פרש"]
-    candidates.sort()
-    return render_template('make-post-group.html', candidates=candidates, user_form=form, current_user=current_user)
+    form.station.choices = MODE_STATIONS["group"] + ["אחר"]
+    if station is not None:
+        form.station.data = station
+        form.odt.data = custom
+    candidates = active_candidates(current_user.id)
+    return render_template('make-post-group.html', candidates=candidates, user_form=form,
+                           current_user=current_user, saved=group_review_saved(current_user.id),
+                           values=values, row_errors=row_errors or {}, form_error=form_error)
 
 def normalize_counter_reviews(station, candidates, current_user):
     """
@@ -1409,6 +1496,12 @@ def update_counter_reviews():
     # Update or create reviews with normalized grades
     for review_data in reviews:
         candidate_id = f"{current_user.id}/{review_data['subject']}"
+        if max_counter <= 0 and not (review_data.get('note') or '').strip() and not data.get('finished') \
+                and not Review.query.filter_by(station=station, subject_id=candidate_id,
+                                               author_id=current_user.id).first():
+            # Nothing counted yet: a note autosave must not hand every
+            # candidate a 1 at this march before it even started.
+            continue
 
         # Calculate normalized grade (1-4 scale)
         normalized_grade = 1.0
@@ -1466,83 +1559,93 @@ def addOneReview():
 
 @app.route('/add-all', methods=['GET','POST'])
 def update_all():
+    """Save the group-mode station grades.
+
+    Each row posts subject + grade-<n> ("0" = "–", not graded) + note-<n>.
+    Nothing is dropped silently any more: a note on an ungraded row, or a
+    sheet with no grade at all, is refused and shown again with the error
+    (and X-Form-Errors for the offline outbox) instead of "saved".
+    """
+    if request.method != 'POST':
+        return redirect(url_for('add_new_group_review'))
     if is_duplicate_request():
         flash('הציונים כבר נשמרו', 'success')
         return redirect(url_for('add_new_group_review'))
-    candidates = Candidate.query.filter_by(group_id=current_user.id).all()
-    candidates = [int(candidate.id.split("/")[1]) for candidate in candidates if candidate.status != "פרש"]
-    candidates.sort()
-    result2 = request.form.to_dict(flat=False)
-    if 'station' not in result2:
-        return redirect(url_for('add_new_group_review'))
-    station = result2['station'][0]
-    if station == "ODT":
-        station = station + " " + result2.get('odt', [''])[0]
-    if station == "אחר":
-        station = result2.get('odt', [''])[0]
-    # Only look at grade/note - the form may carry extra keys (csrf_token,
-    # request_id from the offline replay) with a different number of values.
-    grades = result2.get('grade', [])
-    notes = result2.get('note', [])
-    any_scored = any(g not in ('', '0') for g in grades)
-    # Each row names its candidate. Matching by position (older pages and
-    # queued offline posts) breaks once the group's list changed meanwhile.
-    subjects = result2.get('subject', [])
-    if subjects and len(subjects) == len(grades):
-        active = set(candidates)
-        rows = [int(n) if str(n).isdigit() and int(n) in active else None for n in subjects]
+    active = set(active_candidate_numbers(current_user.id))
+    picked = (request.form.get('station') or '').strip()
+    custom = (request.form.get('odt') or '').strip()[:100]
+    errors = []
+    if picked in ("ODT", "אחר"):
+        station = custom if picked == "אחר" else f"ODT {custom}"
+        if not custom:
+            errors.append("שם תחנה: כתוב את שם התחנה")
     else:
-        rows = candidates
-    for i, (candidate_num, grade) in enumerate(zip(rows, grades)):
-        if candidate_num is None:
+        station = picked
+        if not picked:
+            errors.append("תחנה: בחר תחנה")
+
+    subjects = request.form.getlist('subject')
+    rows = []  # (number, grade, note)
+    if any(key.startswith('grade-') for key in request.form):
+        for subject in subjects:
+            if str(subject).isdigit():
+                rows.append((int(subject), request.form.get(f'grade-{subject}', '0'),
+                             (request.form.get(f'note-{subject}') or '').strip()))
+    else:
+        # Pages from before this change (and their queued offline posts) send
+        # parallel grade/note lists, matched by subject or by position.
+        grades = request.form.getlist('grade')
+        notes = request.form.getlist('note')
+        numbers = [int(n) if str(n).isdigit() else None for n in subjects] \
+            if subjects and len(subjects) == len(grades) else sorted(active)
+        for i, (number, grade) in enumerate(zip(numbers, grades)):
+            if number is not None:
+                rows.append((number, grade, (notes[i] if i < len(notes) else '').strip()))
+    rows = [(n, g if g in GROUP_GRADES else '0', note) for n, g, note in rows if n in active]
+
+    row_errors = {n: "יש הערה בלי ציון — בחר ציון או מחק את ההערה" for n, g, note in rows if g == '0' and note}
+    if row_errors:
+        errors.append("הערה בלי ציון: מגובש " + ", ".join(str(n) for n in sorted(row_errors)))
+    form_error = None
+    if not row_errors and not any(g != '0' for _, g, _ in rows):
+        form_error = "לא סומן אף ציון — בחר ציון לפחות למגובש אחד"
+        errors.append(form_error)
+    if errors:
+        mark_form_errors(errors)
+        return render_group_review(station=picked, custom=custom,
+                                   values={n: [g, note] for n, g, note in rows},
+                                   row_errors=row_errors, form_error=form_error)
+
+    existing = {r.subject_id: r for r in Review.query.filter_by(station=station, author_id=current_user.id)
+                .order_by(Review.id.desc()).all()}
+    graded = filled = 0
+    for number, grade, note in rows:
+        subject_id = f"{current_user.id}/{number}"
+        review = existing.get(subject_id)
+        if grade == '0':
+            # "–" = not graded: last place (1), like a non-finisher in arrival
+            # order. A grade saved earlier is never overwritten by it.
+            if not review:
+                db.session.add(Review(station=station, subject_id=subject_id, grade=1.0, note="",
+                                      author_id=current_user.id))
+                filled += 1
             continue
-        try:
-            grade = int(grade)
-        except ValueError:
-            continue
-        if grade == 0 and any_scored:
-            # Unscored candidate gets the last-place grade, but an existing
-            # review is never overwritten by the sentinel.
-            subject_id = str(current_user.id) + "/" + str(candidate_num)
-            existing = Review.query.filter_by(
-                station=station, subject_id=subject_id, author_id=current_user.id
-            ).first()
-            if not existing:
-                db.session.add(Review(
-                    station=station,
-                    subject_id=subject_id,
-                    grade=1.0,
-                    note="",
-                    author=current_user,
-                    subject=Candidate.query.filter_by(id=subject_id).first()
-                ))
-                db.session.commit()
-            continue
-        if grade != 0:
-            note = notes[i] if i < len(notes) else ''
-            subject_id = str(current_user.id) + "/" + str(candidate_num)
-            # Upsert: re-submitting the group station form is a correction,
-            # not a second review — duplicates here double candidates in the
-            # station ranking and skew averages.
-            review = Review.query.filter_by(
-                station=station, subject_id=subject_id, author_id=current_user.id
-            ).first()
-            if review:
-                review.grade = grade
-                review.note = note
-            else:
-                db.session.add(Review(
-                    station=station,
-                    subject_id=subject_id,
-                    grade=grade,
-                    note=note,
-                    author=current_user,
-                    subject=Candidate.query.filter_by(id=subject_id).first()
-                ))
-            db.session.commit()
-    update_avgs_nf()
-    flash(f'ציוני התחנה {station} נשמרו בהצלחה!', 'success')
-    return redirect(url_for('add_new_group_review'))
+        # Upsert: re-submitting the sheet is a correction, not a second review
+        # (duplicates double candidates in the station ranking).
+        if review:
+            review.grade = int(grade)
+            review.note = note
+        else:
+            db.session.add(Review(station=station, subject_id=subject_id, grade=int(grade), note=note,
+                                  author_id=current_user.id))
+        graded += 1
+    db.session.commit()
+    update_avgs_nf(current_user.id)
+    message = f'ציוני התחנה {station}: נשמרו {graded} ציונים'
+    if filled:
+        message += f' · {filled} שלא דורגו קיבלו 1'
+    flash(message, 'success')
+    return redirect(url_for('add_new_group_review', station=picked, odt=custom or None))
 
 @app.route('/group-manage', methods=["GET", "POST"])
 def manageCandidates():
@@ -1834,35 +1937,31 @@ def showCandidateAdmin():
         return render_template('candidate-admin.html', reviews=clean_reviews, candidate_id=candidate.id.split("/")[1], form=form)
     return render_template('candidate-admin.html', form=form)
 
+def interview_grade_choices():
+    # The first real option is the worst one ("לא לגעת - קו אדום"): without an
+    # empty "choose" entry a required select can never be "missing", and an
+    # untouched form saved that grade.
+    return [("", "— בחרו ציון —")] + [(g, g) for g in GRADE_OPTIONS]
+
+
 @app.route("/final-status/", methods=["GET", "POST"])
 def AddStatus():
     form = AddFinalStatusForm()
-    candidates = Candidate.query.filter_by(group_id=current_user.id).all()
-    candidate_nums = []
-    for candidate in candidates:
-        if candidate.status != "פרש":
-            candidate_nums.append(int(candidate.id.split("/")[1]))
-    candidate_nums.sort()
-    form.id.choices = candidate_nums
-    form.final_status.choices = GRADE_OPTIONS
+    candidates = active_candidates(current_user.id)
+    form.id.choices = [c.number for c in candidates]
+    form.final_status.choices = [("", "— בחרו סטטוס —")] + [(g, g) for g in GRADE_OPTIONS]
+    # Saved values per candidate: switching candidates fills them in on the
+    # phone, with no page reload (which used to throw away a typed summary).
+    current = {c.number: [c.final_status if c.final_status in GRADE_OPTIONS else "", c.final_note or ""]
+               for c in candidates}
 
-    # Get selected_id from URL or form data
-    selected_id = request.args.get('candidate_id')
-    if form.is_submitted():
-        selected_id = form.id.data
-    elif selected_id is None and candidate_nums:
-        selected_id = candidate_nums[0]
-
-    # Set form defaults based on selected candidate
-    if selected_id:
-        candidate = Candidate.query.filter_by(id=f"{current_user.id}/{selected_id}").first()
-        if candidate:
-            # Set form defaults before form validation
-            if not form.is_submitted():
-                form.id.default = int(selected_id)
-                form.final_status.default = candidate.final_status
-                form.final_note.default = candidate.final_note
-                form.process()  # This is crucial - it processes the defaults
+    if not form.is_submitted():
+        selected = request.args.get('candidate_id', type=int)
+        if selected not in current:
+            selected = form.id.choices[0] if form.id.choices else None
+        if selected is not None:
+            form.id.data = str(selected)
+            form.final_status.data, form.final_note.data = current[selected]
 
     if form.validate_on_submit():
         candidate = Candidate.query.filter_by(id=f"{current_user.id}/{form.id.data}").first()
@@ -1872,7 +1971,7 @@ def AddStatus():
         flash(f'נתוני סיכום עבור {candidate.name} נשמרו בהצלחה!', 'success')
         return redirect(url_for('AddStatus', candidate_id=form.id.data))
 
-    return render_template('add-status.html', form=form)
+    return render_template('add-status.html', form=form, current=current)
 
 @app.route("/interview/", methods=["GET", "POST"])
 def Interview():
@@ -1891,7 +1990,7 @@ def Interview():
                 interviewed.append(num)
     candidate_nums.sort()
     form.id.choices = candidate_nums
-    form.grade.choices = GRADE_OPTIONS
+    form.grade.choices = interview_grade_choices()
 
     if form.validate_on_submit():
         candidate = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(form.id.data)).first()
@@ -1948,7 +2047,7 @@ def edit_interview(candidate_id):
         abort(404)
 
     form = InterviewForm(id=int(candidate_id.split("/")[1]), interviewer=candidate.interviewer, grade=candidate.interview_grade, note=candidate.interview_note, tash=candidate.tash_prob, medical=candidate.medical_prob)
-    form.grade.choices = GRADE_OPTIONS
+    form.grade.choices = interview_grade_choices()
     form.id.choices = [int(candidate_id.split("/")[1])]
 
     if form.validate_on_submit():
@@ -2025,102 +2124,68 @@ def showStationReviews():
 
 @app.route("/edit-review/<int:review_id>", methods=["GET", "POST"])
 def edit_review(review_id):
-    unique_stations = db.session.query(distinct(Review.station)).filter(Review.author_id == current_user.id).all()
-    unique_station_values = [station[0] for station in unique_stations]
-    stations = ["ספרינטים", "זחילות", "משימת מחשבה", "דיון מילוט", "פירוק והרכבת נשק", "מסע", "שקים", "ODT", "מעגל זנבות",
-                "אלונקה סוציומטרית","מתלה שזיפים", "הרצאות", "בניית שוח", "חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול","נאסא"]
-    unique_station_values = [station for station in unique_station_values if "אקט" not in station and "סיכום" not in station]
-    final_stations = [station for station in unique_station_values if station not in stations]
-    unique_station_values = stations + final_stations
     review = Review.query.get_or_404(review_id)
     if not can_edit_candidate(Candidate.query.get(review.subject_id)):
         abort(403)
-    candidates = Candidate.query.filter_by(group_id=current_user.id).all()
-    candidate_nums = []
-    for candidate in candidates:
-        if candidate.status != "פרש":
-            candidate_nums.append(int(candidate.id.split("/")[1]))
-    candidate_nums.sort()
-    if "ODT" in review.station:
-        form = CreateReviewForm(station=review.station, grade=review.grade, note=review.note,
-                                subject=review.subject_id.split("/")[1])
-    else:
-        form = CreateReviewForm(station=review.station, grade=int(review.grade), note=review.note, subject=review.subject_id.split("/")[1])
-    form.subject.choices = candidate_nums
-    form.station.choices = unique_station_values
-    # form.station.data = review.station
-    # form.subject.data = review.subject_id.split("/")[1]
-    # form.grade.data = review.grade
+    stations = ["ספרינטים", "זחילות", "משימת מחשבה", "דיון מילוט", "פירוק והרכבת נשק", "מסע", "שקים", "ODT", "מעגל זנבות",
+                "אלונקה סוציומטרית","מתלה שזיפים", "הרצאות", "בניית שוח", "חפירת בור","חפירת בור מכשול קבוצתי","בניית ערימת חול","נאסא"]
+    stations += [st for mode in MODE_STATIONS.values() for st in mode]
+    stations += [st for (st,) in db.session.query(distinct(Review.station)).filter(Review.author_id == review.author_id)
+                 if "אקט" not in st and "סיכום" not in st]
+    form, group_id = edit_review_form(review, stations, station=review.station, note=review.note,
+                                      subject=review.subject_id.split("/")[1])
     if form.validate_on_submit():
-        if form.station.data == "ODT":
-            review.station = form.station.data
-        else:
-            review.station = form.station.data
-        review.subject_id = str(current_user.id) + "/" + str(form.subject.data)
+        review.station = form.station.data
+        review.subject_id = f"{group_id}/{form.subject.data}"
         review.grade = form.grade.data
         review.note = form.note.data
         db.session.commit()
-        update_avgs(form)
+        refresh_after_review_edit(form, group_id)
         return redirect(url_for("candidate_profile", candidate_id=review.subject_id))
-    return render_template("make-post.html", form=form, current_user=current_user)
-
+    return render_template("make-post.html", form=form, current_user=current_user, is_edit=True,
+                           saved_grade=review.grade)
 
 
 @app.route("/edit-physical-review/<int:review_id>", methods=["GET", "POST"])
 def edit_physical_review(review_id):
-    # Get all stations including custom ones plus physical stations for editing
-    base_stations = getAllStations()
+    review = Review.query.get_or_404(review_id)
+    if not can_edit_candidate(Candidate.query.get(review.subject_id)):
+        abort(403)
     physical_stations = ["ספרינטים", "זחילות", "אלונקה סוציומטרית", "מתלה שזיפים"]
-    # Combine physical stations with all stations, avoiding duplicates
-    stations = physical_stations + [s for s in base_stations if s not in physical_stations]
-    review = Review.query.get(review_id)
-    candidates = Candidate.query.filter_by(group_id=current_user.id).all()
-    candidate_nums = []
-    for candidate in candidates:
-        if candidate.status != "פרש":
-            candidate_nums.append(int(candidate.id.split("/")[1]))
-    candidate_nums.sort()
-    form = CreateReviewForm(station=review.station, grade=review.grade, note=review.note, subject=review.subject_id.split("/")[1] )
-    form.subject.choices = candidate_nums
-    form.station.choices = stations
+    stations = physical_stations + [s for s in getAllStations() if s not in physical_stations]
+    form, group_id = edit_review_form(review, stations, station=review.station, note=review.note,
+                                      subject=review.subject_id.split("/")[1])
     if form.validate_on_submit():
         review.station = form.station.data
-        review.subject_id = str(current_user.id) + "/" + str(form.subject.data)
+        review.subject_id = f"{group_id}/{form.subject.data}"
         review.grade = form.grade.data
         review.note = form.note.data
         db.session.commit()
-        update_avgs(form)
+        refresh_after_review_edit(form, group_id)
         return redirect(url_for("showPhysicalReviews"))
-    return render_template("make-post.html", form=form, current_user=current_user)
+    return render_template("make-post.html", form=form, current_user=current_user, is_edit=True,
+                           saved_grade=review.grade)
 
 @app.route("/edit-odt-review/<int:review_id>", methods=["GET", "POST"])
 def edit_odt_review(review_id):
-    # Get all stations including custom ones plus physical stations for editing
-    base_stations = getAllStations()
+    review = Review.query.get_or_404(review_id)
+    if not can_edit_candidate(Candidate.query.get(review.subject_id)):
+        abort(403)
     physical_stations = ["ספרינטים", "זחילות", "אלונקה סוציומטרית", "מתלה שזיפים"]
-    # Combine physical stations with all stations, avoiding duplicates
-    stations = physical_stations + [s for s in base_stations if s not in physical_stations]
-    review = Review.query.get(review_id)
-    candidates = Candidate.query.filter_by(group_id=current_user.id).all()
-    candidate_nums = []
-    for candidate in candidates:
-        if candidate.status != "פרש":
-            candidate_nums.append(int(candidate.id.split("/")[1]))
-    candidate_nums.sort()
-    form = CreateReviewForm(station="ODT", grade=review.grade, note=review.note, subject=review.subject_id.split("/")[1], odt=review.station.split("T ")[1])
-    form.subject.choices = candidate_nums
-    form.station.choices = stations
-    form.odt.data = review.station.split("T ")[1]
-    form.note.data = review.note
+    stations = physical_stations + [s for s in getAllStations() if s not in physical_stations]
+    name = review.station.split("T ", 1)[1] if "T " in review.station else ""
+    form, group_id = edit_review_form(review, stations, station="ODT", odt=name, note=review.note,
+                                      subject=review.subject_id.split("/")[1])
     if form.validate_on_submit():
-        review.station = form.station.data + " " + form.odt.data
-        review.subject_id = str(current_user.id) + "/" + str(form.subject.data)
+        review.station = review_station_name(form)
+        review.subject_id = f"{group_id}/{form.subject.data}"
         review.grade = form.grade.data
         review.note = form.note.data
         db.session.commit()
-        update_avgs(form)
+        refresh_after_review_edit(form, group_id)
         return redirect(url_for("showODTReviews"))
-    return render_template("make-post.html", form=form, current_user=current_user, odt_val = review.station.split("T ")[1], grade = int(review.grade), note = review.note)
+    return render_template("make-post.html", form=form, current_user=current_user, is_edit=True,
+                           saved_grade=review.grade)
 
 
 @app.route("/delete-review/<int:review_id>", methods=["POST"])
@@ -2350,35 +2415,26 @@ def reset_circles():
 @app.route("/new-note", methods=["GET", "POST"])
 def add_new_note():
     form = CreateNoteForm()
-    candidates = Candidate.query.filter_by(group_id=current_user.id).all()
-    candidate_nums = []
-    for candidate in candidates:
-        if candidate.status != "פרש":
-            candidate_nums.append(int(candidate.id.split("/")[1]))
-    candidate_nums.sort()
-    form.subject.choices = candidate_nums
-    israel_tz = pytz.timezone('Israel')
+    candidates = active_candidates(current_user.id)
+    form.subject.choices = [c.number for c in candidates]
     if form.validate_on_submit():
         if is_duplicate_request():
             flash('ההערה כבר נשמרה', 'success')
             return redirect(url_for('add_new_note'))
-        current_time_israel = datetime.now(israel_tz)
-        formatted_time = current_time_israel.strftime('%d-%m-%Y %H:%M')
-        new_note = Note(
-            subject_id=str(current_user.id) + "/" + str(form.subject.data),
+        candidate = Candidate.query.get(f"{current_user.id}/{form.subject.data}")
+        db.session.add(Note(
+            subject_id=candidate.id,
             type=form.type.data,
-            text=form.text.data,
+            text=form.text.data.strip(),
             author=current_user,
-            subject=Candidate.query.filter_by(id=str(current_user.id) + "/" + str(form.subject.data)).first(),
-            date=formatted_time,
-            location=form.location.data
-        )
-        db.session.add(new_note)
+            date=israel_now_str(),
+            location=(form.location.data or "").strip()
+        ))
         db.session.commit()
-        candidate_name = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(form.subject.data)).first().name
-        flash(f'הערה {form.type.data} עבור {candidate_name} נשמרה בהצלחה!', 'success')
+        flash(f'הערה {form.type.data} עבור {candidate.name} נשמרה בהצלחה!', 'success')
         return redirect(url_for('add_new_note'))
-    return render_template("make-note.html", form=form, current_user=current_user)
+    return render_template("make-note.html", form=form, current_user=current_user,
+                           candidate_names={c.number: c.name for c in candidates})
 
 @app.route("/edit-note/<int:note_id>", methods=["GET", "POST"])
 def edit_note(note_id):
@@ -2391,32 +2447,19 @@ def edit_note(note_id):
         text=note.text,
         location=note.location
     )
-
-    candidates = Candidate.query.filter_by(group_id=current_user.id).all()
-    candidate_nums = []
-    for candidate in candidates:
-        if candidate.status != "פרש":
-            candidate_nums.append(int(candidate.id.split("/")[1]))
-    candidate_nums.sort()
-    form.subject.choices = candidate_nums
-
-    israel_tz = pytz.timezone('Israel')
+    candidates = active_candidates(current_user.id)
+    form.subject.choices = [c.number for c in candidates]
     if form.validate_on_submit():
-        note.subject_id = str(current_user.id) + "/" + str(form.subject.data)
+        note.subject_id = f"{current_user.id}/{form.subject.data}"
         note.type = form.type.data
-        note.text = form.text.data
-        note.location = form.location.data
-        note.subject = Candidate.query.filter_by(id=str(current_user.id) + "/" + str(form.subject.data)).first()
-        current_time_israel = datetime.now(israel_tz)
-        formatted_time = current_time_israel.strftime('%d-%m-%Y %H:%M')
-        note.date = formatted_time
-
-
+        note.text = form.text.data.strip()
+        note.location = (form.location.data or "").strip()
+        note.date = israel_now_str()
         db.session.commit()
         flash("ההערה עודכנה", "success")
         return redirect(safe_next(url_for('show_notes')))
-
-    return render_template("make-note.html", form=form, current_user=current_user, is_edit=True)
+    return render_template("make-note.html", form=form, current_user=current_user, is_edit=True,
+                           candidate_names={c.number: c.name for c in candidates})
 
 @app.route("/show-notes", methods=["GET", "POST"])
 def show_notes():

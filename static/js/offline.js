@@ -139,14 +139,23 @@
     el.style.visibility = on ? 'visible' : 'hidden';
   }
 
-  var offlineBar, offlineBarText, offlineBarShown = false, offlineBarDismissed = false;
-  var barKind = null; // 'offline' | 'login' | 'dead' — drives color and ✕ behavior
+  var offlineBar, offlineBarText, offlineBarAction, offlineBarShown = false, offlineBarDismissed = false;
+  var barKind = null; // 'offline' | 'login' | 'dead' — drives color and buttons
   function ensureOfflineBar() {
     if (offlineBar) return offlineBar;
     offlineBar = document.createElement('div');
     offlineBar.id = 'net-banner';
     offlineBar.style.cssText = BAR_CSS + ';background:#b45309';
     offlineBarText = document.createElement('span');
+    // "הצג" on the failed-sync bar opens the list of what did not save
+    // (field question: "I get this message, how do I see the actions?").
+    offlineBarAction = document.createElement('button');
+    offlineBarAction.type = 'button';
+    offlineBarAction.textContent = 'הצג';
+    offlineBarAction.hidden = true;
+    offlineBarAction.style.cssText = 'pointer-events:auto;background:#fff;border:0;border-radius:8px;color:#b91c1c;' +
+      'font-weight:800;font-size:14px;line-height:1;margin-inline-start:12px;padding:8px 14px;cursor:pointer;vertical-align:middle';
+    offlineBarAction.addEventListener('click', function () { openSyncSheet(); });
     var close = document.createElement('button');
     close.type = 'button';
     close.textContent = '✕';
@@ -157,17 +166,13 @@
       'color:#fff;font-weight:700;font-size:16px;line-height:1;margin-inline-start:12px;' +
       'padding:8px 12px;cursor:pointer;vertical-align:middle';
     close.addEventListener('click', function () {
-      if (barKind === 'dead') {
-        // Dismissing the rejected-items bar is an explicit acknowledgment —
-        // the items are deleted, so it never nags again.
-        if (!window.confirm('להסיר את הפעולות שנדחו? לא ניתן יהיה לשחזר אותן מהמכשיר.')) return;
-        clearDead().then(function () { hideOfflineBar(); refreshStatus(); });
-        return;
-      }
+      // Hides the bar only. Failed items stay on the phone until each one is
+      // fixed or deleted from the list — ✕ used to delete them all, unseen.
       offlineBarDismissed = true; // stays hidden until the condition changes
       hideOfflineBar();
     });
     offlineBar.appendChild(offlineBarText);
+    offlineBar.appendChild(offlineBarAction);
     offlineBar.appendChild(close);
     document.body.appendChild(offlineBar);
     return offlineBar;
@@ -184,6 +189,7 @@
     barKind = kind;
     b.style.background = kind === 'dead' ? '#dc2626' : '#b45309';
     offlineBarText.textContent = text;
+    offlineBarAction.hidden = kind !== 'dead';
     if (offlineBarDismissed) return;
     b.style.top = topOffset() + 'px';
     setVisible(b, true);
@@ -236,10 +242,11 @@
       } else if (offline) {
         showOfflineBar(pending ? ('אופליין — ' + pending + ' פעולות ממתינות לסנכרון') : 'אופליין — נתונים יישמרו במכשיר', 'offline');
       } else if (dead) {
-        showOfflineBar(dead + ' פעולות נדחו על ידי השרת ולא נשמרו — בדוק והזן אותן מחדש', 'dead');
+        showOfflineBar(dead === 1 ? 'פעולה אחת לא נשמרה' : (dead + ' פעולות לא נשמרו'), 'dead');
       } else {
         hideOfflineBar();
       }
+      if (syncSheet && syncSheet.open) renderSyncSheet();
     });
   }
 
@@ -283,6 +290,19 @@
   function pathOf(u) {
     try { return new URL(u, location.origin).pathname; } catch (e) { return u; }
   }
+  function decodeReason(header) {
+    try { return decodeURIComponent(header); } catch (e) { return header; }
+  }
+  // 4xx = the server looked at the data and said no; 408/425/429 are "later".
+  function isRefusal(status) {
+    return status >= 400 && status < 500 && [408, 425, 429].indexOf(status) === -1;
+  }
+  function deadLetter(item, reason) {
+    item.dead = true;
+    item.reason = reason || 'השרת לא קיבל את הנתונים';
+    item.deadAt = Date.now();
+    return put(item);
+  }
 
   var flushing = false;
   function flush() {
@@ -313,17 +333,28 @@
             return { synced: synced, dead: dead };
           }
           if (res.ok) {
+            // X-Form-Errors: the server re-rendered the form with errors
+            // (main.flag_refused_forms) — on any form, not only the PRG list.
+            var refused = res.headers.get('X-Form-Errors');
             var rejected = item.kind === 'form' && !res.redirected &&
-              PRG_FORM_PATHS.indexOf(pathOf(item.url)) !== -1;
+              (refused !== null || PRG_FORM_PATHS.indexOf(pathOf(item.url)) !== -1);
             if (!rejected) {
               synced++;
               return remove(item.id).then(function () { return step(i + 1); });
             }
             // Deterministic rejection — same payload gives the same answer,
             // so no retries. Dead-letter it where the user can see it.
-            item.dead = true;
             dead++;
-            return put(item).then(function () { return step(i + 1); });
+            return deadLetter(item, refused !== null ? decodeReason(refused) : '')
+              .then(function () { return step(i + 1); });
+          }
+          if (isRefusal(res.status)) {
+            // 4xx with a message (e.g. /notes/quick "יש לבחור סוג הערה"):
+            // retrying the same data gets the same answer.
+            dead++;
+            return res.clone().json().catch(function () { return null; }).then(function (d) {
+              return deadLetter(item, (d && (d.message || d.error)) || '');
+            }).then(function () { return step(i + 1); });
           }
           // 4xx/5xx may be transient (worker hiccup) — retry a few times.
           item.tries = (item.tries || 0) + 1;
@@ -340,8 +371,8 @@
       flushing = false;
       var parts = [];
       if (r.synced > 0) parts.push('סונכרנו ' + r.synced + ' פעולות ✓');
-      if (r.dead > 0) parts.push(r.dead + ' פעולות נדחו על ידי השרת');
-      if (parts.length) toast(parts.join(' · '));
+      if (r.dead > 0) parts.push(r.dead + ' לא נשמרו — הקישו "הצג"');
+      if (parts.length) toast(parts.join(' · '), r.dead > 0 && !r.synced ? 'error' : null);
       refreshStatus();
       // View pages (e.g. the scores board) opt in to a reload after a sync,
       // so freshly synced reviews actually appear without a manual refresh.
@@ -438,8 +469,18 @@
         fd.forEach(function (v, k) { if (typeof v === 'string') fields.push([k, v]); });
         busy(form, btn, true);
 
+        // A failed item being fixed from the list (see applyPrefill) leaves
+        // the list once the corrected form is saved or queued again.
+        function settleFixed() {
+          var id = form.getAttribute('data-prefill-dead');
+          if (!id) return Promise.resolve();
+          form.removeAttribute('data-prefill-dead');
+          return remove(+id).then(refreshStatus);
+        }
+
         function queueIt() {
           return queue({ kind: 'form', url: action, fields: fields, requestId: requestId, ts: Date.now() }).then(function () {
+            settleFixed();
             setOffline(true);  // we couldn't reach the server; show the pending strip
             toast('נשמר במכשיר — יסונכרן ברגע שתהיה רשת ✓');
             // Entry forms start over; editing forms (data-keep) keep what was typed.
@@ -455,6 +496,17 @@
         fetchWithTimeout(action, { method: 'POST', headers: { 'X-Request-Id': requestId }, body: fd })
           .then(function (res) {
             if (pathOf(res.url) === '/login') { needLogin = true; queueIt(); return; }
+            var refusedNow = res.headers.get('X-Form-Errors') !== null ||
+              (!res.redirected && PRG_FORM_PATHS.indexOf(pathOf(action)) !== -1);
+            if (res.ok && !refusedNow) settleFixed();
+            else if (refusedNow && form.getAttribute('data-prefill-dead')) {
+              // Refused again: the page is re-rendered with its errors; the
+              // next try on it still settles the same list item.
+              try {
+                sessionStorage.setItem('mm-fixing', JSON.stringify({
+                  action: pathOf(action), deadId: form.getAttribute('data-prefill-dead') }));
+              } catch (e) {}
+            }
             if (res.redirected) {
               // PRG success. fetch already followed the redirect and that GET
               // consumed the one-shot flash message — navigating again would
@@ -553,6 +605,9 @@
     // on an offline→online EDGE, so items queued in a previous page load
     // never synced when the app reopened already-online.
     flush();
+    // After app.js ran (it loads right after this file), so the refilled
+    // form can show its errors.
+    setTimeout(applyPrefill, 0);
   });
 
   // Ask the service worker to keep the field pages cached for offline use.
@@ -578,7 +633,239 @@
     setTimeout(warmPages, 4000); // after the page settled; idle network only
   });
 
+  // --- Items that did not save: list, fix & send, delete --------------------
+  // What each queued write was, for the list. Paths are the POST targets.
+  var KIND_LABELS = {
+    '/new-note': 'הערה', '/notes/quick': 'הערה', '/new-review': 'ציון', '/add-all': 'ציונים קבוצתיים',
+    '/interview/': 'ראיון', '/final-status/': 'נתוני סיכום', '/final-grade/': 'ציון סופי',
+    '/group-manage/names': 'שמות מגובשים', '/update-counter-reviews': 'מונה מסע',
+    '/circles/finished-act': 'סדר הגעה', '/circles/finished': 'סדר הגעה', '/final-summary/save': 'דירוג סופי'
+  };
+  // The page that holds the form for a POST target, when they differ.
+  var PAGE_FOR = { '/add-all': '/new-group-review' };
+
+  function fieldsOf(item) {
+    var f = {};
+    if (item.kind === 'form') {
+      item.fields.forEach(function (kv) { if (!(kv[0] in f)) f[kv[0]] = kv[1]; });
+    } else {
+      try { f = JSON.parse(item.body) || {}; } catch (e) {}
+    }
+    return f;
+  }
+  function describe(item) {
+    var path = pathOf(item.url);
+    var f = fieldsOf(item);
+    var label = KIND_LABELS[path] || (path.indexOf('/edit-') === 0 ? 'עריכה' : 'פעולה');
+    var who = path === '/add-all' ? '' : String(f.subject || f.id || '');
+    var text = f.text || f.note || f.final_note || '';
+    if (path === '/add-all') {
+      var notes = [];
+      item.fields.forEach(function (kv) {
+        var m = /^note-(\d+)$/.exec(kv[0]);
+        if (m && kv[1].trim()) notes.push(m[1] + ': ' + kv[1].trim());
+      });
+      text = notes.join(' · ');
+    }
+    var where = path === '/add-all' ? (f.station === 'אחר' ? f.odt : f.station) : (f.station || f.movement_type || f.location || '');
+    return { label: label, who: who, text: text, where: where || '', path: path, fields: f };
+  }
+  function hhmm(ts) {
+    var d = new Date(ts || Date.now());
+    return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+  }
+  function isGroupUser() { return !!document.getElementById('warm-pages'); }
+  function canFix(item) {
+    var path = pathOf(item.url);
+    if (item.kind === 'form') return true;
+    return path === '/notes/quick' && (!!window.QuickNote || isGroupUser());
+  }
+
+  var syncSheet = null, syncList = null;
+  function ensureSyncSheet() {
+    if (syncSheet) return syncSheet;
+    syncSheet = document.createElement('dialog');
+    syncSheet.id = 'sync-sheet';
+    syncSheet.className = 'app-sheet';
+    syncSheet.setAttribute('aria-labelledby', 'sync-title');
+    syncSheet.innerHTML =
+      '<div class="sheet-form">' +
+        '<header class="sheet-head">' +
+          '<div class="sheet-grabber" aria-hidden="true"></div>' +
+          '<div class="flex items-center justify-between gap-3">' +
+            '<h2 id="sync-title" class="font-display text-xl font-extrabold flex items-center gap-2">' +
+              '<i class="fas fa-exclamation-circle text-error"></i> לא נשמרו בסנכרון</h2>' +
+            '<button type="button" class="btn btn-ghost btn-circle btn-sm text-lg" data-sync-close aria-label="סגור">✕</button>' +
+          '</div>' +
+          '<p class="text-sm opacity-70 mt-1">שמורים במכשיר עד שתשלים או תמחק</p>' +
+        '</header>' +
+        '<div class="sheet-body" id="sync-list"></div>' +
+      '</div>';
+    document.body.appendChild(syncSheet);
+    syncList = syncSheet.querySelector('#sync-list');
+    syncSheet.addEventListener('click', function (e) {
+      if (e.target === syncSheet || (e.target.closest && e.target.closest('[data-sync-close]'))) { closeSyncSheet(); return; }
+      var btn = e.target.closest ? e.target.closest('[data-sync-act]') : null;
+      if (!btn) return;
+      var id = +btn.closest('[data-item]').getAttribute('data-item');
+      allItems().then(function (all) {
+        var item = all.filter(function (i) { return i.id === id; })[0];
+        if (item) syncAction(btn.getAttribute('data-sync-act'), item);
+      });
+    });
+    return syncSheet;
+  }
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined) n.textContent = text;
+    return n;
+  }
+  function renderSyncSheet() {
+    return deadItems().then(function (items) {
+      syncList.innerHTML = '';
+      if (!items.length) { closeSyncSheet(); return; }
+      items.sort(function (a, b) { return a.ts - b.ts; });
+      items.forEach(function (item) {
+        var d = describe(item);
+        var card = el('article', 'sync-item');
+        card.setAttribute('data-item', item.id);
+        var head = el('div', 'flex items-center gap-2');
+        if (d.who) head.appendChild(el('span', 'bib bib-sm shrink-0', d.who));
+        var title = el('b', 'grow min-w-0 truncate', d.label + ' · ' + hhmm(item.ts));
+        head.appendChild(title);
+        if (d.where) head.appendChild(el('span', 'badge badge-ghost badge-sm max-w-[40%] truncate', d.where));
+        card.appendChild(head);
+        card.appendChild(el('p', 'sync-reason', item.reason || 'השרת לא קיבל את הנתונים'));
+        if (d.text) card.appendChild(el('p', 'sync-text', d.text));
+        var actions = el('div', 'flex gap-2');
+        var fix = el('button', 'btn btn-primary btn-sm grow', canFix(item) ? 'השלם ושלח' : 'נסה שוב');
+        fix.type = 'button';
+        fix.setAttribute('data-sync-act', canFix(item) ? 'fix' : 'retry');
+        var del = el('button', 'btn btn-ghost btn-sm text-error', 'מחק');
+        del.type = 'button';
+        del.setAttribute('data-sync-act', 'delete');
+        actions.appendChild(fix);
+        actions.appendChild(del);
+        card.appendChild(actions);
+        syncList.appendChild(card);
+      });
+    });
+  }
+  function openSyncSheet() {
+    var sheet = ensureSyncSheet();
+    renderSyncSheet().then(function () {
+      if (!syncList.children.length || sheet.open) return;
+      if (sheet.showModal) sheet.showModal(); else sheet.setAttribute('open', '');
+    });
+  }
+  function closeSyncSheet() {
+    if (syncSheet && syncSheet.open) { if (syncSheet.close) syncSheet.close(); else syncSheet.removeAttribute('open'); }
+  }
+  function goFix(page, action, fields, item) {
+    try {
+      sessionStorage.setItem('mm-prefill', JSON.stringify({
+        path: page, action: action, fields: fields, deadId: item.id, reason: item.reason || ''
+      }));
+    } catch (e) {}
+    if (location.pathname === page) { closeSyncSheet(); applyPrefill(); }
+    else location.href = page;
+  }
+  function syncAction(act, item) {
+    if (act === 'delete') {
+      if (!window.confirm('למחוק את הפעולה הזאת מהמכשיר? לא ניתן לשחזר אותה.')) return;
+      remove(item.id).then(function () { refreshStatus(); renderSyncSheet(); });
+      return;
+    }
+    if (act === 'retry') {
+      item.dead = false;
+      item.tries = 0;
+      delete item.reason;
+      put(item).then(function () { refreshStatus(); renderSyncSheet(); flush(); });
+      return;
+    }
+    var path = pathOf(item.url);
+    if (item.kind === 'form') {
+      goFix(PAGE_FOR[path] || path, path, item.fields, item);
+      return;
+    }
+    // A quick note: refill the sheet (or the full note page, same fields).
+    var b = fieldsOf(item);
+    if (window.QuickNote) {
+      closeSyncSheet();
+      window.QuickNote.open({
+        group: b.group, candidate: b.subject, type: b.type, text: b.text || '', location: b.location || '',
+        onSaved: function () { remove(item.id).then(refreshStatus); }
+      });
+      return;
+    }
+    goFix('/new-note', '/new-note', [['subject', String(b.subject || '')], ['type', b.type || ''],
+                                     ['text', b.text || ''], ['location', b.location || '']], item);
+  }
+
+  // Opened from "השלם ושלח": put the refused data back into the page's form,
+  // mark what is missing, and let the user send it again.
+  function fillForm(form, fields) {
+    var byName = {};
+    fields.forEach(function (kv) {
+      if (kv[0] === 'csrf_token' || kv[0] === 'request_id') return;
+      (byName[kv[0]] = byName[kv[0]] || []).push(kv[1]);
+    });
+    Object.keys(byName).forEach(function (name) {
+      var nodes = form.querySelectorAll('[name="' + (window.CSS && CSS.escape ? CSS.escape(name) : name) + '"]');
+      var values = byName[name];
+      if (!nodes.length) return;
+      if (nodes[0].type === 'radio' || nodes[0].type === 'checkbox') {
+        Array.prototype.forEach.call(nodes, function (n) { n.checked = values.indexOf(n.value) !== -1; });
+      } else if (nodes.length === 1) {
+        var node = nodes[0];
+        if (node.type !== 'hidden') node.value = values[0];
+        // A choice that is gone (a retired candidate) shows the "choose"
+        // entry, not a blank box — the validator then marks it.
+        if (node.tagName === 'SELECT' && node.selectedIndex === -1) node.value = '';
+      }
+      Array.prototype.forEach.call(nodes, function (n) {
+        n.dispatchEvent(new Event('input', { bubbles: true }));
+        n.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    });
+  }
+  function reattachFixing() {
+    var raw = null;
+    try { raw = sessionStorage.getItem('mm-fixing'); sessionStorage.removeItem('mm-fixing'); } catch (e) {}
+    if (!raw) return;
+    var f;
+    try { f = JSON.parse(raw); } catch (e) { return; }
+    var form = Array.prototype.slice.call(document.querySelectorAll('form[data-offline]')).filter(function (x) {
+      return pathOf(x.getAttribute('action') || location.pathname) === f.action;
+    })[0];
+    if (form) form.setAttribute('data-prefill-dead', String(f.deadId));
+  }
+  function applyPrefill() {
+    reattachFixing();
+    var raw = null;
+    try { raw = sessionStorage.getItem('mm-prefill'); } catch (e) {}
+    if (!raw) return;
+    var p;
+    try { p = JSON.parse(raw); } catch (e) { return; }
+    if (!p || p.path !== location.pathname) return;
+    try { sessionStorage.removeItem('mm-prefill'); } catch (e) {}
+    var forms = Array.prototype.slice.call(document.querySelectorAll('form[data-offline]'));
+    var form = forms.filter(function (f) { return pathOf(f.getAttribute('action') || location.pathname) === p.action; })[0] || forms[0];
+    if (!form) return;
+    fillForm(form, p.fields || []);
+    form.setAttribute('data-prefill-dead', String(p.deadId));
+    var note = el('div', 'alert alert-warning text-sm');
+    note.setAttribute('role', 'status');
+    note.appendChild(el('i', 'fas fa-undo'));
+    note.appendChild(el('span', '', 'החזרנו את מה שלא נשמר' + (p.reason ? ' (' + p.reason + ')' : '') + '. השלם את המסומן ושלח שוב.'));
+    form.insertBefore(note, form.firstChild);
+    document.dispatchEvent(new CustomEvent('mm:prefilled'));
+    setTimeout(function () { if (window.AppUI && window.AppUI.validateForm) window.AppUI.validateForm(form); }, 60);
+  }
+
   // Small API for pages that want to reflect the outbox state (e.g. the
   // scores board shows "pending sync"), plus dead-letter inspection.
-  window.MeymadionOffline = { pendingCount: pendingCount, deadItems: deadItems, clearDead: clearDead, toast: toast };
+  window.MeymadionOffline = { pendingCount: pendingCount, deadItems: deadItems, clearDead: clearDead, toast: toast,
+                              openSyncSheet: openSyncSheet };
 })();

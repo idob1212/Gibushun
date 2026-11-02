@@ -152,6 +152,103 @@
     if (window.MeymadionOffline && window.MeymadionOffline.toast) window.MeymadionOffline.toast(text, kind);
   }
 
+  // --- Required fields, checked on the phone --------------------------------
+  // The rules come from forms.py (required / maxlength / data-msg on each
+  // input), so the phone and the server agree. This runs in the capture
+  // phase, before offline.js sends or queues the form: a missing field is
+  // shown under the field and NOTHING is saved or queued. (Field bug: an
+  // offline note without a type was queued, then refused on sync and lost.)
+  function isShown(el) {
+    if (el.closest('[hidden]')) return false;
+    if (el.type === 'hidden') return false;
+    return el.offsetParent !== null || el.getClientRects().length > 0 ||
+      // visually hidden radios inside a visible picker
+      (!!el.parentElement && el.parentElement.getClientRects().length > 0);
+  }
+  function textLike(el) {
+    return el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && /^(text|search|tel|email|password|number|url)$/i.test(el.type));
+  }
+  function problemOf(el) {
+    var v = el.validity;
+    if (v.valueMissing || (el.required && textLike(el) && !el.value.trim())) {
+      return el.getAttribute('data-msg') || 'זהו סעיף חובה';
+    }
+    if (v.tooLong) return 'הטקסט ארוך מדי';
+    if (!v.valid) return el.getAttribute('data-msg-invalid') || 'ערך לא תקין';
+    return '';
+  }
+  function fieldOf(el) { return el.closest('[data-field]'); }
+  function setFieldError(el, msg) {
+    var wrap = fieldOf(el);
+    if (!wrap) return;
+    var slot = wrap.querySelector('.field-error');
+    if (!slot) {
+      slot = document.createElement('p');
+      slot.className = 'field-error';
+      slot.setAttribute('role', 'alert');
+      wrap.appendChild(slot);
+    }
+    if (!slot.id) slot.id = 'err-' + Math.random().toString(36).slice(2, 9);
+    wrap.classList.toggle('is-invalid', !!msg);
+    slot.textContent = msg || '';
+    slot.hidden = !msg;
+    var inputs = el.type === 'radio' ? wrap.querySelectorAll('input[name="' + el.name + '"]') : [el];
+    Array.prototype.forEach.call(inputs, function (input) {
+      if (msg) { input.setAttribute('aria-invalid', 'true'); input.setAttribute('aria-describedby', slot.id); }
+      else { input.removeAttribute('aria-invalid'); }
+    });
+  }
+  function shake(node) {
+    node.classList.remove('qn-invalid');
+    void node.offsetWidth;
+    node.classList.add('qn-invalid');
+  }
+  function validateForm(form) {
+    var first = null;
+    var seenRadio = {};
+    Array.prototype.forEach.call(form.elements, function (el) {
+      if (!el.willValidate || el.disabled || !isShown(el)) return;
+      if (el.type === 'radio') {
+        if (seenRadio[el.name]) return;
+        seenRadio[el.name] = true;
+      }
+      var msg = problemOf(el);
+      if (fieldOf(el)) setFieldError(el, msg);
+      if (msg && !first) first = el;
+    });
+    // Page rules that are not one field (group grading: a note on a "–" row).
+    if (typeof form.mmValidate === 'function') {
+      var extra = form.mmValidate();
+      if (extra && !first) first = extra;
+    }
+    if (!first) return true;
+    var target = fieldOf(first) || first;
+    if (target.scrollIntoView) target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    shake(target);
+    try { first.focus({ preventScroll: true }); } catch (e) {}
+    return false;
+  }
+  onWindow(document, 'submit', function (e) {
+    var form = e.target;
+    if (!form || form.tagName !== 'FORM' || form.getAttribute('data-validate') === 'off') return;
+    if ((form.getAttribute('method') || 'get').toLowerCase() !== 'post') return;
+    if (!validateForm(form)) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      e.stopPropagation();
+    }
+  }, true);
+  // An error clears as soon as the field is fixed.
+  function revalidate(e) {
+    var el = e.target;
+    if (!el || !el.closest) return;
+    var wrap = el.closest('[data-field].is-invalid');
+    if (!wrap || !el.willValidate) return;
+    if (!problemOf(el)) setFieldError(el, '');
+  }
+  onWindow(document, 'input', revalidate, true);
+  onWindow(document, 'change', revalidate, true);
+
   function uuid() {
     if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
     return 'xxxxxxxxxxxx4xxxyxxxxxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
@@ -160,7 +257,8 @@
     });
   }
 
-  window.AppUI = { setBusy: setBusy, markButton: markButton, setFormBusy: setFormBusy, toast: toast, uuid: uuid };
+  window.AppUI = { setBusy: setBusy, markButton: markButton, setFormBusy: setFormBusy, toast: toast, uuid: uuid,
+                   validateForm: validateForm };
 
   // --- Quick note sheet -----------------------------------------------------
   var sheet = document.getElementById('qn-sheet');
@@ -278,6 +376,11 @@
       if (opts.candidate !== undefined && opts.candidate !== null && opts.candidate !== '') {
         state.number = +opts.candidate;
       }
+      // Refilled from a note the server refused (offline.js "fix & send").
+      if (opts.type && !cfg.fixedType) state.type = opts.type;
+      if (opts.text !== undefined) text.value = opts.text;
+      if (opts.location !== undefined) loc.value = opts.location;
+      state.onSaved = opts.onSaved || null;
       renderPicked();
       renderTypes();
       // The page tells us where we are (the selected station), if anywhere.
@@ -354,6 +457,7 @@
       }).then(function (r) {
         if (!r.ok || !r.data.success) throw new Error(r.data.message || 'השמירה נכשלה');
         toast(r.data.message || 'ההערה נשמרה ✓');
+        if (state.onSaved) { try { state.onSaved(r.data); } catch (e) {} state.onSaved = null; }
         text.value = '';
         loc.value = '';
         state.type = cfg.fixedType || null;

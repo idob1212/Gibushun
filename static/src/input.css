@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @source "../../templates";
 @source "../js/app.js";
+@source "../js/offline.js";
 
 @plugin "daisyui";
 
@@ -122,6 +123,12 @@
     color: var(--color-primary);
     background: color-mix(in oklab, var(--color-primary) 16%, var(--color-base-100));
     box-shadow: none;
+  }
+  .bib-sm {
+    min-width: 2.35rem;
+    min-height: 2.35rem;
+    font-size: 1.05rem;
+    border-radius: 0.7rem;
   }
   .bib-lg {
     min-width: 4.5rem;
@@ -672,4 +679,218 @@ html.is-loading .app-progress {
   background-color: var(--color-primary);
   border-color: var(--color-primary);
   color: var(--color-primary-content);
+}
+
+/* ---- Required fields & errors (forms.py rules, app.js / server messages) --
+   One look everywhere: the field gets a red outline, its message sits right
+   under it, and it shakes once when a save is blocked. */
+.req-mark {
+  color: var(--color-error);
+  font-weight: 700;
+}
+.field-error {
+  display: flex;
+  align-items: flex-start;
+  gap: .35rem;
+  margin-top: .35rem;
+  font-size: .85rem;
+  font-weight: 600;
+  color: var(--color-error);
+}
+.field-error::before {
+  content: "!";
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 1.05rem;
+  height: 1.05rem;
+  margin-top: .1rem;
+  border-radius: 999px;
+  background: var(--color-error);
+  color: var(--color-error-content);
+  font-size: .7rem;
+  font-weight: 800;
+}
+.field-error[hidden] {
+  display: none;
+}
+.is-invalid :is(.input, .select, .textarea) {
+  border-color: var(--color-error);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-error) 22%, transparent);
+}
+.is-invalid :is(.chip-pick, .type-pick, .seg-pick, .grade-seg, .grade-pick) {
+  border-radius: .9rem;
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-error) 55%, transparent);
+}
+.group-row.is-invalid {
+  box-shadow: 0 0 0 2px var(--color-error);
+}
+
+/* Radio pickers: the input is visually hidden but still posts (and replays
+   offline) like a normal field; the span is what you tap. */
+:is(.chip-opt, .type-opt, .seg-opt, .grade-seg label) {
+  position: relative;
+  display: block;
+  cursor: pointer;
+}
+:is(.chip-opt, .type-opt, .seg-opt, .grade-seg label) > input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+:is(.chip-opt, .type-opt, .seg-opt, .grade-seg label) > input:focus-visible + span {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Candidate number chips — the same chips as the quick-note sheet. */
+.chip-pick {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(2.85rem, 1fr));
+  gap: .4rem;
+}
+.chip-opt > span {
+  display: grid;
+  place-items: center;
+  height: 2.85rem;
+  border-radius: .8rem;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.05rem;
+  background: var(--color-base-200);
+  color: var(--color-base-content);
+  transition: transform .08s ease;
+}
+.chip-opt:active > span {
+  transform: scale(.92);
+}
+.chip-opt > input:checked + span {
+  color: #fff;
+  background: linear-gradient(135deg, var(--color-brand-violet), var(--color-brand-blue));
+  box-shadow: 0 6px 14px -6px color-mix(in oklab, var(--color-brand-violet) 75%, transparent);
+}
+
+/* Note type — the same buttons as the quick-note sheet. */
+.type-pick {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: .5rem;
+}
+.type-opt > span {
+  display: grid;
+  place-items: center;
+  height: 2.8rem;
+  border-radius: .8rem;
+  border: 2px solid var(--color-base-300);
+  background: var(--color-base-100);
+  font-weight: 700;
+}
+.type-opt[data-type="טובה"] > input:checked + span { background: var(--color-success); border-color: var(--color-success); color: var(--color-success-content); }
+.type-opt[data-type="ניטרלית"] > input:checked + span { background: var(--color-warning); border-color: var(--color-warning); color: var(--color-warning-content); }
+.type-opt[data-type="רעה"] > input:checked + span { background: var(--color-error); border-color: var(--color-error); color: var(--color-error-content); }
+
+/* Generic segmented radio group (render_field for a RadioField). */
+.seg-pick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem;
+}
+.seg-opt > span {
+  display: grid;
+  place-items: center;
+  min-height: 2.6rem;
+  padding: 0 .9rem;
+  border-radius: .7rem;
+  border: 2px solid var(--color-base-300);
+  font-weight: 700;
+}
+.seg-opt > input:checked + span {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-primary-content);
+}
+
+/* Group grading: "– 1 2 3 4" in one tap (– = not graded). */
+.grade-seg {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  border: 1px solid var(--color-base-300);
+  border-radius: .8rem;
+  overflow: hidden;
+  background: var(--color-base-100);
+}
+.grade-seg label + label {
+  border-inline-start: 1px solid var(--color-base-300);
+}
+.grade-seg span {
+  display: grid;
+  place-items: center;
+  height: 2.6rem;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.05rem;
+}
+.grade-seg label:first-child span {
+  color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+}
+.grade-seg input:checked + span {
+  background: var(--color-primary);
+  color: var(--color-primary-content);
+}
+.grade-seg label:first-child input:checked + span {
+  background: var(--color-base-300);
+  color: var(--color-base-content);
+}
+.note-open {
+  font-size: .85rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  padding: .15rem .1rem;
+}
+.note-area {
+  min-height: 2.6rem;
+  resize: none;
+  overflow: hidden;
+  font-size: 1rem;
+}
+/* Count + save stay in reach while scrolling a long group. */
+.group-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+  margin-inline: -.25rem;
+  padding: .7rem .75rem;
+  border-radius: 1rem 1rem 0 0;
+  background: var(--color-base-100);
+  box-shadow: 0 -8px 20px -12px rgba(0, 0, 0, .35);
+}
+
+/* Items the server did not accept (offline.js "לא נשמרו בסנכרון"). */
+.sync-item {
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+  padding: .75rem;
+  border-radius: 1rem;
+  background: var(--color-base-200);
+}
+.sync-reason {
+  font-size: .85rem;
+  font-weight: 700;
+  color: var(--color-error);
+}
+.sync-text {
+  font-size: .9rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: .45rem .6rem;
+  border-radius: .7rem;
+  background: var(--color-base-100);
 }
