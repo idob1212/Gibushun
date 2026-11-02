@@ -1021,15 +1021,7 @@ html.is-loading .app-progress {
   padding-right: env(safe-area-inset-right);
   background-color: var(--color-base-200);
 }
-/* iOS home-screen app: iOS can leave a strip under the page that the page
-   cannot draw in (59pt on an iPhone 15 Pro simulator, iOS 17) — it shows
-   the body colour. Make that the dock's colour, so it reads as part of the
-   dock instead of a gap under it. */
-@media (display-mode: standalone) {
-  body:has(.app-dock) {
-    background-color: var(--color-base-100);
-  }
-}
+
 /* No dock (it is md:hidden — wide screens, and a notched phone on its side):
    the sticky save bars sit at the very bottom, so keep them clear of the
    home indicator. */

@@ -1,4 +1,4 @@
-const VERSION = 'v19';
+const VERSION = 'v20';
 const SHELL_CACHE = 'meymadion-shell-' + VERSION;
 const PAGE_CACHE = 'meymadion-pages-' + VERSION;
 // Candidate photos use versioned URLs (?v=N), so a cached copy never goes stale.

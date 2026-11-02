@@ -63,6 +63,9 @@ Never toggle layout on input focus/blur — a tap on "save" blurs first and a la
 jump sends the tap elsewhere. The same goes for anything that appears or goes away
 by itself: the offline bar grows `<main>`'s scroll position by its own height, and
 self-dismissing messages fade but keep their space (`AppUI.fadeAway`).
+The iOS status bar is opaque (`apple-mobile-web-app-status-bar-style: default`,
+coloured by `theme-color` per theme): with `black-translucent` iOS sizes the
+home-screen app one status bar short and leaves a dead strip under the dock.
 
 ### Database Models
 
@@ -82,7 +85,8 @@ self-dismissing messages fade but keep their space (`AppUI.fadeAway`).
 - Links candidates to their performance scores
 - Supports both numerical grades and counter-based evaluations
 - `created_at` (Israel time, NULL on older rows); arrival-order rows keep `place`
-  (1 = first, 0 = did not finish; NULL on older rows — `act_split()` infers it)
+  (1 = first, 0 = did not finish; NULL on older rows — `act_split()` infers it from
+  the grades, and when they fit more than one split the act is shown "to check")
 
 **Note Model (`notes` table):**
 - Behavioral observations and notes

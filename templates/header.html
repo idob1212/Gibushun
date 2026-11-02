@@ -5,16 +5,28 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
   <meta name="description" content="">
-  <meta name="theme-color" content="#1f2937">
+  {# The phone's status bar takes the top bar's colour (set below for the
+     theme in use, and again when it is switched in the app). #}
+  <meta name="theme-color" content="#ffffff">
   <title>מימדיון</title>
 
   <script>
     // Apply the saved theme before paint to avoid a flash. No saved value = follow the device.
     (function () {
+      var BAR = { 'meymadion': '#ffffff', 'meymadion-dark': '#1b1827' };
+      var html = document.documentElement;
+      window.mmStatusBar = function () {
+        var t = html.getAttribute('data-theme') ||
+          (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'meymadion-dark' : 'meymadion');
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', BAR[t] || BAR.meymadion);
+      };
       try {
         var t = localStorage.getItem('theme');
-        if (t) document.documentElement.setAttribute('data-theme', t);
+        if (t) html.setAttribute('data-theme', t);
       } catch (e) {}
+      window.mmStatusBar();
+      try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', window.mmStatusBar); } catch (e) {}
     })();
   </script>
 
@@ -24,7 +36,12 @@
   <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/apple-touch-icon.png') }}">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  {# Opaque, not black-translucent: with the translucent bar iOS sizes the
+     home-screen app one status bar short (793 of 852pt on an iPhone 15 Pro)
+     and leaves a strip under the dock the page cannot draw in — a bare test
+     page does the same. iOS reads this when the app is added to the home
+     screen, so an app added before keeps the strip until it is re-added. #}
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="מימדיון">
   <meta name="mobile-web-app-capable" content="yes">
 
