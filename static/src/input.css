@@ -1124,3 +1124,10 @@ html.is-loading .app-progress {
 .act-more > summary::-webkit-details-marker {
   display: none;
 }
+/* 320px phones: the reorder rows give their padding to the name. */
+@media (max-width: 359px) {
+  :is([data-finished], [data-unfinished]) > li > .card-body {
+    padding-inline: .5rem;
+    gap: .375rem;
+  }
+}

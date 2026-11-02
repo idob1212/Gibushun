@@ -66,19 +66,22 @@
     if (finished) {
       // The place is a picker: a long move is one choice on the phone's
       // wheel instead of tapping ▲ ten times (no keyboard, no typos).
-      var place = el('select', 'rank rank-pick font-display font-extrabold text-base min-w-9 text-center text-primary');
+      // The place, and under it where the row came from ("↑ היה 4"): beside
+      // the name it squeezed the row to three lines on a 375px phone.
+      var rank = el('div', 'flex flex-col items-center shrink-0 min-w-12 gap-0.5');
+      var place = el('select', 'rank rank-pick font-display font-extrabold text-base text-center text-primary');
       place.setAttribute('data-place', '');
       place.setAttribute('aria-label', 'מקום של מגובש ' + n);
-      body.appendChild(place);
+      rank.appendChild(place);
+      var moved = el('span', '', '');
+      moved.setAttribute('data-moved', '');
+      rank.appendChild(moved);
+      body.appendChild(rank);
       body.appendChild(el('div', 'bib bib-sm shrink-0', n));
       var mid = el('div', 'flex-1 min-w-0');
       mid.appendChild(el('div', 'font-semibold truncate', name));
-      var sub = el('div', 'text-xs text-base-content/60 flex items-center gap-2');
-      sub.appendChild(el('span', '', ''));
-      sub.lastChild.setAttribute('data-moved', '');
       // An action, not a status: under every finisher a bare "לא סיים" read as one.
-      sub.appendChild(button('btn btn-xs btn-ghost px-1.5 font-medium', 'סמן כלא סיים', ['data-dnf', ''], 'סמן שמגובש ' + n + ' לא סיים'));
-      mid.appendChild(sub);
+      mid.appendChild(button('btn btn-xs btn-ghost px-1.5 font-medium text-base-content/60', 'סמן כלא סיים', ['data-dnf', ''], 'סמן שמגובש ' + n + ' לא סיים'));
       body.appendChild(mid);
       var grade = el('span', 'font-display font-bold text-lg w-10 text-center', '');
       grade.setAttribute('data-grade', '');
@@ -90,7 +93,7 @@
       arrows.lastChild.innerHTML = '<i class="fas fa-chevron-down"></i>';
       body.appendChild(arrows);
     } else {
-      body.appendChild(el('span', 'rank font-display font-extrabold text-base min-w-9 text-center text-base-content/40', '–'));
+      body.appendChild(el('span', 'rank font-display font-extrabold text-base min-w-12 text-center text-base-content/40', '–'));
       body.appendChild(el('div', 'bib bib-sm bib-ghost shrink-0', n));
       body.appendChild(el('div', 'flex-1 min-w-0 font-semibold truncate', name));
       body.appendChild(el('span', 'font-display font-bold text-lg w-10 text-center text-base-content/50', '1.0'));
@@ -112,7 +115,7 @@
       li.querySelector('[data-grade]').textContent = g[i].toFixed(1);
       var was = +li.dataset.was, moved = li.querySelector('[data-moved]');
       moved.textContent = !was ? 'נוסף' : (was > i + 1 ? '↑ היה ' + was : (was < i + 1 ? '↓ היה ' + was : ''));
-      moved.className = was === i + 1 ? '' : 'font-semibold text-primary';
+      moved.className = 'text-xs whitespace-nowrap ' + (was === i + 1 ? '' : 'font-semibold text-primary');
       li.querySelector('[data-move="up"]').disabled = i === 0;
       li.querySelector('[data-move="down"]').disabled = i === items.length - 1;
       li.querySelector('[data-dnf]').hidden = items.length === 1;   // someone must finish
