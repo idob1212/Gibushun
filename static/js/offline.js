@@ -178,10 +178,34 @@
     return offlineBar;
   }
   function offlineBarVisible() { return offlineBarShown; }
-  // Reserve space in the page flow so the bar never covers the top of the content.
+  // Reserve space at the top of <main> so the bar never hides the start of the
+  // page — without moving what is on screen. The bar shows up mid-use (going
+  // offline right as "save" is tapped), and pushing the page down by its
+  // height sent that tap to whatever slid under the finger. So the scroll
+  // position grows by the same amount: the content stays put and the
+  // reserved strip sits under the bar (scroll up to see it). The strip also
+  // stays when the bar hides; the next page drops it.
+  var reservedTop = 0, barSpacer = null;
   function reserveBarSpace() {
     var main = document.querySelector('main');
-    if (main) main.style.paddingTop = (offlineBarShown && offlineBar) ? (offlineBar.offsetHeight + 12) + 'px' : '';
+    if (!main || !offlineBarShown || !offlineBar) return;
+    var need = offlineBar.offsetHeight + 12;
+    if (need <= reservedTop) return;
+    var grow = need - reservedTop;
+    reservedTop = need;
+    var target = main.scrollTop + grow;
+    main.style.paddingTop = need + 'px';
+    // A short page can't scroll far enough to absorb the strip: give it room.
+    var short = target - (main.scrollHeight - main.clientHeight);
+    if (short > 0) {
+      if (!barSpacer) {
+        barSpacer = document.createElement('div');
+        barSpacer.setAttribute('aria-hidden', 'true');
+        main.appendChild(barSpacer);
+      }
+      barSpacer.style.height = ((parseFloat(barSpacer.style.height) || 0) + short) + 'px';
+    }
+    main.scrollTop = target;
   }
   function showOfflineBar(text, kind) {
     var b = ensureOfflineBar();
@@ -238,9 +262,10 @@
       var pending = 0, dead = 0;
       all.forEach(function (i) { if (i.dead) dead++; else pending++; });
       if (needLogin && pending) {
-        showOfflineBar('ההתחברות פגה — התחבר מחדש כדי לסנכרן ' + pending + ' פעולות ממתינות', 'login');
+        showOfflineBar('ההתחברות פגה — התחבר מחדש כדי לסנכרן ' + (pending === 1 ? 'פעולה ממתינה' : pending + ' פעולות ממתינות'), 'login');
       } else if (offline) {
-        showOfflineBar(pending ? ('אופליין — ' + pending + ' פעולות ממתינות לסנכרון') : 'אופליין — נתונים יישמרו במכשיר', 'offline');
+        showOfflineBar(pending ? ('אופליין — ' + (pending === 1 ? 'פעולה אחת ממתינה' : pending + ' פעולות ממתינות') + ' לסנכרון')
+          : 'אופליין — נתונים יישמרו במכשיר', 'offline');
       } else if (dead) {
         showOfflineBar(dead === 1 ? 'פעולה אחת לא נשמרה' : (dead + ' פעולות לא נשמרו'), 'dead');
       } else {
@@ -370,7 +395,7 @@
     }).then(function (r) {
       flushing = false;
       var parts = [];
-      if (r.synced > 0) parts.push('סונכרנו ' + r.synced + ' פעולות ✓');
+      if (r.synced > 0) parts.push(r.synced === 1 ? 'פעולה אחת סונכרנה ✓' : 'סונכרנו ' + r.synced + ' פעולות ✓');
       if (r.dead > 0) parts.push(r.dead + ' לא נשמרו — הקישו "הצג"');
       if (parts.length) toast(parts.join(' · '), r.dead > 0 && !r.synced ? 'error' : null);
       refreshStatus();
@@ -440,6 +465,19 @@
     else form.__mmSubmitting = on;
   }
 
+  // An entry form starts over after a save queued offline, except the fields
+  // named in data-keep-fields: single mode keeps its station (and custom
+  // name) for the next candidate, as it does online.
+  function resetEntry(form) {
+    var keep = (form.getAttribute('data-keep-fields') || '').split(/\s+/).filter(Boolean);
+    var saved = keep.map(function (name) {
+      var el = form.elements[name];
+      return el ? [el, el.value] : null;
+    }).filter(Boolean);
+    form.reset();
+    saved.forEach(function (pair) { pair[0].value = pair[1]; });
+  }
+
   function bindForms() {
     document.querySelectorAll('form[data-offline]').forEach(function (form) {
       if (form._offlineBound) return;
@@ -464,7 +502,9 @@
         var btn = e.submitter || form.querySelector('[type="submit"]');
         var fd = new FormData(form);
         fd.append('request_id', requestId);
-        var action = form.getAttribute('action') || location.pathname;
+        // Like a browser: a form with no action posts to the full URL, query
+        // too (an edit's ?next= brings you back to the filtered board).
+        var action = form.getAttribute('action') || (location.pathname + location.search);
         var fields = [];
         fd.forEach(function (v, k) { if (typeof v === 'string') fields.push([k, v]); });
         busy(form, btn, true);
@@ -484,8 +524,10 @@
             setOffline(true);  // we couldn't reach the server; show the pending strip
             toast('נשמר במכשיר — יסונכרן ברגע שתהיה רשת ✓');
             // Entry forms start over; editing forms (data-keep) keep what was typed.
-            if (!form.hasAttribute('data-keep')) form.reset();
+            if (!form.hasAttribute('data-keep')) resetEntry(form);
             requestId = uuid();
+            // Lets the page move on as it would online (single mode: next candidate).
+            form.dispatchEvent(new CustomEvent('mm:queued', { bubbles: true, detail: { fields: fields } }));
           }).catch(function () {
             toast('השמירה נכשלה — נסו שוב', 'error');
           }).then(function () { busy(form, btn, false); });
@@ -579,7 +621,8 @@
     e.stopPropagation();
     allItems().then(function (all) {
       var pending = all.filter(function (i) { return !i.dead; }).length;
-      if (pending && !window.confirm(pending + ' פעולות עדיין לא סונכרנו ויימחקו אם תתנתק. להתנתק בכל זאת?')) return;
+      if (pending && !window.confirm((pending === 1 ? 'פעולה אחת עדיין לא סונכרנה ותימחק' : pending + ' פעולות עדיין לא סונכרנו ויימחקו') +
+                                     ' אם תתנתק. להתנתק בכל זאת?')) return;
       // Cached pages and photos belong to this account — a shared phone
       // must not show them to the next login.
       var wipeCaches = window.caches ? caches.keys().then(function (keys) {
@@ -768,7 +811,9 @@
         path: page, action: action, fields: fields, deadId: item.id, reason: item.reason || ''
       }));
     } catch (e) {}
-    if (location.pathname === page) { closeSyncSheet(); applyPrefill(); }
+    // Online, load the page fresh even when already on it: its choices may
+    // have changed since (the usual refusal is a candidate who retired).
+    if (location.pathname === page && offline) { closeSyncSheet(); applyPrefill(); }
     else location.href = page;
   }
   function syncAction(act, item) {

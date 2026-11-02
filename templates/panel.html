@@ -47,7 +47,9 @@
                 </div>
               </div>
             </div>
-            <input type="file" accept="image/*" capture="environment" hidden data-photo-input="{{ n }}">
+            {# No `capture`: it forced the camera. Without it iOS/Android offer
+               camera, photo library or file (field feedback). #}
+            <input type="file" accept="image/*" hidden data-photo-input="{{ n }}">
             <div class="flex flex-wrap gap-2 pt-2 border-t border-base-200">
               <button type="submit" form="retire-{{ n }}" class="btn btn-xs btn-outline btn-warning" onclick="return confirm('האם אתה בטוח שברצונך לסמן מועמד זה כפורש?')">פרש</button>
               <button type="submit" form="retire-med-{{ n }}" class="btn btn-xs btn-outline btn-error" onclick="return confirm('האם אתה בטוח שברצונך לסמן מועמד זה כפורש בעקבות החלטת רופא?')">הופרש על ידי הרופא</button>
@@ -123,7 +125,7 @@
     box.textContent = text;
     messages.innerHTML = '';
     messages.appendChild(box);
-    if (kind === 'success') setTimeout(function () { box.remove(); }, 4000);
+    if (kind === 'success' && window.AppUI) AppUI.fadeAway(box, 4000);  // keeps its space
   }
 
   // Phone photos are several MB; shrink to a 640px JPEG (~50 KB) before the

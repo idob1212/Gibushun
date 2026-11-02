@@ -1,0 +1,13 @@
+{# The four grading modes as one segmented control (it replaces three
+   full-width "עבור למצב" buttons). The mode in use is remembered on the
+   phone, and the dock's "ציונים" reopens it (see app.js). #}
+{% set modes = [('circles', 'סדרי הגעה', 'fa-stopwatch'), ('counter_review', 'מסע', 'fa-hiking'),
+                ('add_new_review', 'יחיד', 'fa-user'), ('add_new_group_review', 'קבוצתי', 'fa-users')] %}
+<nav class="mode-tabs" aria-label="מצב הזנת ציונים" data-grade-modes="{{ current_user.id }}">
+  {% for endpoint, label, icon in modes %}
+    {% set on = request.endpoint == endpoint %}
+    <a href="{{ url_for(endpoint) }}" class="mode-tab{{ ' is-active' if on }}"{% if on %} aria-current="page"{% endif %}>
+      <i class="fas {{ icon }}" aria-hidden="true"></i><span>{{ label }}</span>
+    </a>
+  {% endfor %}
+</nav>

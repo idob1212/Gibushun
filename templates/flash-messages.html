@@ -15,13 +15,10 @@
 {% endwith %}
 
 <script>
+// Success messages fade after a while but keep their space (AppUI.fadeAway).
 document.addEventListener('DOMContentLoaded', function () {
   document.querySelectorAll('.app-flash[data-cat="success"]').forEach(function (el) {
-    setTimeout(function () {
-      el.style.transition = 'opacity .4s';
-      el.style.opacity = '0';
-      setTimeout(function () { el.remove(); }, 400);
-    }, 5000);
+    if (window.AppUI) AppUI.fadeAway(el, 5000);
   });
 });
 </script>

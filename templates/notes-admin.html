@@ -3,96 +3,21 @@
 
 <section class="app-hero px-5 pt-6 pb-6" style="background-image:url('{{ url_for('static', filename='img/edit.jpg') }}')">
   <h1 class="text-2xl font-extrabold leading-tight">לוח הערות</h1>
-  {% if candidate_id and not all_notes %}
-  <p class="text-white/75 text-sm mt-1">הערות למועמד מס' {{ candidate_id }} קבוצה מספר {{ group }}</p>
-  {% elif all_notes %}
-  <p class="text-white/75 text-sm mt-1">הערות על קבוצה מס' {{ group }}</p>
+  <p class="text-white/75 text-sm mt-1">{% if group_id %}קבוצה {{ group_id }} · {% endif %}כל ההערות והערות התחנות, החדשות למעלה</p>
+</section>
+
+<section class="px-4 mt-4 pb-4">
+  {% if groups %}
+  <nav class="flex gap-2 overflow-x-auto pb-2 mb-1" aria-label="בחירת קבוצה">
+    {% for g in groups %}
+      <a href="{{ url_for('showNotesAdmin', group=g) }}" class="btn btn-sm shrink-0 {{ 'btn-primary' if g == group_id else 'btn-outline' }}">קבוצה {{ g }}</a>
+    {% endfor %}
+  </nav>
+  {% include "_notes-board.html" %}
+  {% else %}
+  <div class="card bg-base-100 shadow-sm"><div class="card-body text-center text-base-content/60">אין קבוצות עדיין</div></div>
   {% endif %}
 </section>
-
-<section class="px-4 mt-4 max-w-md mx-auto">
-  <div class="card bg-base-100 shadow-sm">
-    <div class="card-body p-4">
-      <form method="POST" class="flex flex-col gap-3">
-        {{ form.csrf_token }}
-        <div class="form-control w-full">
-          <label class="label pb-1" for="group"><span class="label-text font-medium">קבוצה</span></label>
-          {{ form.group(class="select select-bordered w-full") }}
-        </div>
-        <div class="form-control w-full">
-          <label class="label pb-1" for="id"><span class="label-text font-medium">מגובש</span></label>
-          {{ form.id(class="select select-bordered w-full") }}
-        </div>
-        <button type="submit" class="btn btn-primary btn-lg w-full">הצג</button>
-      </form>
-    </div>
-  </div>
-</section>
-
-<section class="px-4 mt-4">
-{% if all_notes|length > 0 %}
-  {% for list in all_notes %}
-    {% if list|length > 0 %}
-      <div class="mb-5">
-        <div class="flex items-center gap-2 mb-2">
-          <div class="bib">{{ list[0].subject_id.split("/")[1] }}</div>
-          <h3 class="font-display font-bold text-lg">מועמד מספר {{ list[0].subject_id.split("/")[1] }}</h3>
-        </div>
-        <div class="grid gap-2">
-          {% for note in list %}
-            <div class="card bg-base-100 shadow-sm border-r-4 {{ {'טובה': 'border-success', 'ניטרלית': 'border-warning', 'רפואה': 'border-info', 'כוח אדם': 'border-secondary'}.get(note.type, 'border-error') }}">
-              <div class="card-body p-3">
-                <div class="flex items-center gap-2">
-                  <span class="badge badge-sm {{ {'טובה': 'badge-success', 'ניטרלית': 'badge-warning', 'רפואה': 'badge-info', 'כוח אדם': 'badge-secondary'}.get(note.type, 'badge-error') }} font-medium">{{ note.type }}</span>
-                  <span class="text-xs text-base-content/50 mr-auto">{{ note.date }}</span>
-                </div>
-                <p class="text-sm mt-1.5 whitespace-pre-wrap break-words">{{ note.text }}</p>
-              </div>
-            </div>
-          {% endfor %}
-        </div>
-      </div>
-    {% endif %}
-  {% endfor %}
-{% elif candidate_id %}
-  <div class="grid gap-2">
-    {% for note in notes %}
-      <div class="card bg-base-100 shadow-sm border-r-4 {{ {'טובה': 'border-success', 'ניטרלית': 'border-warning', 'רפואה': 'border-info', 'כוח אדם': 'border-secondary'}.get(note.type, 'border-error') }}">
-        <div class="card-body p-3">
-          <div class="flex items-center gap-2">
-            <span class="badge badge-sm {{ {'טובה': 'badge-success', 'ניטרלית': 'badge-warning', 'רפואה': 'badge-info', 'כוח אדם': 'badge-secondary'}.get(note.type, 'badge-error') }} font-medium">{{ note.type }}</span>
-            <span class="text-xs text-base-content/50 mr-auto">{{ note.date }}</span>
-          </div>
-          <p class="text-sm mt-1.5 whitespace-pre-wrap break-words">{{ note.text }}</p>
-        </div>
-      </div>
-    {% endfor %}
-  </div>
-{% endif %}
-</section>
-
-<script>
-    var group_select = document.getElementById("group");
-    var subject_select = document.getElementById("id");
-
-    group_select.onchange = function() {
-
-        group = group_select.value;
-
-        fetch('/subjects/' + group).then(function(response) {
-
-            response.json().then(function(data) {
-                var optionHTML = '';
-
-                for (var candidate of data.subjects) {
-                    optionHTML += '<option value="' + candidate.id + '">' + candidate.id + '</option>';
-                }
-                subject_select.innerHTML = optionHTML;
-            })
-
-        });
-    }
-</script>
 
 {% include "footer.html" %}
 {% endblock %}

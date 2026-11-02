@@ -16,6 +16,7 @@ Run like the other scripts (pinned deps):
     python tests/test_form_rules.py
 """
 import os
+import re
 from urllib.parse import unquote
 
 os.environ["DATABASE_URL"] = "sqlite:////tmp/test_form_rules.db"
@@ -94,13 +95,14 @@ resp = client.post("/new-review", data={"station": "אחר", "odt": "חבלים"
 assert resp.status_code == 200 and resp.headers.get("X-Form-Errors") is None
 html = html_of(resp)
 assert 'value="חבלים"' in html and '<option selected value="אחר">' in html, "station kept for the next one"
-subject_html = html.split('id="subject"')[1].split("</select>")[0]
-assert 'required><option value="">— בחרו מגובש —</option>' in html and "selected" not in subject_html, \
-    "the next candidate is chosen, never assumed"
+# the next candidate without a grade at this station is picked (and named
+# on the save button by the page script); nobody else is
+assert 'id="subject-3" checked' in html and len(re.findall(r'id="subject-\d+"', html)) == 5
+assert html.count(" checked required") == 1, "exactly one candidate picked"
 with app.app_context():
     review = Review.query.filter_by(station="חבלים", subject_id="1/2").one()
     assert review.grade == 3
-print("OK: single grade has no default, needs a name for 'אחר', keeps the station")
+print("OK: single grade has no default, needs a name for 'אחר', keeps the station, moves to the next")
 
 # 2b) Editing a saved grade shows it (it used to show 1 and overwrite it)
 with app.app_context():

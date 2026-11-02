@@ -9,10 +9,8 @@
 </section>
 
 {% if not is_edit %}
-<section class="px-4 mt-4 grid gap-2">
-  <a href="{{ url_for('circles') }}" class="btn btn-outline w-full">עבור למצב סדרי הגעה</a>
-  <a href="{{ url_for('counter_review') }}" class="btn btn-outline w-full">עבור למצב מסע</a>
-  <a href="{{ url_for('add_new_group_review') }}" class="btn btn-outline w-full">עבור למצב קבוצתי</a>
+<section class="px-4 mt-4">
+  {% include "_grade-modes.html" %}
 </section>
 {% endif %}
 
@@ -20,13 +18,17 @@
   {% include "flash-messages.html" %}
 </div>
 
+{# Field feedback: "most of the group does the same individual task, keep
+   the task". The station stays (also after leaving the page), the next
+   candidate without a grade there is picked, and grade + save sit in a
+   sticky footer under the thumb. #}
 <section class="px-4 mt-2 max-w-md mx-auto">
-  <div class="card bg-base-100 shadow-sm">
-    <div class="card-body p-4">
-      <form method="POST" novalidate data-offline{% if is_edit %} data-keep{% endif %} class="flex flex-col gap-3">
-        {{ form.hidden_tag() }}
-        {{ f.form_alert(form) }}
+  <form method="POST" novalidate data-offline{% if is_edit %} data-keep{% else %} data-keep-fields="station odt" data-single-grade{% if restore_station %} data-restore-station{% endif %}{% endif %} class="flex flex-col gap-3">
+    {{ form.hidden_tag() }}
+    {{ f.form_alert(form) }}
 
+    <div class="card bg-base-100 shadow-sm">
+      <div class="card-body p-4 gap-3">
         <div class="form-control w-full{{ ' is-invalid' if form.station.errors }}" data-field="station">
           <div class="flex items-center justify-between pb-1">
             <label class="label p-0" for="station">{{ f.label_for(form.station) }}</label>
@@ -43,48 +45,131 @@
           {{ f.field_error(form.odt) }}
         </div>
 
-        {{ f.render_field(form.subject) }}
+        {% if is_edit %}
+          {{ f.render_field(form.subject) }}
+        {% else %}
+          {{ f.chip_field(form.subject, label="מגובש") }}
+          <p class="text-xs text-base-content/60 -mt-1"><span class="text-success font-black">✓</span> = כבר קיבל ציון בתחנה הזו</p>
+        {% endif %}
 
-        {# No grade is pre-selected: one nobody tapped must not be saved as 1. #}
-        <div class="form-control w-full{{ ' is-invalid' if form.grade.errors }}" data-field="grade">
-          <span class="label pb-1" id="grade-label">{{ f.label_for(form.grade) }}</span>
-          <div class="grade-pick flex justify-center gap-4 py-1" role="radiogroup" aria-labelledby="grade-label">
-            {% for value, label in form.grade.choices %}
-            <label>
-              <input type="radio" name="grade" value="{{ value }}" required data-msg="{{ required_message(form.grade) }}"{% if form.grade.data is not none and form.grade.data|string == value|string %} checked{% endif %}>
-              <span class="btn btn-circle btn-lg text-lg">{{ label }}</span>
-            </label>
-            {% endfor %}
-          </div>
-          {% if saved_grade is defined and saved_grade is not none and form.grade.data is none %}
-            <p class="text-sm text-base-content/60 text-center">הציון השמור: {{ '%.1f'|format(saved_grade) }} — בחר ציון חדש כדי לשמור</p>
-          {% endif %}
-          {{ f.field_error(form.grade) }}
+        {% set note_open = is_edit or form.note.data or form.note.errors %}
+        <button type="button" class="note-open self-start" data-note-open{% if note_open %} hidden{% endif %}>＋ הערה <span class="font-normal opacity-60">(לא חובה)</span></button>
+        <div data-note-box{% if not note_open %} hidden{% endif %}>
+          {{ f.render_field(form.note, mark=False, optional=True, placeholder="מה ראית?", rows=3) }}
         </div>
-
-        {{ f.render_field(form.note, mark=False, optional=True) }}
-
-        <button type="submit" class="btn btn-primary btn-lg w-full mt-2">{% if is_edit %}עדכן{% else %}הוסף תוצאה{% endif %}</button>
-      </form>
+      </div>
     </div>
-  </div>
+
+    {# No grade is pre-selected: one nobody tapped must not be saved as 1. #}
+    <div class="single-foot">
+      <div class="form-control w-full{{ ' is-invalid' if form.grade.errors }}" data-field="grade">
+        <span class="sr-only" id="grade-label">{{ form.grade.label.text }}</span>
+        <div class="grade-pick flex justify-center gap-3" role="radiogroup" aria-labelledby="grade-label">
+          {% for value, label in form.grade.choices %}
+          <label>
+            <input type="radio" name="grade" value="{{ value }}" required data-msg="{{ required_message(form.grade) }}"{% if form.grade.data is not none and form.grade.data|string == value|string %} checked{% endif %}>
+            <span class="btn btn-circle btn-lg text-lg">{{ label }}</span>
+          </label>
+          {% endfor %}
+        </div>
+        {% if saved_grade is defined and saved_grade is not none and form.grade.data is none %}
+          <p class="text-sm text-base-content/60 text-center">הציון השמור: {{ '%.1f'|format(saved_grade) }} — בחר ציון חדש כדי לשמור</p>
+        {% endif %}
+        {{ f.field_error(form.grade) }}
+      </div>
+      <button type="submit" class="btn btn-primary btn-lg w-full"><span id="save-label">{% if is_edit %}עדכן{% else %}שמור ציון{% endif %}</span></button>
+    </div>
+  </form>
 </section>
 
 <script>
-  document.addEventListener('DOMContentLoaded', function () {
-    var stationField = document.getElementById('station');
-    var additionalField = document.getElementById('additionalField');
-    var odt = document.getElementById('odt');
-    if (!stationField) return;
-    function sync() {
-      var custom = stationField.value === 'ODT' || stationField.value === 'אחר';
-      additionalField.hidden = !custom;
-      odt.required = custom;   // the same rule as the server (forms.RequiredWhen)
-    }
-    stationField.addEventListener('change', sync);
-    document.addEventListener('mm:prefilled', sync);
-    sync();
+(function () {
+  var form = document.querySelector('form[data-offline]');
+  var station = document.getElementById('station');
+  var extra = document.getElementById('additionalField');
+  var odt = document.getElementById('odt');
+  var noteOpen = form.querySelector('[data-note-open]');
+  var noteBox = form.querySelector('[data-note-box]');
+  var note = document.getElementById('note');
+  if (!station) return;
+
+  function sync() {
+    var custom = station.value === 'ODT' || station.value === 'אחר';
+    extra.hidden = !custom;
+    odt.required = custom;   // the same rule as the server (forms.RequiredWhen)
+  }
+  function openNote(on) {
+    noteBox.hidden = !on;
+    noteOpen.hidden = on;
+  }
+  noteOpen.addEventListener('click', function () { openNote(true); note.focus(); });
+  station.addEventListener('change', sync);
+  document.addEventListener('mm:prefilled', function () { sync(); if (note.value) openNote(true); });
+
+  if (!form.hasAttribute('data-single-grade')) { sync(); return; }
+
+  var GROUP = {{ current_user.id | tojson }};
+  var KEY = 'mm-single-station:' + GROUP;
+  var names = {{ (candidate_names or {}) | tojson }};
+  var graded = {{ (graded or {}) | tojson }};
+  var picked = form.querySelector('[data-chip-picked]');
+  var saveLabel = document.getElementById('save-label');
+
+  function chips() { return Array.prototype.slice.call(form.querySelectorAll('input[name="subject"]')); }
+  function current() { var r = form.querySelector('input[name="subject"]:checked'); return r ? r.value : ''; }
+  function stationKey() {   // the name the grade is saved under (review_station_name)
+    if (station.value === 'ODT') return 'ODT ' + odt.value.trim();
+    if (station.value === 'אחר') return odt.value.trim();
+    return station.value;
+  }
+  function paint() {
+    var done = graded[stationKey()] || [];
+    chips().forEach(function (r) { r.parentNode.classList.toggle('is-done', done.indexOf(+r.value) !== -1); });
+    var n = current();
+    picked.textContent = n ? ('מגובש ' + n + (names[n] ? ' · ' + names[n] : '')) : '';
+    saveLabel.textContent = n ? 'שמור ציון למגובש ' + n : 'שמור ציון';
+  }
+  function remember() {
+    try { localStorage.setItem(KEY, JSON.stringify({ station: station.value, odt: odt.value })); } catch (e) {}
+  }
+  function restore() {
+    var saved = null;
+    try { saved = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) {}
+    if (!saved || !Array.prototype.some.call(station.options, function (o) { return o.value === saved.station; })) return;
+    station.value = saved.station;
+    odt.value = saved.odt || '';
+  }
+  // After a save queued offline: the same as the server does online.
+  function advance(after) {
+    var done = graded[stationKey()] || [];
+    var nums = chips().map(function (r) { return +r.value; });
+    var i = nums.indexOf(+after);
+    var order = i === -1 ? nums : nums.slice(i + 1).concat(nums.slice(0, i));
+    var next = order.filter(function (n) { return done.indexOf(n) === -1; })[0];
+    chips().forEach(function (r) { r.checked = +r.value === next; });
+    var el = next !== undefined && form.querySelector('input[name="subject"][value="' + next + '"]');
+    if (el) el.parentNode.scrollIntoView({ block: 'nearest' });
+  }
+
+  station.addEventListener('change', function () { remember(); paint(); });
+  odt.addEventListener('input', function () { remember(); paint(); });
+  form.addEventListener('change', function (e) { if (e.target.name === 'subject') paint(); });
+  document.addEventListener('mm:prefilled', paint);
+  form.addEventListener('mm:queued', function (e) {
+    var sent = {};
+    (e.detail && e.detail.fields || []).forEach(function (kv) { sent[kv[0]] = kv[1]; });
+    var key = stationKey();
+    graded[key] = (graded[key] || []).concat(+sent.subject);
+    advance(sent.subject);
+    openNote(false);
+    paint();
   });
+
+  if (form.hasAttribute('data-restore-station')) restore();
+  sync();
+  remember();
+  paint();
+})();
 </script>
 
 {% set help_mode = "individual" %}

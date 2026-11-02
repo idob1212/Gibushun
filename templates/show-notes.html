@@ -1,74 +1,18 @@
-{% import "_formhelpers.html" as f %}
-
 {% block content %}
 {% include "header.html" %}
 
 <section class="app-hero px-5 pt-6 pb-6" style="background-image:url('{{ url_for('static', filename='img/edit.jpg') }}')">
   <h1 class="text-2xl font-extrabold leading-tight">לוח הערות</h1>
-  {% if everyone %}
-  <p class="text-white/75 text-sm mt-1">הערות לכל המועמדים</p>
-  {% elif candidate_id %}
-  <p class="text-white/75 text-sm mt-1">הערות למועמד מס' {{ candidate_id }}</p>
-  {% endif %}
+  <p class="text-white/75 text-sm mt-1">כל ההערות והערות התחנות, החדשות למעלה</p>
 </section>
 
-<section class="px-4 mt-4 max-w-md mx-auto">
+<div class="px-4 mt-4">
+  {% include "flash-messages.html" %}
+</div>
+
+<section class="px-4 mt-2 pb-4">
   <a href="{{ url_for('add_new_note') }}" class="btn btn-accent w-full mb-3"><i class="fas fa-pen"></i> כתוב הערה</a>
-  <div class="card bg-base-100 shadow-sm">
-    <div class="card-body p-4">
-      {{ f.render_form(form, submit_label="הצג", marks=False) }}
-    </div>
-  </div>
-</section>
-
-<section class="px-4 mt-4">
-{% if everyone %}
-  {% for list in all_notes %}
-    {% if list|length > 0 %}
-      <div class="mb-5">
-        <div class="flex items-center gap-2 mb-2">
-          <div class="bib">{{ list[0].subject_id.split("/")[1] }}</div>
-          <h3 class="font-display font-bold text-lg">מועמד מספר {{ list[0].subject_id.split("/")[1] }}</h3>
-        </div>
-        <div class="grid gap-2">
-          {% for note in list %}
-            <div class="card bg-base-100 shadow-sm border-r-4 {{ {'טובה': 'border-success', 'ניטרלית': 'border-warning', 'רפואה': 'border-info', 'כוח אדם': 'border-secondary'}.get(note.type, 'border-error') }}">
-              <div class="card-body p-3">
-                <div class="flex items-center gap-2 flex-wrap">
-                  <span class="badge badge-sm {{ {'טובה': 'badge-success', 'ניטרלית': 'badge-warning', 'רפואה': 'badge-info', 'כוח אדם': 'badge-secondary'}.get(note.type, 'badge-error') }} font-medium">{{ note.type }}</span>
-                  {% if note.location %}<span class="badge badge-ghost badge-sm max-w-full"><span class="truncate">{{ note.location }}</span></span>{% endif %}
-                  <span class="text-xs text-base-content/50 mr-auto">{{ note.date }}</span>
-                </div>
-                <p class="text-sm mt-1.5 whitespace-pre-wrap break-words">{{ note.text }}</p>
-                {% if note.date != "" and note.type not in ["רפואה", "כוח אדם"] %}
-                <a href="{{ url_for('edit_note', note_id=note.id) }}" class="btn btn-xs btn-ghost mt-2"><i class="fas fa-pen"></i> ערוך</a>
-                {% endif %}
-              </div>
-            </div>
-          {% endfor %}
-        </div>
-      </div>
-    {% endif %}
-  {% endfor %}
-{% elif candidate_id %}
-  <div class="grid gap-2">
-    {% for note in notes %}
-      <div class="card bg-base-100 shadow-sm border-r-4 {{ {'טובה': 'border-success', 'ניטרלית': 'border-warning', 'רפואה': 'border-info', 'כוח אדם': 'border-secondary'}.get(note.type, 'border-error') }}">
-        <div class="card-body p-3">
-          <div class="flex items-center gap-2 flex-wrap">
-            <span class="badge badge-sm {{ {'טובה': 'badge-success', 'ניטרלית': 'badge-warning', 'רפואה': 'badge-info', 'כוח אדם': 'badge-secondary'}.get(note.type, 'badge-error') }} font-medium">{{ note.type }}</span>
-            {% if note.location %}<span class="badge badge-ghost badge-sm max-w-full"><span class="truncate">{{ note.location }}</span></span>{% endif %}
-            <span class="text-xs text-base-content/50 mr-auto">{{ note.date }}</span>
-          </div>
-          <p class="text-sm mt-1.5 whitespace-pre-wrap break-words">{{ note.text }}</p>
-          {% if note.date != "" and note.type not in ["רפואה", "כוח אדם"] %}
-          <a href="{{ url_for('edit_note', note_id=note.id) }}" class="btn btn-xs btn-ghost mt-2"><i class="fas fa-pen"></i> ערוך</a>
-          {% endif %}
-        </div>
-      </div>
-    {% endfor %}
-  </div>
-{% endif %}
+  {% include "_notes-board.html" %}
 </section>
 
 {% include "footer.html" %}

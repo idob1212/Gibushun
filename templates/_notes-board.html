@@ -1,0 +1,130 @@
+{# Notes board: every note and grade comment of the group, newest first.
+   The candidate, type and order filters run on the phone the moment they
+   change, and are kept in the address (?c=&k=&s=) so "back" after an edit
+   returns to the same view. #}
+<div class="notes-board" data-board>
+  <div class="card bg-base-100 shadow-sm">
+    <div class="card-body p-3 gap-3">
+      <div class="flex items-center gap-2">
+        <select class="select select-bordered select-sm flex-1 min-w-0" data-board-candidate aria-label="סינון לפי מגובש">
+          <option value="">כל המגובשים</option>
+          {% for c in board_candidates %}
+            <option value="{{ c.number }}"{% if c.number == picked %} selected{% endif %}>{{ c.number }} · {{ c.name }}</option>
+          {% endfor %}
+        </select>
+        <div class="join shrink-0" role="group" aria-label="סדר">
+          <button type="button" class="btn btn-sm join-item" data-board-sort="new">חדש קודם</button>
+          <button type="button" class="btn btn-sm join-item" data-board-sort="number">לפי מגובש</button>
+        </div>
+      </div>
+      <div class="kind-chips" role="group" aria-label="סוג הערה">
+        <button type="button" class="kind-chip" data-kind="">הכל <b data-count></b></button>
+        {% for kind in kinds %}
+          <button type="button" class="kind-chip" data-kind="{{ kind }}" data-tone="{{ tones.get(kind, 'primary') }}">{{ kind }} <b data-count></b></button>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <ol class="grid gap-2 mt-3" data-board-list>
+    {% for it in items %}
+      <li class="card bg-base-100 shadow-sm border-r-4 border-{{ it.tone }}" data-kind="{{ it.kind }}" data-number="{{ it.number }}" data-seq="{{ loop.index0 }}">
+        <div class="card-body p-3">
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <span class="bib bib-sm" title="{{ it.name }}">{{ it.number }}</span>
+            {% if it.kind == "תחנה" %}
+              <span class="badge badge-sm badge-primary badge-outline font-medium">תחנה</span>
+              <span class="badge badge-ghost badge-sm max-w-full"><span class="truncate">{{ it.place }}</span></span>
+              <span class="badge badge-sm badge-{{ it.tone }} font-bold">ציון {{ '%g'|format(it.grade|round(1)) }}</span>
+            {% else %}
+              <span class="badge badge-sm badge-{{ it.tone }} font-medium">{{ it.kind }}</span>
+              {% if it.place %}<span class="badge badge-ghost badge-sm max-w-full"><span class="truncate">{{ it.place }}</span></span>{% endif %}
+            {% endif %}
+            {% if it.when %}
+              <time class="text-xs text-base-content/50 mr-auto" datetime="{{ it.when.isoformat() }}">{{ it.when.strftime('%d/%m %H:%M' if it.has_time else '%d/%m') }}</time>
+            {% endif %}
+          </div>
+          <p class="text-sm mt-1.5 whitespace-pre-wrap break-words"><span class="font-semibold">{{ it.name }}:</span> {{ it.text }}</p>
+          {% if it.edit %}
+            <a href="{{ it.edit }}" class="btn btn-xs btn-ghost mt-1 self-start" data-board-edit><i class="fas fa-pen"></i> ערוך</a>
+          {% endif %}
+        </div>
+      </li>
+    {% endfor %}
+  </ol>
+  <div class="card bg-base-100 shadow-sm mt-3" data-board-empty hidden>
+    <div class="card-body items-center text-center py-8">
+      <i class="fas fa-comment-slash text-2xl text-base-content/40"></i>
+      <p class="text-base-content/60 text-sm" data-board-empty-text>אין הערות עדיין</p>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var board = document.querySelector('[data-board]');
+  var list = board.querySelector('[data-board-list]');
+  var pick = board.querySelector('[data-board-candidate]');
+  var chips = board.querySelectorAll('.kind-chip');
+  var sorts = board.querySelectorAll('[data-board-sort]');
+  var empty = board.querySelector('[data-board-empty]');
+  var emptyText = board.querySelector('[data-board-empty-text]');
+  var items = Array.prototype.slice.call(list.children);
+  var state = { c: pick.value, k: {{ picked_kind | tojson }}, s: {{ picked_sort | tojson }} };
+  if (!Array.prototype.some.call(chips, function (b) { return b.dataset.kind === state.k; })) state.k = '';
+
+  function apply() {
+    var counts = {}, all = 0, shown = 0;
+    items.forEach(function (li) {
+      var mine = !state.c || li.dataset.number === state.c;
+      if (mine) { all++; counts[li.dataset.kind] = (counts[li.dataset.kind] || 0) + 1; }
+      var on = mine && (!state.k || li.dataset.kind === state.k);
+      li.hidden = !on;
+      if (on) shown++;
+    });
+    chips.forEach(function (b) {
+      var k = b.dataset.kind;
+      b.querySelector('[data-count]').textContent = k ? (counts[k] || 0) : all;
+      b.setAttribute('aria-pressed', k === state.k ? 'true' : 'false');
+    });
+    sorts.forEach(function (b) {
+      var on = b.dataset.boardSort === state.s;
+      b.classList.toggle('btn-primary', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    var sorted = items.slice().sort(state.s === 'number'
+      ? function (a, b) { return (a.dataset.number - b.dataset.number) || (a.dataset.seq - b.dataset.seq); }
+      : function (a, b) { return a.dataset.seq - b.dataset.seq; });
+    sorted.forEach(function (li) { list.appendChild(li); });
+    empty.hidden = shown > 0;
+    emptyText.textContent = all ? 'אין הערות מסוג זה' : (state.c ? 'אין הערות למגובש הזה עדיין' : 'אין הערות עדיין');
+    var q = new URLSearchParams(location.search);
+    ['c', 'k', 's'].forEach(function (key) {
+      var v = key === 's' && state.s === 'new' ? '' : state[key];
+      if (v) q.set(key, v); else q.delete(key);
+    });
+    q.delete('id');
+    var qs = q.toString();
+    try { history.replaceState(history.state, '', location.pathname + (qs ? '?' + qs : '')); } catch (e) {}
+  }
+
+  pick.addEventListener('change', function () { state.c = pick.value; apply(); });
+  chips.forEach(function (b) {
+    b.addEventListener('click', function () { state.k = b.dataset.kind === state.k ? '' : b.dataset.kind; apply(); });
+  });
+  sorts.forEach(function (b) {
+    b.addEventListener('click', function () { state.s = b.dataset.boardSort; apply(); });
+  });
+  // An edit comes back to this exact view.
+  board.addEventListener('click', function (e) {
+    var a = e.target.closest('[data-board-edit]');
+    if (!a) return;
+    var url = new URL(a.getAttribute('href'), location.href);
+    if (url.pathname.indexOf('/edit-note/') === 0) {
+      url.searchParams.set('next', location.pathname + location.search);
+      a.href = url.pathname + url.search + url.hash;
+    }
+  }, true);
+  apply();
+})();
+</script>
