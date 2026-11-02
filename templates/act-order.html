@@ -64,7 +64,12 @@
     var body = el('div', 'card-body p-3 flex-row items-center gap-2.5');
     var name = NAMES[n] || '';
     if (finished) {
-      body.appendChild(button('rank font-display font-extrabold text-base min-w-9 text-center text-primary', '', ['data-place', ''], 'הקלד מקום חדש למגובש ' + n));
+      // The place is a picker: a long move is one choice on the phone's
+      // wheel instead of tapping ▲ ten times (no keyboard, no typos).
+      var place = el('select', 'rank rank-pick font-display font-extrabold text-base min-w-9 text-center text-primary');
+      place.setAttribute('data-place', '');
+      place.setAttribute('aria-label', 'מקום של מגובש ' + n);
+      body.appendChild(place);
       body.appendChild(el('div', 'bib bib-sm shrink-0', n));
       var mid = el('div', 'flex-1 min-w-0');
       mid.appendChild(el('div', 'font-semibold truncate', name));
@@ -98,7 +103,12 @@
   function refresh() {
     var items = rows(fin), g = grades(items.length);
     items.forEach(function (li, i) {
-      li.querySelector('[data-place]').textContent = '#' + (i + 1);
+      var place = li.querySelector('[data-place]');
+      if (place.options.length !== items.length) {
+        place.innerHTML = '';
+        for (var k = 1; k <= items.length; k++) place.appendChild(new Option('#' + k, k));
+      }
+      place.value = String(i + 1);
       li.querySelector('[data-grade]').textContent = g[i].toFixed(1);
       var was = +li.dataset.was, moved = li.querySelector('[data-moved]');
       moved.textContent = !was ? 'נוסף' : (was > i + 1 ? '↑ היה ' + was : (was < i + 1 ? '↓ היה ' + was : ''));
@@ -147,8 +157,18 @@
     if (li) li.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
 
+  document.addEventListener('change', function (e) {
+    var place = e.target.closest('[data-place]');
+    if (!place) return;
+    var li = place.closest('li');
+    var to = +place.value;
+    fin.removeChild(li);
+    fin.insertBefore(li, fin.children[to - 1] || null);
+    changed(li);
+  });
+
   document.addEventListener('click', function (e) {
-    var btn = e.target.closest('[data-move], [data-dnf], [data-finish], [data-place]');
+    var btn = e.target.closest('[data-move], [data-dnf], [data-finish]');
     if (!btn) return;
     var li = btn.closest('li');
     var n = +li.dataset.number;
@@ -156,13 +176,6 @@
       fin.insertBefore(li, li.previousElementSibling);
     } else if (btn.dataset.move === 'down' && li.nextElementSibling) {
       fin.insertBefore(li.nextElementSibling, li);
-    } else if (btn.hasAttribute('data-place')) {
-      // A long move: type the new place instead of tapping ▲ ten times.
-      var count = fin.children.length;
-      var to = parseInt(window.prompt('מקום חדש למגובש ' + n + ' (1–' + count + ')', ''), 10);
-      if (!(to >= 1 && to <= count)) return;
-      fin.removeChild(li);
-      fin.insertBefore(li, fin.children[to - 1] || null);
     } else if (btn.hasAttribute('data-dnf')) {
       var out = row(n, li.dataset.was, false);
       li.remove();
