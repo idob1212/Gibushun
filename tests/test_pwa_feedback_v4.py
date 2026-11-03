@@ -261,12 +261,15 @@ print("OK: home page sorts by physical score")
 # 12) Final grade: categories only, ranking inside a category
 html = html_of(client.get("/final-grade/"))
 assert 'name="note"' not in html, "the final grade has no free-text note"
+assert '>כן, אבל<' in html and '>לקחת<' not in html, "לקחת was removed from the categories"
 client.post("/final-grade/", data={"id": "1", "grade": "91"})
+client.post("/final-grade/", data={"id": "1", "grade": "לקחת"})
 with app.app_context():
     assert Candidate.query.get("1/1").final_weighted_grade is None
+assert client.post("/final-summary/save", json={"order": {"לקחת": [1]}}).status_code == 400
 for number in (1, 2, 3):
-    client.post("/final-grade/", data={"id": str(number), "grade": "לקחת"})
-resp = client.post("/final-summary/save", json={"order": {"לקחת": [3, 1, 2]}})
+    client.post("/final-grade/", data={"id": str(number), "grade": "להתאבד"})
+resp = client.post("/final-summary/save", json={"order": {"להתאבד": [3, 1, 2]}})
 assert resp.get_json()["success"]
 with app.app_context():
     assert [Candidate.query.get(f"1/{n}").final_rank for n in (3, 1, 2)] == [1, 2, 3]

@@ -109,7 +109,7 @@ PHYSICAL_BASE_STATIONS = ["ספרינטים", "זחילות", "אלונקה סו
 GRADE_OPTIONS = ["לא לגעת - קו אדום", "בלית ברירה", "כן, אבל", "להתאבד"]
 # Final weighted grade: categories only, ordered best → worst. The final
 # summary screen ranks candidates inside each category.
-FINAL_CATEGORIES = ["להתאבד", "לקחת", "כן, אבל", "בלית ברירה", "לא לגעת - קו אדום"]
+FINAL_CATEGORIES = ["להתאבד", "כן, אבל", "בלית ברירה", "לא לגעת - קו אדום"]
 # New groups start with numbered placeholder candidates; the group renames
 # them in "ניהול קבוצה" instead of typing every number by hand.
 DEFAULT_GROUP_SIZE = 25
